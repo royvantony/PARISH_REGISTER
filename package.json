@@ -1,0 +1,17 @@
+{
+  "name": "parish-register",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Parish Family Register Application",
+  "scripts": {
+    "dev": "concurrently --kill-others -n \"SERVER,CLIENT\" -c \"cyan.bold,green.bold\" \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev",
+    "build:server": "npm --prefix server run build",
+    "build:client": "npm --prefix client run build",
+    "build": "npm run build:server && npm run build:client"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

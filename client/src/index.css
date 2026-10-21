@@ -1,0 +1,146 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
+@theme {
+  --color-parish-bg: var(--bg-app);
+  --color-parish-surface: var(--bg-surface);
+  --color-parish-surface-subtle: var(--bg-surface-subtle);
+  --color-parish-border: var(--border-color);
+  --color-parish-primary: var(--primary);
+  --color-parish-primary-hover: var(--primary-hover);
+  --color-parish-primary-light: var(--primary-light);
+  --color-parish-accent: var(--accent-gold);
+  --color-parish-text: var(--text-main);
+  --color-parish-text-muted: var(--text-muted);
+  --color-parish-danger: var(--danger);
+
+  --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
+
+  --shadow-soft: 0 2px 10px -2px var(--shadow-ambient, rgba(27, 67, 50, 0.05)), 0 1px 3px -1px rgba(0, 0, 0, 0.05);
+  --shadow-soft-hover: 0 10px 25px -5px var(--shadow-ambient, rgba(27, 67, 50, 0.08)), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+  --shadow-drawer: -10px 0 30px -5px var(--shadow-ambient, rgba(27, 67, 50, 0.1));
+}
+
+/* 1. Heritage Emerald (Warm Linen & Forest Green) - Default */
+:root, [data-theme="emerald"] {
+  --bg-app: #fbf9f4;
+  --bg-surface: #ffffff;
+  --bg-surface-subtle: #f4efe6;
+  --border-color: #e8e1d2;
+
+  --primary: #1b4332;
+  --primary-hover: #143527;
+  --primary-light: #e8f3ed;
+  --primary-foreground: #ffffff;
+
+  --accent-gold: #c69214;
+  --text-main: #19231f;
+  --text-muted: #5e6f65;
+  --danger: #b91c1c;
+
+  --glass-bg: rgba(251, 249, 244, 0.88);
+  --scrollbar-thumb: #d6ccb8;
+  --scrollbar-hover: #baa991;
+  --shadow-ambient: rgba(27, 67, 50, 0.06);
+}
+
+/* 2. Marian Sapphire (Crisp Slate & Royal Azure) */
+[data-theme="sapphire"] {
+  --bg-app: #f6f8fc;
+  --bg-surface: #ffffff;
+  --bg-surface-subtle: #edf2f9;
+  --border-color: #d7e0ea;
+
+  --primary: #1d4ed8;
+  --primary-hover: #1e40af;
+  --primary-light: #eff6ff;
+  --primary-foreground: #ffffff;
+
+  --accent-gold: #d97706;
+  --text-main: #0f172a;
+  --text-muted: #475569;
+  --danger: #dc2626;
+
+  --glass-bg: rgba(246, 248, 252, 0.88);
+  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-hover: #94a3b8;
+  --shadow-ambient: rgba(30, 64, 175, 0.07);
+}
+
+/* 3. Cathedral Burgundy (Warm Ivory & Episcopal Wine) */
+[data-theme="burgundy"] {
+  --bg-app: #fbf6f6;
+  --bg-surface: #ffffff;
+  --bg-surface-subtle: #f5ebeb;
+  --border-color: #e6d5d7;
+
+  --primary: #831843;
+  --primary-hover: #701338;
+  --primary-light: #fdf2f4;
+  --primary-foreground: #ffffff;
+
+  --accent-gold: #b45309;
+  --text-main: #241417;
+  --text-muted: #675357;
+  --danger: #be123c;
+
+  --glass-bg: rgba(251, 246, 246, 0.88);
+  --scrollbar-thumb: #dfc8cb;
+  --scrollbar-hover: #c4a9ad;
+  --shadow-ambient: rgba(131, 24, 67, 0.07);
+}
+
+/* 4. Midnight Sanctuary (Dark Slate & Luminous Mint) */
+[data-theme="midnight"] {
+  --bg-app: #0f172a;
+  --bg-surface: #1e293b;
+  --bg-surface-subtle: #273548;
+  --border-color: #334155;
+
+  --primary: #10b981;
+  --primary-hover: #059669;
+  --primary-light: #064e3b;
+  --primary-foreground: #ffffff;
+
+  --accent-gold: #f59e0b;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --danger: #f43f5e;
+
+  --glass-bg: rgba(15, 23, 42, 0.88);
+  --scrollbar-thumb: #334155;
+  --scrollbar-hover: #475569;
+  --shadow-ambient: rgba(0, 0, 0, 0.35);
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+.glass-panel {
+  background: var(--glass-bg, rgba(251, 249, 244, 0.85));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb, #d6ccb8);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-hover, #baa991);
+}

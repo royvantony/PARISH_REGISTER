@@ -1,0 +1,285 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum RegistrationType {
+  FAMILY
+  INDIVIDUAL_STUDENT
+  INDIVIDUAL
+}
+
+enum MemberRole {
+  HEAD
+  SPOUSE
+  CHILD
+  OTHER_DEPENDENT
+}
+
+enum FamilyStatus {
+  ACTIVE
+  INACTIVE
+  MERGED
+  PENDING
+}
+
+enum UserRole {
+  SUPER_ADMIN         // Developer / System Architect (Global wildcard)
+  DIOCESAN_ADMIN      // Bishop / Chancellor (Diocesan governance)
+  DIOCESAN_USER       // Diocesan Staff / Accountant (Diocesan read-only)
+  PARISH_SUPER_ADMIN  // Parish Priest (Supreme Parish Authority - approve registrations, block admins)
+  PARISH_ADMIN        // Parish Trustees / Executive Committee (Parish management)
+  PARISH_USER         // Parish Secretary / Office Volunteers / General Users
+  WARD_USER           // Ward Coordinator / Unit Representative (Ward-scoped)
+}
+
+// ----------------------------------------------------
+// 1. GLOBAL & TENANT MASTERS
+// ----------------------------------------------------
+
+model NativeDiocese {
+  id           Int      @id @default(autoincrement())
+  parishId     Int
+  parish       Parish   @relation(fields: [parishId], references: [id], onDelete: Cascade)
+  dioceseName  String
+  stateInIndia String   @default("Kerala")
+  rite         String   @default("Syro-Malabar")
+  createdAt    DateTime @default(now())
+
+  @@unique([parishId, dioceseName])
+}
+
+model Parish {
+  id                 Int           @id @default(autoincrement())
+  parishCode         String        @unique // e.g. "SABN", "SMEL"
+  parishName         String        // "St. Alphonsa Syro-Malabar Parish"
+  city               String        // "Brisbane North"
+  state              String        // "QLD"
+  postalCode         String?
+  contactEmail       String?
+  contactPhone       String?
+  idPrefix           String        @default("SABN")
+  nextFamilyNumber   Int           @default(100001)
+  isActive           Boolean       @default(true)
+
+  // Scoped Relations
+  units              FamilyUnit[]
+  families           Family[]
+  users              ParishUser[]
+  directDebits       DirectDebit[]
+  nativeDioceses     NativeDiocese[]
+  rolePermissions    RolePermission[]
+
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+}
+
+// ----------------------------------------------------
+// 2. USERS & ACCESS CONTROL
+// ----------------------------------------------------
+
+model ParishUser {
+  id             Int         @id @default(autoincrement())
+  parishId       Int?        // NULL for Diocesan Admins
+  parish         Parish?     @relation(fields: [parishId], references: [id])
+  fullName       String
+  email          String      @unique
+  passwordHash   String
+  role           UserRole    @default(PARISH_ADMIN)
+  assignedUnitId Int?        // For Unit Coordinators
+  unit           FamilyUnit? @relation(fields: [assignedUnitId], references: [id])
+  isActive       Boolean     @default(true)
+  mustChangePassword Boolean @default(false)
+  overrides      UserPermissionOverride[]
+
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+model RolePermission {
+  id         Int      @id @default(autoincrement())
+  parishId   Int
+  parish     Parish   @relation(fields: [parishId], references: [id], onDelete: Cascade)
+  role       UserRole
+  module     String   // "REGISTER", "DIRECT_DEBIT", "WARDS", "USERS", "DASHBOARD_FINANCE", "DASHBOARD_ACTIVITY", "SETTINGS"
+  canView    Boolean  @default(true)
+  canCreate  Boolean  @default(false)
+  canEdit    Boolean  @default(false)
+  canArchive Boolean  @default(false) // Deactivate
+  canDelete  Boolean  @default(false) // Hard delete
+  canExport  Boolean  @default(false)
+  canApprove Boolean  @default(false) // Approval cycle permission for registrations & imports
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([parishId, role, module])
+}
+
+model UserPermissionOverride {
+  id         Int        @id @default(autoincrement())
+  userId     Int
+  user       ParishUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  module     String     // "REGISTER", "DIRECT_DEBIT", "WARDS", "USERS", "DASHBOARD_FINANCE", "DASHBOARD_ACTIVITY", "SETTINGS"
+  canView    Boolean?
+  canCreate  Boolean?
+  canEdit    Boolean?
+  canArchive Boolean?
+  canDelete  Boolean?
+  canExport  Boolean?
+  canApprove Boolean?
+
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@unique([userId, module])
+}
+
+// ----------------------------------------------------
+// 3. PARISH ENTITIES (Scoped by parishId)
+// ----------------------------------------------------
+
+model FamilyUnit {
+  id          Int          @id @default(autoincrement())
+  parishId    Int
+  parish      Parish       @relation(fields: [parishId], references: [id], onDelete: Cascade)
+  unitName    String       // "St-Thomas", "International-Student"
+  category    String       @default("GEOGRAPHIC") // "GEOGRAPHIC" or "DEMOGRAPHIC"
+  isActive    Boolean      @default(true)
+
+  families    Family[]
+  users       ParishUser[]
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([parishId, unitName])
+}
+
+model Family {
+  id                 Int               @id @default(autoincrement())
+  parishId           Int
+  parish             Parish            @relation(fields: [parishId], references: [id], onDelete: Cascade)
+  familyCode         String?           @unique // e.g. "SABN100398"
+  registrationType   RegistrationType  @default(FAMILY)
+  houseName          String            // Veettuperu / Family Name
+  headFullName       String?           // Head of Family Full Name for canonical alphabetical listing
+
+  unitId             Int?
+  unit               FamilyUnit?       @relation(fields: [unitId], references: [id])
+
+  // Australian Address
+  streetAddress      String?
+  city               String?
+  state              String?
+  postalCode         String?
+  primaryPhone       String?
+  primaryEmail       String?
+
+  // Roots in India
+  originParish       String?
+  originDiocese      String?
+  originParishPhone  String?
+
+  // Lifecycle & Status
+  status             FamilyStatus      @default(ACTIVE)
+  mergedIntoFamilyId Int?
+  mergedIntoFamily   Family?           @relation("FamilyMerges", fields: [mergedIntoFamilyId], references: [id])
+  mergedSubFamilies  Family[]          @relation("FamilyMerges")
+
+  // Verification & Signatures
+  agreementConsent   Boolean           @default(false)
+  signaturePath      String?
+  registrationDate   DateTime?
+
+  // Flexible Metadata & Notes
+  studentMetadata    Json?
+  generalNotes       String?
+
+  // Child collections
+  members            FamilyMember[]
+  documents          FamilyDocument[]
+  directDebit        DirectDebit?
+  notes              FamilyNote[]
+  historyEntries     MemberHistory[]
+
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@index([parishId, headFullName])
+}
+
+model FamilyMember {
+  id               Int             @id @default(autoincrement())
+  familyId         Int
+  family           Family          @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  role             MemberRole      @default(CHILD)
+  fullName         String
+  dateOfBirth      DateTime?
+  placeOfBirth     String?
+  phone            String?
+  email            String?
+  isPrimaryContact Boolean         @default(false)
+  orderIndex       Int             @default(0) // 0: Head, 1: Spouse, 2+: Children
+
+  history          MemberHistory[]
+  documents        FamilyDocument[]
+
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+}
+
+model MemberHistory {
+  id           Int          @id @default(autoincrement())
+  memberId     Int
+  member       FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  familyId     Int
+  family       Family       @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  unitName     String
+  role         MemberRole
+  startDate    DateTime     @default(now())
+  endDate      DateTime?    // NULL = current active role
+  changeReason String?      // e.g. "Initial student registration", "Married into SABN100398"
+
+  createdAt    DateTime     @default(now())
+}
+
+model FamilyDocument {
+  id           Int           @id @default(autoincrement())
+  familyId     Int
+  family       Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  memberId     Int?
+  member       FamilyMember? @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  documentType String        // "PARISH_LETTER", "SIGNATURE", "CERTIFICATE"
+  fileName     String
+  localPath    String
+  originalUrl  String?
+  uploadedAt   DateTime      @default(now())
+}
+
+model DirectDebit {
+  id        Int      @id @default(autoincrement())
+  parishId  Int
+  parish    Parish   @relation(fields: [parishId], references: [id], onDelete: Cascade)
+  familyId  Int      @unique
+  family    Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  amount    Decimal? @db.Decimal(10, 2)
+  frequency String?  // "Weekly", "Fortnightly", "Monthly"
+  comments  String?
+  active    Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+}
+
+model FamilyNote {
+  id          Int       @id @default(autoincrement())
+  familyId    Int
+  family      Family    @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  noteDate    DateTime?
+  noteContent String
+  recordedBy  String?
+  createdAt   DateTime  @default(now())
+}
