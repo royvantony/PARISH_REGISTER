@@ -4,6 +4,7 @@ import { Button } from '../ui/Button';
 import { ConfirmButton } from '../ui/ConfirmButton';
 import { Input } from '../ui/Input';
 import { api } from '../../lib/api';
+import { cn } from '../../lib/utils';
 import {
   CreditCard,
   AlertCircle,
@@ -197,66 +198,71 @@ export const DirectDebitModal: React.FC<DirectDebitModalProps> = ({
           </label>
         </div>
 
-        {/* Amount & Frequency Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {/* Amount */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-semibold text-parish-text">
-              Direct Debit Amount ($ AUD) {active && <span className="text-red-500">*</span>}
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-parish-text-muted">
-                $
-              </span>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="50.00"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                disabled={!canEdit || isLoading || !active}
-                className="pl-7 text-xs font-semibold"
-                required={active}
-              />
-            </div>
+        {/* Direct Debit Amount */}
+        <div className="space-y-1.5">
+          <label className="block text-xs font-semibold text-parish-text">
+            Direct Debit Amount ($ AUD) {active && <span className="text-red-500">*</span>}
+          </label>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-parish-text-muted">
+              $
+            </span>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="50.00"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              disabled={!canEdit || isLoading || !active}
+              className="pl-7 text-xs font-semibold"
+              required={active}
+            />
+          </div>
 
-            {/* Amount Presets */}
-            {canEdit && active && (
-              <div className="flex items-center gap-1.5 pt-1">
-                <span className="text-[10px] text-parish-text-muted">Quick:</span>
-                {PRESET_AMOUNTS.map((p) => (
+          {/* Amount Presets */}
+          {canEdit && active && (
+            <div className="flex items-center flex-wrap gap-1.5 pt-1">
+              <span className="text-[10px] font-medium text-parish-text-muted mr-0.5">Quick:</span>
+              {PRESET_AMOUNTS.map((p) => {
+                const isSelected = amount === p;
+                return (
                   <button
                     key={p}
                     type="button"
                     onClick={() => setAmount(p)}
-                    className="px-2 py-0.5 text-[10px] font-semibold rounded bg-parish-surface-subtle hover:bg-parish-primary-light hover:text-parish-primary hover:border-parish-primary text-parish-text border border-parish-border transition-colors cursor-pointer"
+                    className={cn(
+                      'px-2.5 py-0.5 text-[11px] font-semibold rounded-lg border transition-all cursor-pointer select-none',
+                      isSelected
+                        ? 'bg-parish-primary text-white border-parish-primary shadow-xs'
+                        : 'bg-parish-surface-subtle hover:bg-parish-primary-light hover:text-parish-primary hover:border-parish-primary text-parish-text border-parish-border'
+                    )}
                   >
                     ${p}
                   </button>
-                ))}
-              </div>
-            )}
-          </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
-          {/* Frequency */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-semibold text-parish-text">
-              Contribution Frequency <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={frequency}
-              onChange={(e) => setFrequency(e.target.value)}
-              disabled={!canEdit || isLoading || !active}
-              className="w-full bg-parish-surface text-parish-text text-xs rounded-xl border border-parish-border p-2.5 transition-all focus:outline-none focus:ring-2 focus:ring-parish-primary/30 focus:border-parish-primary disabled:opacity-60"
-            >
-              {FREQUENCY_OPTIONS.map((f) => (
-                <option key={f} value={f}>
-                  {f}
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* Contribution Frequency */}
+        <div className="space-y-1.5">
+          <label className="block text-xs font-semibold text-parish-text">
+            Contribution Frequency <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={frequency}
+            onChange={(e) => setFrequency(e.target.value)}
+            disabled={!canEdit || isLoading || !active}
+            className="w-full bg-parish-surface text-parish-text text-xs rounded-xl border border-parish-border p-2.5 transition-all focus:outline-none focus:ring-2 focus:ring-parish-primary/30 focus:border-parish-primary disabled:opacity-60"
+          >
+            {FREQUENCY_OPTIONS.map((f) => (
+              <option key={f} value={f}>
+                {f}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Notes & Bank Reference */}
