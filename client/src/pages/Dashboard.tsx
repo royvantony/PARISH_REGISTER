@@ -334,7 +334,7 @@ export const DashboardPage: React.FC = () => {
           title="Click to view all Parish Members in Register"
         >
           <div className="flex items-center justify-between text-parish-text-muted text-xs font-bold uppercase tracking-wider">
-            <span>Parishioners (Souls)</span>
+            <span>Parishioners</span>
             <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center group-hover:scale-105 transition-transform">
               <Users className="w-4 h-4" />
             </div>
