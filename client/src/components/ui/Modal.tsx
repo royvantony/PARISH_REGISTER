@@ -8,7 +8,7 @@ export interface ModalProps {
   title?: string;
   description?: string;
   children: React.ReactNode;
-  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | '6xl';
   closeOnBackdropClick?: boolean;
   closeOnEsc?: boolean;
 }
@@ -50,10 +50,14 @@ export const Modal: React.FC<ModalProps> = ({
     lg: 'max-w-lg',
     xl: 'max-w-xl',
     '2xl': 'max-w-2xl',
+    '3xl': 'max-w-3xl',
+    '4xl': 'max-w-4xl',
+    '5xl': 'max-w-5xl',
+    '6xl': 'max-w-6xl',
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
       {/* Backdrop - Clicking outside does NOT close modal to protect user input */}
       <div
         className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity animate-in fade-in duration-200"
@@ -70,10 +74,10 @@ export const Modal: React.FC<ModalProps> = ({
       >
         {/* Header */}
         {(title || description) ? (
-          <div className="px-6 pt-6 pb-4 border-b border-parish-border flex items-start justify-between">
-            <div className="space-y-1 pr-6">
-              {title && <h3 className="text-lg font-bold text-parish-text tracking-tight">{title}</h3>}
-              {description && <p className="text-sm text-parish-text-muted">{description}</p>}
+          <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-3 sm:pb-4 border-b border-parish-border flex items-start justify-between">
+            <div className="space-y-1 pr-4 sm:pr-6">
+              {title && <h3 className="text-base sm:text-lg font-bold text-parish-text tracking-tight">{title}</h3>}
+              {description && <p className="text-xs sm:text-sm text-parish-text-muted">{description}</p>}
             </div>
             <button
               type="button"
@@ -98,7 +102,7 @@ export const Modal: React.FC<ModalProps> = ({
         )}
 
         {/* Content */}
-        <div className="px-6 py-5 max-h-[80vh] overflow-y-auto">{children}</div>
+        <div className="px-3 sm:px-6 py-4 sm:py-5 max-h-[85vh] overflow-y-auto">{children}</div>
       </div>
     </div>
   );

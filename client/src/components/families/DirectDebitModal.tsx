@@ -4,7 +4,7 @@ import { Button } from '../ui/Button';
 import { ConfirmButton } from '../ui/ConfirmButton';
 import { Input } from '../ui/Input';
 import { api } from '../../lib/api';
-import { cn } from '../../lib/utils';
+import { cn, calculateMonthlyEquivalent } from '../../lib/utils';
 import {
   CreditCard,
   AlertCircle,
@@ -263,6 +263,12 @@ export const DirectDebitModal: React.FC<DirectDebitModalProps> = ({
               </option>
             ))}
           </select>
+          {active && amount && !isNaN(parseFloat(amount)) && parseFloat(amount) > 0 && frequency.toLowerCase() !== 'monthly' && (
+            <div className="text-[11px] text-parish-primary font-medium flex items-center gap-1.5 pt-0.5">
+              <span>Normalized Monthly Average:</span>
+              <strong className="font-bold">≈ ${Math.round(calculateMonthlyEquivalent(amount, frequency)).toLocaleString()} AUD / mo (Avg)</strong>
+            </div>
+          )}
         </div>
 
         {/* Notes & Bank Reference */}

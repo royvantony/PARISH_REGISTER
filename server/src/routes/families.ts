@@ -2,178 +2,209 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { authenticateJWT } from '../middleware/auth.js';
 import { FamilyStatus, RegistrationType, MemberRole, UserRole, Prisma } from '@prisma/client';
-import { canUserApproveRegistration, getUserDirectDebitPermissions } from './permissions.js';
+import { canUserApproveRegistration, getUserDirectDebitPermissions, canUserExportModule } from './permissions.js';
+import { normalizeAustralianState } from '../lib/address.js';
+import ExcelJS from 'exceljs';
 
 export const familiesRouter = Router();
 
 // Apply auth to all family endpoints
 familiesRouter.use(authenticateJWT);
 
+/**
+ * Helper to construct Prisma where and orderBy filters for parish families
+ */
+export function buildFamilyQuery(
+  parishId: number,
+  query: Record<string, any>,
+  user: any
+): { isBlocked: boolean; where: Prisma.FamilyWhereInput; orderBy: any; searchStr: string } {
+  const {
+    search,
+    unitId,
+    status,
+    type,
+    directDebit,
+    sortBy = 'headOfFamily',
+    sortOrder = 'asc',
+  } = query;
+
+  const andConditions: Prisma.FamilyWhereInput[] = [];
+
+  // Ward isolation: Ward Users can only see families in their assigned ward
+  if (user && user.role === UserRole.WARD_USER) {
+    if (!user.assignedUnitId) {
+      return { isBlocked: true, where: { id: -1 }, orderBy: {}, searchStr: '' };
+    }
+    andConditions.push({ unitId: user.assignedUnitId });
+  } else if (unitId) {
+    const uStr = (unitId as string).trim().toUpperCase();
+    if (uStr === 'UNASSIGNED' || uStr === 'NONE' || uStr === 'NULL' || uStr === 'BLANK') {
+      andConditions.push({ unitId: null });
+    } else {
+      const parsedId = parseInt(unitId as string, 10);
+      if (!isNaN(parsedId)) {
+        andConditions.push({ unitId: parsedId });
+      }
+    }
+  }
+
+  const searchStr = search && typeof search === 'string' ? search.trim() : '';
+
+  const isExplicitRefLookup = Boolean(
+    searchStr && (
+      /^#\s*\w+/i.test(searchStr) ||
+      /^(?:ref(?:erence)?|no\.?|num(?:ber)?|household|id|code)\s*#?\s*\w+/i.test(searchStr) ||
+      /^\d{1,6}$/.test(searchStr)
+    )
+  );
+
+  if (status && !isExplicitRefLookup) {
+    andConditions.push({ status: status as FamilyStatus });
+  }
+
+  if (type) {
+    andConditions.push({ registrationType: type as RegistrationType });
+  }
+
+  if (directDebit) {
+    const dd = (directDebit as string).trim().toUpperCase();
+    if (dd === 'YES' || dd === 'TRUE' || dd === '1' || dd === 'PLEDGED') {
+      andConditions.push({
+        directDebit: {
+          is: { active: true },
+        },
+      });
+    } else if (dd === 'NO' || dd === 'FALSE' || dd === '0') {
+      andConditions.push({
+        OR: [
+          { directDebit: { is: null } },
+          { directDebit: { is: { active: false } } },
+        ],
+      });
+    }
+  }
+
+  if (searchStr) {
+    const q = searchStr;
+    const lower = q.toLowerCase();
+    const isUnassignedQuery =
+      lower.includes('unasign') ||
+      lower.includes('unassign') ||
+      lower.includes('no ward') ||
+      lower === 'null' ||
+      lower === 'blank';
+    const isNilQuery = lower === 'nil';
+
+    const cleanedRef = q
+      .replace(/^(?:ref(?:erence)?|no\.?|num(?:ber)?|household|code|id|#|:|\s)+/gi, '')
+      .trim();
+
+    const searchOr: Prisma.FamilyWhereInput[] = [
+      { headFullName: { contains: q, mode: 'insensitive' } },
+      { houseName: { contains: q, mode: 'insensitive' } },
+      { familyCode: { contains: q, mode: 'insensitive' } },
+      { streetAddress: { contains: q, mode: 'insensitive' } },
+      { city: { contains: q, mode: 'insensitive' } },
+      { postalCode: { contains: q, mode: 'insensitive' } },
+      { primaryPhone: { contains: q, mode: 'insensitive' } },
+      { primaryEmail: { contains: q, mode: 'insensitive' } },
+      {
+        members: {
+          some: {
+            fullName: { contains: q, mode: 'insensitive' },
+          },
+        },
+      },
+    ];
+
+    if (cleanedRef && cleanedRef !== q) {
+      searchOr.push({ familyCode: { contains: cleanedRef, mode: 'insensitive' } });
+    }
+
+    const candidateDigits = /^\d+$/.test(cleanedRef)
+      ? cleanedRef
+      : /^\d+$/.test(q)
+        ? q
+        : (q.match(/\b\d+\b/)?.[0] || '');
+
+    if (candidateDigits && !candidateDigits.startsWith('0') && candidateDigits.length <= 9) {
+      const parsedId = parseInt(candidateDigits, 10);
+      if (!isNaN(parsedId) && parsedId > 0) {
+        searchOr.push({ id: parsedId });
+      }
+    }
+
+    if (isUnassignedQuery) {
+      searchOr.push({ unitId: null });
+    }
+
+    if (isNilQuery) {
+      searchOr.push({ unit: { unitName: { equals: 'Nil', mode: 'insensitive' } } });
+    }
+
+    andConditions.push({ OR: searchOr });
+  }
+
+  const where: Prisma.FamilyWhereInput = {
+    parishId,
+    ...(andConditions.length > 0 ? { AND: andConditions } : {}),
+  };
+
+  let orderBy: any;
+  const direction = sortOrder === 'desc' ? 'desc' : 'asc';
+
+  if (sortBy === 'ward' || sortBy === 'unit') {
+    orderBy = [
+      { unit: { unitName: direction } },
+      { headFullName: 'asc' },
+    ];
+  } else if (sortBy === 'members' || sortBy === 'membersCount') {
+    orderBy = [
+      { members: { _count: direction } },
+      { headFullName: 'asc' },
+    ];
+  } else if (sortBy === 'status') {
+    orderBy = [
+      { status: direction },
+      { headFullName: 'asc' },
+    ];
+  } else if (sortBy === 'familyCode' || sortBy === 'code') {
+    orderBy = { familyCode: direction };
+  } else if (sortBy === 'createdAt') {
+    orderBy = { createdAt: direction };
+  } else if (sortBy === 'houseName') {
+    orderBy = [
+      { houseName: direction },
+      { headFullName: 'asc' },
+    ];
+  } else {
+    // Default: 'parishioner' / 'headOfFamily' / 'headFullName' (Head name only)
+    orderBy = { headFullName: direction };
+  }
+
+  return { isBlocked: false, where, orderBy, searchStr };
+}
+
 // GET /api/families - List with search, filtering, and pagination
 familiesRouter.get('/', async (req: Request, res: Response) => {
   try {
     const parishId = req.activeParishId;
     const {
-      search,
-      unitId,
-      status,
-      type,
-      directDebit,
       page = '1',
       limit = '20',
-      sortBy = 'headOfFamily',
-      sortOrder = 'asc',
     } = req.query;
 
     const pageNum = Math.max(1, parseInt(page as string, 10));
     const pageSize = Math.min(100, Math.max(1, parseInt(limit as string, 10)));
     const skip = (pageNum - 1) * pageSize;
 
-    // Build Prisma where filter with multi-criteria support
-    const andConditions: Prisma.FamilyWhereInput[] = [];
-
-    // Ward isolation: Ward Users can only see families in their assigned ward
-    if (req.user && req.user.role === UserRole.WARD_USER) {
-      if (!req.user.assignedUnitId) {
-        return res.json({
-          data: [],
-          pagination: { page: pageNum, limit: pageSize, total: 0, totalPages: 0 },
-        });
-      }
-      andConditions.push({ unitId: req.user.assignedUnitId });
-    } else if (unitId) {
-      const uStr = (unitId as string).trim().toUpperCase();
-      if (uStr === 'UNASSIGNED' || uStr === 'NONE' || uStr === 'NULL' || uStr === 'BLANK') {
-        andConditions.push({ unitId: null });
-      } else {
-        const parsedId = parseInt(unitId as string, 10);
-        if (!isNaN(parsedId)) {
-          andConditions.push({ unitId: parsedId });
-        }
-      }
-    }
-
-    const searchStr = search && typeof search === 'string' ? search.trim() : '';
-
-    // Check if query is an explicit reference or identifier lookup (e.g. "#571", "ref no. #571", "ref #571", pure digits "571")
-    const isExplicitRefLookup = Boolean(
-      searchStr && (
-        /^#\s*\w+/i.test(searchStr) ||
-        /^(?:ref(?:erence)?|no\.?|num(?:ber)?|household|id|code)\s*#?\s*\w+/i.test(searchStr) ||
-        /^\d{1,6}$/.test(searchStr)
-      )
-    );
-
-    // If status filter is passed, apply it — unless the user specifically searched an exact reference ID/code (#571)
-    // where they want to locate that specific household regardless of its current lifecycle state (PENDING, ACTIVE, etc.).
-    if (status && !isExplicitRefLookup) {
-      andConditions.push({ status: status as FamilyStatus });
-    }
-
-    if (type) {
-      andConditions.push({ registrationType: type as RegistrationType });
-    }
-
-    if (directDebit) {
-      const dd = (directDebit as string).trim().toUpperCase();
-      if (dd === 'YES' || dd === 'TRUE' || dd === '1' || dd === 'PLEDGED') {
-        andConditions.push({
-          directDebit: {
-            is: { active: true },
-          },
-        });
-      } else if (dd === 'NO' || dd === 'FALSE' || dd === '0') {
-        andConditions.push({
-          OR: [
-            { directDebit: { is: null } },
-            { directDebit: { is: { active: false } } },
-          ],
-        });
-      }
-    }
-
-    if (searchStr) {
-      const q = searchStr;
-      const lower = q.toLowerCase();
-      const isUnassignedQuery =
-        lower.includes('unasign') ||
-        lower.includes('unassign') ||
-        lower.includes('no ward') ||
-        lower === 'null' ||
-        lower === 'blank';
-      const isNilQuery = lower === 'nil';
-
-      // Cleaned reference code/number (strips leading prefixes like "ref no. #", "ref #", "ref:", "#", "id #", "household #")
-      const cleanedRef = q
-        .replace(/^(?:ref(?:erence)?|no\.?|num(?:ber)?|household|code|id|#|:|\s)+/gi, '')
-        .trim();
-
-      const searchOr: Prisma.FamilyWhereInput[] = [
-        { headFullName: { contains: q, mode: 'insensitive' } },
-        { houseName: { contains: q, mode: 'insensitive' } },
-        { familyCode: { contains: q, mode: 'insensitive' } },
-        { streetAddress: { contains: q, mode: 'insensitive' } },
-        { city: { contains: q, mode: 'insensitive' } },
-        { postalCode: { contains: q, mode: 'insensitive' } },
-        { primaryPhone: { contains: q, mode: 'insensitive' } },
-        { primaryEmail: { contains: q, mode: 'insensitive' } },
-        {
-          members: {
-            some: {
-              fullName: { contains: q, mode: 'insensitive' },
-            },
-          },
-        },
-      ];
-
-      // If query had a "#" or "ref" prefix, also search cleanedRef against familyCode
-      if (cleanedRef && cleanedRef !== q) {
-        searchOr.push({ familyCode: { contains: cleanedRef, mode: 'insensitive' } });
-      }
-
-      // Check for numeric ID match (e.g. 571, #571, ref no. #571)
-      const candidateDigits = /^\d+$/.test(cleanedRef)
-        ? cleanedRef
-        : /^\d+$/.test(q)
-        ? q
-        : (q.match(/\b\d+\b/)?.[0] || '');
-
-      // Avoid treating phone numbers with leading 0 as database IDs
-      if (candidateDigits && !candidateDigits.startsWith('0') && candidateDigits.length <= 9) {
-        const parsedId = parseInt(candidateDigits, 10);
-        if (!isNaN(parsedId) && parsedId > 0) {
-          searchOr.push({ id: parsedId });
-        }
-      }
-
-      // If user typed "unasigned" / "unassigned" / "null" / "no ward", match records without any ward (unitId: null)
-      if (isUnassignedQuery) {
-        searchOr.push({ unitId: null });
-      }
-
-      // If user typed "nil", match the unit named "Nil"
-      if (isNilQuery) {
-        searchOr.push({ unit: { unitName: { equals: 'Nil', mode: 'insensitive' } } });
-      }
-
-      andConditions.push({ OR: searchOr });
-    }
-
-    const where: Prisma.FamilyWhereInput = {
-      parishId,
-      ...(andConditions.length > 0 ? { AND: andConditions } : {}),
-    };
-
-    // Determine sorting - Default: Always alphabetical by Head of Family
-    const orderBy: any = {};
-    if (sortBy === 'familyCode') {
-      orderBy.familyCode = sortOrder === 'desc' ? 'desc' : 'asc';
-    } else if (sortBy === 'createdAt') {
-      orderBy.createdAt = sortOrder === 'desc' ? 'desc' : 'asc';
-    } else if (sortBy === 'houseName') {
-      orderBy.houseName = sortOrder === 'desc' ? 'desc' : 'asc';
-    } else {
-      orderBy.headFullName = sortOrder === 'desc' ? 'desc' : 'asc';
+    const { isBlocked, where, orderBy } = buildFamilyQuery(parishId, req.query, req.user);
+    if (isBlocked) {
+      return res.json({
+        data: [],
+        pagination: { page: pageNum, limit: pageSize, total: 0, totalPages: 0 },
+      });
     }
 
     const [families, totalCount] = await Promise.all([
@@ -232,6 +263,7 @@ familiesRouter.get('/', async (req: Request, res: Response) => {
         originDiocese: f.originDiocese,
         status: f.status,
         headOfFamily: f.members.find((m) => m.role === MemberRole.HEAD) || f.members[0] || null,
+        spouse: f.members.find((m) => m.role === MemberRole.SPOUSE) || null,
         membersCount: f._count.members,
         documentsCount: f._count.documents,
         registrationDate: f.registrationDate,
@@ -264,6 +296,387 @@ familiesRouter.get('/meta/pending-count', async (req: Request, res: Response) =>
   } catch (err: any) {
     console.error('Error fetching pending count:', err);
     return res.status(500).json({ error: 'Failed to fetch pending count.' });
+  }
+});
+
+// GET /api/families/export/data - Unpaginated filtered families list for print preview
+familiesRouter.get('/export/data', async (req: Request, res: Response) => {
+  try {
+    const parishId = req.activeParishId;
+    if (req.user) {
+      const canExport = await canUserExportModule(req.user.userId, req.user.role, parishId, 'REGISTER');
+      if (!canExport) {
+        return res.status(403).json({ error: 'Permission denied: Export not authorized for your role.' });
+      }
+    }
+
+    const { isBlocked, where, orderBy } = buildFamilyQuery(parishId, req.query, req.user);
+    if (isBlocked) {
+      return res.json({ parish: null, total: 0, data: [] });
+    }
+
+    const [families, parish] = await Promise.all([
+      prisma.family.findMany({
+        where,
+        orderBy,
+        take: 5000,
+        include: {
+          unit: {
+            select: { id: true, unitName: true, category: true },
+          },
+          members: {
+            orderBy: { orderIndex: 'asc' },
+            select: {
+              id: true,
+              role: true,
+              fullName: true,
+              dateOfBirth: true,
+              placeOfBirth: true,
+              phone: true,
+              email: true,
+              isPrimaryContact: true,
+            },
+          },
+          directDebit: {
+            select: { id: true, amount: true, frequency: true, active: true },
+          },
+        },
+      }),
+      prisma.parish.findUnique({
+        where: { id: parishId },
+        select: { parishCode: true, parishName: true, city: true, state: true, contactPhone: true, contactEmail: true },
+      }),
+    ]);
+
+    return res.json({
+      parish,
+      total: families.length,
+      data: families.map((f) => ({
+        id: f.id,
+        familyCode: f.familyCode,
+        registrationType: f.registrationType,
+        houseName: f.houseName,
+        unit: f.unit,
+        streetAddress: f.streetAddress,
+        city: f.city,
+        state: f.state,
+        postalCode: f.postalCode,
+        primaryPhone: f.primaryPhone,
+        primaryEmail: f.primaryEmail,
+        originParish: f.originParish,
+        originDiocese: f.originDiocese,
+        status: f.status,
+        headOfFamily: f.members.find((m) => m.role === MemberRole.HEAD) || f.members[0] || null,
+        membersCount: f.members.length,
+        members: f.members,
+        hasDirectDebit: Boolean(f.directDebit?.active),
+        directDebit: f.directDebit,
+      })),
+    });
+  } catch (err: any) {
+    console.error('Error fetching export dataset:', err);
+    return res.status(500).json({ error: 'Failed to fetch export dataset.' });
+  }
+});
+
+// GET /api/families/export/excel - Generate and download styled Excel (.xlsx) workbook
+familiesRouter.get('/export/excel', async (req: Request, res: Response) => {
+  try {
+    const parishId = req.activeParishId;
+    if (req.user) {
+      const canExport = await canUserExportModule(req.user.userId, req.user.role, parishId, 'REGISTER');
+      if (!canExport) {
+        return res.status(403).json({ error: 'Permission denied: Export not authorized for your role.' });
+      }
+    }
+
+    const { isBlocked, where, orderBy } = buildFamilyQuery(parishId, req.query, req.user);
+    if (isBlocked) {
+      return res.status(400).json({ error: 'No records accessible for export.' });
+    }
+
+    const [families, parish] = await Promise.all([
+      prisma.family.findMany({
+        where,
+        orderBy,
+        take: 5000,
+        include: {
+          unit: {
+            select: { id: true, unitName: true, category: true },
+          },
+          members: {
+            orderBy: { orderIndex: 'asc' },
+            select: {
+              id: true,
+              role: true,
+              fullName: true,
+              dateOfBirth: true,
+              placeOfBirth: true,
+              phone: true,
+              email: true,
+              isPrimaryContact: true,
+            },
+          },
+          directDebit: {
+            select: { id: true, amount: true, frequency: true, active: true },
+          },
+        },
+      }),
+      prisma.parish.findUnique({
+        where: { id: parishId },
+        select: { parishCode: true, parishName: true, city: true, state: true },
+      }),
+    ]);
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'eParish Register';
+    workbook.created = new Date();
+
+    // ----------------------------------------------------
+    // Sheet 1: Households Directory
+    // ----------------------------------------------------
+    const sheet1 = workbook.addWorksheet('Households Directory');
+    sheet1.views = [{ state: 'frozen', ySplit: 4 }];
+
+    // Row 1: Parish Header
+    sheet1.mergeCells('A1:P1');
+    const titleCell = sheet1.getCell('A1');
+    titleCell.value = `${parish?.parishName || 'Parish'} — Official Parish Directory`;
+    titleCell.font = { name: 'Calibri', size: 15, bold: true, color: { argb: 'FF1B4332' } };
+    titleCell.alignment = { vertical: 'middle', horizontal: 'left' };
+    sheet1.getRow(1).height = 28;
+
+    // Row 2: Subtitle with active filters
+    sheet1.mergeCells('A2:P2');
+    const subtitleCell = sheet1.getCell('A2');
+    const filterParts: string[] = [];
+    if (req.query.unitName || req.query.unitId) filterParts.push(`Ward: ${req.query.unitName || req.query.unitId}`);
+    filterParts.push(`Status: ${req.query.status || 'All Statuses'}`);
+    if (req.query.type) filterParts.push(`Type: ${req.query.type}`);
+    if (req.query.directDebit) filterParts.push(`Direct Debit: ${req.query.directDebit === 'YES' ? 'Active' : 'None'}`);
+    if (req.query.search) filterParts.push(`Search: "${req.query.search}"`);
+    const filterDesc = filterParts.length > 0 ? filterParts.join(' | ') : 'All Households (No Filters)';
+
+    subtitleCell.value = `Filter Context: ${filterDesc}   •   Generated: ${new Date().toLocaleString()}   •   Total: ${families.length} Households`;
+    subtitleCell.font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF5E6F65' } };
+    sheet1.getRow(2).height = 20;
+
+    // Row 3: Blank
+    sheet1.getRow(3).height = 8;
+
+    // Row 4: Column Headers
+    const headerRow1 = sheet1.getRow(4);
+    headerRow1.values = [
+      'Sl. No.',
+      'Family Code',
+      'Head of Household',
+      'House Name (Veettuperu)',
+      'Ward / Unit',
+      'Category',
+      'Registration Type',
+      'Status',
+      'Total Members',
+      'Street Address',
+      'City / Suburb',
+      'State',
+      'Postcode',
+      'Primary Phone',
+      'Primary Email',
+      'Roots: Native Diocese',
+      'Roots: Native Parish',
+      'Direct Debit Status',
+      'Pledge Amount',
+      'Frequency',
+    ];
+    headerRow1.height = 26;
+    headerRow1.eachCell((cell, colNumber) => {
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF1B4332' }, // Sacred Emerald
+      };
+      cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.alignment = {
+        vertical: 'middle',
+        horizontal: colNumber === 1 ? 'center' : 'left',
+      };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+        bottom: { style: 'medium', color: { argb: 'FF143527' } },
+      };
+    });
+
+    // Data Rows
+    families.forEach((f, idx) => {
+      const head = f.members.find((m) => m.role === MemberRole.HEAD) || f.members[0];
+      const isEven = idx % 2 === 0;
+
+      const row = sheet1.addRow([
+        idx + 1,
+        f.familyCode || `#${f.id}`,
+        head?.fullName || 'Not recorded',
+        f.houseName,
+        f.unit?.unitName ? `${f.unit.unitName} Ward` : 'Unassigned',
+        f.unit?.category || 'GEOGRAPHIC',
+        f.registrationType,
+        f.status,
+        f.members.length,
+        f.streetAddress || '',
+        f.city || '',
+        normalizeAustralianState(f.state),
+        f.postalCode || '',
+        f.primaryPhone || '',
+        f.primaryEmail || '',
+        f.originDiocese || '',
+        f.originParish || '',
+        f.directDebit ? (f.directDebit.active ? 'Active' : 'Inactive') : 'None',
+        f.directDebit?.amount ? Number(f.directDebit.amount) : '',
+        f.directDebit?.frequency || '',
+      ]);
+      row.height = 20;
+
+      row.eachCell((cell, colNumber) => {
+        cell.font = { name: 'Calibri', size: 10 };
+        cell.alignment = {
+          vertical: 'middle',
+          horizontal: colNumber === 1 ? 'center' : 'left',
+        };
+        if (isEven) {
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFFBF9F4' }, // Warm Linen
+          };
+        }
+        cell.border = {
+          bottom: { style: 'thin', color: { argb: 'FFE8E1D2' } },
+        };
+        // Format direct debit amount as currency
+        if (colNumber === 19 && cell.value) {
+          cell.numFmt = '$#,##0.00';
+        }
+      });
+    });
+
+    // Auto-fit column widths
+    sheet1.columns.forEach((col) => {
+      let maxLen = 12;
+      col.eachCell?.({ includeEmpty: false }, (cell) => {
+        const valStr = cell.value ? String(cell.value) : '';
+        if (valStr.length > maxLen) {
+          maxLen = Math.min(valStr.length + 3, 40);
+        }
+      });
+      col.width = maxLen;
+    });
+
+    // ----------------------------------------------------
+    // Sheet 2: All Parishioners (Census)
+    // ----------------------------------------------------
+    const sheet2 = workbook.addWorksheet('All Parishioners (Census)');
+    sheet2.views = [{ state: 'frozen', ySplit: 2 }];
+
+    const headerRow2 = sheet2.getRow(1);
+    headerRow2.values = [
+      'Sl. No.',
+      'Family Code',
+      'House Name',
+      'Ward',
+      'Parishioner Full Name',
+      'Role in Family',
+      'Date of Birth',
+      'Age',
+      'Place of Birth',
+      'Personal Phone',
+      'Personal Email',
+      'Primary Contact?',
+      'Residential Address',
+    ];
+    headerRow2.height = 26;
+    headerRow2.eachCell((cell, colNumber) => {
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF1B4332' },
+      };
+      cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.alignment = {
+        vertical: 'middle',
+        horizontal: colNumber === 1 ? 'center' : 'left',
+      };
+    });
+
+    let censusRowIndex = 0;
+    families.forEach((f) => {
+      f.members.forEach((m) => {
+        censusRowIndex++;
+        const isEven = censusRowIndex % 2 === 0;
+
+        const dob = m.dateOfBirth ? new Date(m.dateOfBirth) : null;
+        let ageStr = '';
+        if (dob) {
+          const now = new Date();
+          let age = now.getFullYear() - dob.getFullYear();
+          const mo = now.getMonth() - dob.getMonth();
+          if (mo < 0 || (mo === 0 && now.getDate() < dob.getDate())) age--;
+          ageStr = String(age);
+        }
+
+        const row = sheet2.addRow([
+          censusRowIndex,
+          f.familyCode || `#${f.id}`,
+          f.houseName,
+          f.unit?.unitName ? `${f.unit.unitName} Ward` : 'Unassigned',
+          m.fullName,
+          m.role,
+          dob ? dob.toLocaleDateString() : '',
+          ageStr,
+          m.placeOfBirth || '',
+          m.phone || '',
+          m.email || '',
+          m.isPrimaryContact ? 'Yes' : 'No',
+          f.streetAddress ? `${f.streetAddress}, ${f.city || ''} ${normalizeAustralianState(f.state)}` : '',
+        ]);
+        row.height = 19;
+
+        row.eachCell((cell) => {
+          cell.font = { name: 'Calibri', size: 10 };
+          cell.alignment = { vertical: 'middle' };
+          if (isEven) {
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FFFBF9F4' },
+            };
+          }
+          cell.border = {
+            bottom: { style: 'thin', color: { argb: 'FFE8E1D2' } },
+          };
+        });
+      });
+    });
+
+    sheet2.columns.forEach((col) => {
+      let maxLen = 12;
+      col.eachCell?.({ includeEmpty: false }, (cell) => {
+        const valStr = cell.value ? String(cell.value) : '';
+        if (valStr.length > maxLen) {
+          maxLen = Math.min(valStr.length + 3, 38);
+        }
+      });
+      col.width = maxLen;
+    });
+
+    const safeParishCode = parish?.parishCode || 'PARISH';
+    const filename = `${safeParishCode}_Register_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err: any) {
+    console.error('Error generating Excel register:', err);
+    return res.status(500).json({ error: 'Failed to generate Excel report.' });
   }
 });
 
@@ -416,7 +829,7 @@ familiesRouter.patch('/:id', async (req: Request, res: Response) => {
     // 4. Contact / Address / Roots
     if (streetAddress !== undefined) dataToUpdate.streetAddress = streetAddress ? streetAddress.trim() : null;
     if (city !== undefined) dataToUpdate.city = city ? city.trim() : null;
-    if (state !== undefined) dataToUpdate.state = state ? state.trim() : null;
+    if (state !== undefined) dataToUpdate.state = normalizeAustralianState(state);
     if (postalCode !== undefined) dataToUpdate.postalCode = postalCode ? postalCode.trim() : null;
     if (primaryPhone !== undefined) dataToUpdate.primaryPhone = primaryPhone ? primaryPhone.trim() : null;
     if (primaryEmail !== undefined) dataToUpdate.primaryEmail = primaryEmail ? primaryEmail.trim() : null;
@@ -557,7 +970,7 @@ familiesRouter.post('/', async (req: Request, res: Response) => {
           unitId: resolvedUnitId,
           streetAddress: streetAddress ? streetAddress.trim() : null,
           city: city ? city.trim() : null,
-          state: state ? state.trim() : null,
+          state: normalizeAustralianState(state),
           postalCode: postalCode ? postalCode.trim() : null,
           primaryPhone: primaryPhone ? primaryPhone.trim() : null,
           primaryEmail: primaryEmail ? primaryEmail.trim() : null,
@@ -696,7 +1109,7 @@ familiesRouter.put('/:id', async (req: Request, res: Response) => {
           unitId: resolvedUnitId,
           streetAddress: streetAddress !== undefined ? (streetAddress ? streetAddress.trim() : null) : existing.streetAddress,
           city: city !== undefined ? (city ? city.trim() : null) : existing.city,
-          state: state !== undefined ? (state ? state.trim() : null) : existing.state,
+          state: state !== undefined ? normalizeAustralianState(state) : existing.state,
           postalCode: postalCode !== undefined ? (postalCode ? postalCode.trim() : null) : existing.postalCode,
           primaryPhone: primaryPhone !== undefined ? (primaryPhone ? primaryPhone.trim() : null) : existing.primaryPhone,
           primaryEmail: primaryEmail !== undefined ? (primaryEmail ? primaryEmail.trim() : null) : existing.primaryEmail,
@@ -863,7 +1276,7 @@ familiesRouter.post('/:id/approve', async (req: Request, res: Response) => {
             unitId: resolvedUnitId,
             streetAddress: streetAddress !== undefined ? (streetAddress ? streetAddress.trim() : null) : family.streetAddress,
             city: city !== undefined ? (city ? city.trim() : null) : family.city,
-            state: state !== undefined ? (state ? state.trim() : null) : family.state,
+            state: state !== undefined ? normalizeAustralianState(state) : family.state,
             postalCode: postalCode !== undefined ? (postalCode ? postalCode.trim() : null) : family.postalCode,
             primaryPhone: primaryPhone !== undefined ? (primaryPhone ? primaryPhone.trim() : null) : family.primaryPhone,
             primaryEmail: primaryEmail !== undefined ? (primaryEmail ? primaryEmail.trim() : null) : family.primaryEmail,

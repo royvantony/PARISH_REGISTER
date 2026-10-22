@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { useAuth, INACTIVITY_TIMEOUT_MINUTES } from '../../context/AuthContext';
@@ -6,6 +6,17 @@ import { Clock, CheckCircle2, LogOut } from 'lucide-react';
 
 export const SessionTimeoutWarningModal: React.FC = () => {
   const { isWarningOpen, remainingSeconds, staySignedIn, logout } = useAuth();
+
+  // If the countdown reaches 0 while the popup is visible, automatically close all pages and redirect to /login
+  useEffect(() => {
+    if (isWarningOpen && remainingSeconds <= 0) {
+      sessionStorage.setItem(
+        'inactivity_logout_notice',
+        `You were automatically signed out after ${INACTIVITY_TIMEOUT_MINUTES} minutes of inactivity for security.`
+      );
+      logout();
+    }
+  }, [isWarningOpen, remainingSeconds, logout]);
 
   if (!isWarningOpen) return null;
 

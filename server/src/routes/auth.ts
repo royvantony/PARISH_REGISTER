@@ -106,6 +106,32 @@ authRouter.get('/parishes', async (_req: Request, res: Response) => {
   }
 });
 
+// GET /api/auth/diocese - Publicly accessible official governing diocese details
+authRouter.get('/diocese', async (_req: Request, res: Response) => {
+  try {
+    const dioceseRows: any[] = await prisma.$queryRawUnsafe(`SELECT * FROM "Diocese" LIMIT 1;`);
+    if (dioceseRows.length > 0) {
+      return res.json(dioceseRows[0]);
+    }
+    return res.json({
+      dioceseName: 'Diocese of St. Thomas the Apostle, Melbourne',
+      rite: 'Syro-Malabar',
+      bishopName: 'Bishop Bosco Puthur',
+      chanceryAddress: '62 Moore Rd, Mill Park VIC 3082, Australia',
+      city: 'Melbourne',
+      state: 'VIC',
+      postalCode: '3082',
+      contactPhone: '+61 3 9404 1533',
+      contactEmail: 'chancery@syromalabar.org.au',
+      website: 'https://syromalabar.org.au',
+      logoUrl: '/branding/logo.png',
+    });
+  } catch (err: any) {
+    console.error('Fetch diocese error:', err);
+    return res.status(500).json({ error: 'Failed to fetch diocese details' });
+  }
+});
+
 // GET /api/auth/me
 authRouter.get('/me', authenticateJWT, async (req: Request, res: Response) => {
   try {

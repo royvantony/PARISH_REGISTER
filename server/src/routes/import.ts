@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma.js';
 import { authenticateJWT } from '../middleware/auth.js';
 import { FamilyStatus, RegistrationType, MemberRole, UserRole } from '@prisma/client';
 import { canUserImportRegistrations } from './permissions.js';
+import { normalizeAustralianState } from '../lib/address.js';
 
 export const importRouter = Router();
 
@@ -161,7 +162,7 @@ importRouter.get('/template', async (req: Request, res: Response) => {
   const sampleRows = [
     [
       'FAMILY',
-      'Valiyaveettil',
+      'Vadakumpadan',
       'St-Thomas',
       'Thomas Joseph',
       '1982-05-14',
@@ -413,7 +414,8 @@ importRouter.post('/preview', async (req: Request, res: Response) => {
         'Address',
       ]);
       const city = getRowValue(row, ['City / Suburb', 'City|address-1-city', 'Suburb', 'City']) || 'Brisbane';
-      const state = getRowValue(row, ['State', 'State/Province|address-1-state']) || 'QLD';
+      const rawState = getRowValue(row, ['State', 'State/Province|address-1-state']);
+      const state = normalizeAustralianState(rawState);
       const postalCode = getRowValue(row, ['Postal Code', 'ZIP / Postal Code|address-1-zip', 'Postcode', 'Zip']);
 
       // 6. Spouse
@@ -560,12 +562,12 @@ importRouter.post('/preview', async (req: Request, res: Response) => {
         isDuplicate: Boolean(duplicateMatch),
         duplicateInfo: duplicateMatch
           ? {
-              id: duplicateMatch.id,
-              familyCode: duplicateMatch.familyCode,
-              houseName: duplicateMatch.houseName,
-              headFullName: duplicateMatch.headFullName,
-              status: duplicateMatch.status,
-            }
+            id: duplicateMatch.id,
+            familyCode: duplicateMatch.familyCode,
+            houseName: duplicateMatch.houseName,
+            headFullName: duplicateMatch.headFullName,
+            status: duplicateMatch.status,
+          }
           : null,
         data: {
           registrationType: regType,
@@ -704,7 +706,7 @@ importRouter.post('/save-single', async (req: Request, res: Response) => {
           unitId: resolvedUnitId,
           streetAddress: streetAddress ? streetAddress.trim() : null,
           city: city ? city.trim() : null,
-          state: state ? state.trim() : null,
+          state: normalizeAustralianState(state),
           postalCode: postalCode ? postalCode.trim() : null,
           primaryPhone: headPhone ? headPhone.trim() : null,
           primaryEmail: headEmail ? headEmail.trim() : null,

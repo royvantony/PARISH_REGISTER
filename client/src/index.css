@@ -144,3 +144,31 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--scrollbar-hover, #baa991);
 }
+
+/* Document preview horizontal scrollbar for mobile & responsive viewing */
+.preview-scroll-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: auto;
+  scrollbar-color: #94a3b8 rgba(0, 0, 0, 0.08);
+}
+
+.preview-scroll-container::-webkit-scrollbar {
+  height: 8px;
+}
+
+.preview-scroll-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 9999px;
+  margin: 0 8px;
+}
+
+.preview-scroll-container::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 9999px;
+}
+
+.preview-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+

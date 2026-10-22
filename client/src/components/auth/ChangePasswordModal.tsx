@@ -10,7 +10,7 @@ interface ChangePasswordModalProps {
 }
 
 export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen }) => {
-  const { user, updatePassword, logout } = useAuth();
+  const { user, updatePassword, requestLogout } = useAuth();
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -113,8 +113,8 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen
           <div className="pt-3 border-t border-parish-border flex items-center justify-between gap-3">
             <button
               type="button"
-              onClick={logout}
-              className="text-xs text-parish-text-muted hover:text-red-600 transition-colors font-medium"
+              onClick={requestLogout}
+              className="text-xs text-parish-text-muted hover:text-red-600 transition-colors font-medium cursor-pointer"
             >
               Cancel & Sign Out
             </button>

@@ -35,7 +35,9 @@ api.interceptors.response.use(
       if (!isLoginRequest && window.location.pathname !== '/login') {
         localStorage.removeItem('parish_token');
         localStorage.removeItem('parish_user');
-        window.location.href = '/login';
+        localStorage.removeItem('parish_last_activity');
+        localStorage.removeItem('parish_active_id');
+        window.location.replace('/login');
       }
     }
     return Promise.reject(error);

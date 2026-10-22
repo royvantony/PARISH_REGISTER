@@ -20,7 +20,7 @@ export const SYSTEM_MODULES = [
   { key: 'SETTINGS', name: 'System Settings & Masters', category: 'Administration' },
 ];
 
-const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, {
+export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, {
   canView: boolean;
   canCreate: boolean;
   canEdit: boolean;
@@ -607,5 +607,45 @@ permissionsRouter.get('/import', async (req: Request, res: Response) => {
     return res.status(500).json({ error: 'Failed to check import permissions.' });
   }
 });
+
+/**
+ * Checks if a user has export capability for a specific module (default: REGISTER)
+ */
+export async function canUserExportModule(
+  userId: number,
+  role: UserRole,
+  parishId: number,
+  module: string = 'REGISTER'
+): Promise<boolean> {
+  if (role === UserRole.SUPER_ADMIN || role === UserRole.DIOCESAN_ADMIN || role === UserRole.PARISH_SUPER_ADMIN) {
+    return true;
+  }
+  const override = await prisma.userPermissionOverride.findUnique({
+    where: {
+      userId_module: {
+        userId,
+        module,
+      },
+    },
+  });
+  if (override?.canExport !== null && override?.canExport !== undefined) {
+    return Boolean(override.canExport);
+  }
+  const targetParishId = parishId || 1;
+  const rolePerm = await prisma.rolePermission.findUnique({
+    where: {
+      parishId_role_module: {
+        parishId: targetParishId,
+        role,
+        module,
+      },
+    },
+  });
+  if (rolePerm?.canExport !== null && rolePerm?.canExport !== undefined) {
+    return Boolean(rolePerm.canExport);
+  }
+  return Boolean(DEFAULT_ROLE_PERMISSIONS[role]?.[module]?.canExport ?? false);
+}
+
 
 

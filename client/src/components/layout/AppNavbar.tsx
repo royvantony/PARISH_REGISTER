@@ -1,12 +1,12 @@
 import React from 'react';
 import {
-  Church,
   LogOut,
   Menu,
   X,
 } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { ThemeSelector } from './ThemeSelector';
+import { CLIENT_BRANDING } from '../../config/branding';
 
 export interface AppNavbarProps {
   onToggleMobileMenu?: () => void;
@@ -15,8 +15,6 @@ export interface AppNavbarProps {
   activeParishCode?: string;
   userName?: string;
   userRole?: string;
-  availableParishes?: { id: number; parishCode: string; parishName: string }[];
-  onSelectParish?: (id: number) => void;
   onLogout?: () => void;
   onGoHome?: () => void;
 }
@@ -27,7 +25,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
   activeParishName = 'St. Alphonsa Syro-Malabar Parish',
   activeParishCode = 'SABN',
   userName = 'Super Admin',
-  userRole = 'DIOCESAN_ADMIN',
+  userRole = 'PARISH_ADMIN',
   onLogout,
   onGoHome,
 }) => {
@@ -40,10 +38,14 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
             type="button"
             onClick={onGoHome}
             title="Go to Home"
-            className="flex items-center gap-2.5 text-left focus:outline-none focus:ring-2 focus:ring-parish-primary rounded-xl transition-all cursor-pointer group"
+            className="flex items-center gap-3 text-left outline-none focus:outline-none focus:ring-0 focus-visible:outline-none rounded-xl transition-all cursor-pointer group select-none"
           >
-            <div className="w-9 h-9 rounded-xl bg-parish-primary text-white flex items-center justify-center shadow-sm shrink-0 group-hover:bg-parish-primary-hover transition-colors">
-              <Church className="w-5 h-5 text-white" />
+            <div className="h-10 px-2 py-0.5 rounded-xl bg-white border border-parish-border shadow-xs flex items-center justify-center shrink-0 group-hover:border-parish-primary/40 transition-colors">
+              <img
+                src={CLIENT_BRANDING.logoUrl}
+                alt={CLIENT_BRANDING.logoAlt}
+                className="h-8 w-auto object-contain shrink-0"
+              />
             </div>
             <div>
               <span className="font-extrabold text-sm tracking-tight text-parish-text uppercase hidden sm:inline-block group-hover:text-parish-primary transition-colors">
@@ -54,10 +56,10 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
 
           <div className="h-5 w-[1px] bg-parish-border hidden sm:block" />
 
-          {/* Active Parish Display (Locked per session - To switch, logout and log in) */}
+          {/* Active Parish Display (Locked per session - Selected during login) */}
           <div
             className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-parish-surface-subtle text-parish-text text-xs font-semibold border border-parish-border select-none"
-            title={`Active Parish: ${activeParishName} (${activeParishCode}) - To switch parish, please log out and sign in.`}
+            title={`Active Parish: ${activeParishName} (${activeParishCode})`}
           >
             <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse shrink-0" />
             <span className="truncate max-w-[225px] sm:max-w-[310px] md:max-w-[360px]">{activeParishName}</span>

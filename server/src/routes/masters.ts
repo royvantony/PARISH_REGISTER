@@ -191,7 +191,10 @@ mastersRouter.post('/users', async (req: Request, res: Response) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    const targetParishId = parishId;
+    const isGlobalCaller =
+      req.user?.role === UserRole.SUPER_ADMIN ||
+      req.user?.role === UserRole.DIOCESAN_ADMIN;
+    const targetParishId = isGlobalCaller && req.body.parishId ? parseInt(req.body.parishId, 10) : parishId;
 
     const newUser = await prisma.parishUser.create({
       data: {

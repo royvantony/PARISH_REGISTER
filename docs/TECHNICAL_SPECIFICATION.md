@@ -456,18 +456,44 @@ The entire frontend is engineered following strict reactive design guidelines ac
 - **Mobile-Adaptive Presentation**:
   - **Mobile (< 768px)**: Renders a clean card list with avatar initials, role badge, email link, assigned ward/parish, and action controls (Edit, Permissions, Activate/Deactivate).
   - **Desktop (≥ 768px)**: Renders a tabular data view with user avatars, roles, jurisdictions, and action controls.
-- **Create User Modal**: Form with Bcrypt password hashing, role selection strictly across the 4 active Parish roles, one-click WhatsApp/SMS copy, and unit assignment selector for Ward Users.
+- **Create User Modal**: Streamlined form with Bcrypt password hashing, role selection across active Parish roles, one-click WhatsApp/SMS credentials copy, and ward assignment for Ward Users. Accounts automatically and seamlessly inherit the active logged-in parish context (`req.activeParishId`) without requiring manual parish dropdown selection.
 - **Edit User Modal**: Allows editing only editable attributes (Full Name, Role assignment, Ward Jurisdiction for Ward Users, and optional password reset). Fixed system identifiers (Login Email and Parish Jurisdiction) remain strictly locked and read-only. Role change is restricted based on hierarchy (users cannot change their own role, lower roles cannot promote to higher tiers).
 - **Deactivate/Activate Action**: Enforces hierarchy checks (lower roles cannot deactivate superiors, Super Admin cannot be deactivated from UI) and uses [`ConfirmDialog.tsx`](file:///c:/Dev/PARISH_REGISTER/client/src/components/ui/ConfirmDialog.tsx) to prevent accidental credential revocation.
 
 ### 9.3 Live Executive Dashboard (`/dashboard`)
 - **Backend API**: `GET /api/dashboard/stats` and `GET /api/dashboard/charts`.
-- **Live KPI Metric Cards**: Synchronized counts for Registered Families (73), Parish Members (147), Family Units / Wards (8), and Direct Debit Pledges (31) with monthly contribution totals.
-- **Recharts Integration**:
-  - **Ward Distribution Bar Chart**: Wrapped inside `ResponsiveContainer width="100%"` for automatic mobile responsiveness, styled with Sacred Green (`#1b4332`).
-  - **Demographic Donut Chart**: Breakdown of families, international students, and individuals (singles & adults).
-  - **Top Indian Dioceses**: Visual ranking of origin eparchies (Pala, Ernakulam-Angamaly, Thrissur, etc.).
-  - **Recent Activity Feed**: Real-time pastoral annotations and sacramental note trail.
+- **People & Community KPI Cards (Finance Omitted)**:
+  - **Registered Families**: Active household count with instant link to family register.
+  - **Parishioners (All Souls)**: Total parish membership headcount across all registered households.
+  - **Adults (18+)**: Adult parishioner count and percentage share (~71%).
+  - **Children & Minors (<18)**: Minors in school, youth groups, and Sunday catechism (~29%).
+  - **Family Units / Wards**: Count of active geographic and demographic prayer wards.
+- **Vibrant & Color-Coded Recharts Suite**:
+  1. **Adults vs. Children Ratio (Donut Chart)**:
+     - Hollow center displaying total parish souls (`1,234`).
+     - Royal Blue (`#2563eb`) for Adults (18+) and Warm Golden Amber (`#f59e0b`) for Children (<18).
+     - Breakdown tiles with exact counts and percentage tags.
+  2. **Household Registration Demographics (Donut Chart)**:
+     - Parts-of-a-whole breakdown for Families (Emerald `#10b981`), International Students (Sapphire Blue `#3b82f6`), and Individuals (Fuchsia Pink `#ec4899`).
+     - Center display showing total households (`364`).
+  3. **Age Demographics & Generations (Vertical Column Bar Chart)**:
+     - 7 pastoral life stages: `0–4 yrs` (Infants/Toddlers), `5–12 yrs` (Primary/Catechism), `13–17 yrs` (Teens/Confirmation), `18–25 yrs` (Young Adults), `26–45 yrs` (Young Families), `46–64 yrs` (Mature Adults), and `65+ yrs` (Seniors/Elders).
+     - Individual multi-colored column bars with tooltips and summary tag pills.
+  4. **Household Size Breakdown (Vertical Frequency Column Chart)**:
+     - Frequency distribution of members per family (`1 Member`, `2 Members`, `3 Members`, `4 Members`, `5+ Members`).
+     - Identifies core household composition across the parish.
+  5. **Parish Registration Timeline (Monotone Gradient Area Chart)**:
+     - Historical annual family registration influx from inaugural years through **2026**.
+     - Dual-stop emerald-to-cyan gradient fill showing both annual new intake and cumulative running total.
+  6. **Top Suburbs Spread (Horizontal Bar Chart)**:
+     - Top 8 Greater Brisbane residential suburbs (*Carseldine, Mango Hill, Chermside West, Bracken Ridge, Bridgeman Downs, North Lakes, McDowall, Aspley*).
+     - Horizontal bar orientation (`layout="vertical"`) for clean readability of long suburb names.
+  7. **Families by Ward Jurisdiction (Vertical Column Bar Chart)**:
+     - Distribution across all active prayer wards with 25° angled category labels and a curated 16-color rainbow palette.
+  8. **Dioceses of Origin in Kerala / India (Ranked Leaderboard List)**:
+     - Interactive ranked list of native eparchies (*Ernakulam-Angamaly, Changanacherry, Palai, Kothamangalam, etc.*) with real-time text search, medal badges, and expandable drawer.
+  9. **Record History & Activity Feed**:
+     - Real-time administrative and pastoral note timeline.
 
 ### 9.4 Parish Register Directory & Drawer (`/register`)
 - **Backend API**: `GET /api/families?search=...&unitId=...&status=...&type=...` and `GET /api/families/:id`.
@@ -475,7 +501,7 @@ The entire frontend is engineered following strict reactive design guidelines ac
   - **Mobile (< 768px)**: Rich family cards with primary Head of Family name in bold, house name underneath, family code, ward badge, address, and quick Details action.
   - **Desktop (≥ 768px)**: High-density directory table with search, ward dropdown, status pills, and pagination.
 - **Slide-Over Detail Drawer ([`Drawer.tsx`](file:///c:/Dev/PARISH_REGISTER/client/src/components/ui/Drawer.tsx))**:
-  - Dwelling & Australian contact card (Street, Suburb, Phone, Email).
+  - Residential address & Australian contact card (Street, Suburb, Phone, Email).
   - Ecclesiastical roots in India (Native diocese and home parish).
   - Family members breakdown with role badges (Head, Spouse, Child), birth dates, calculated ages, and canonical change trail.
   - **Dedicated Direct Debit Area**: Integrated pledge view with amount, payment frequency, bank account last 4 digits, and purpose notes. Strictly visible to `SUPER_ADMIN` and `PARISH_ADMIN`; masked to `null` for `PARISH_USER`, `DIOCESAN_USER`, and `WARD_USER`.
@@ -500,6 +526,28 @@ To accelerate local testing across all hierarchical permissions without manually
 - **🛡️ Parish Admin (Trustee)**: `trustee@parish.org` / `parishAdmin2026!` (Executive committee, parish management, direct debit access)
 - **📋 Parish User (Secretary)**: `secretary@stalphonsabrisbane.org.au` / `parishAdmin2026!` (Parish office, registrations, no finance)
 - **🛠️ Platform Super Admin (Developer)**: `royvantony@gmail.com` / `DevSuperAdmin2026!` (Platform developer, cross-parish scope)
+
+### 9.7 Household Dossier & Print Engine ([`HouseholdDossierModal.tsx`](file:///c:/Dev/PARISH_REGISTER/client/src/components/families/HouseholdDossierModal.tsx))
+- **A4 Portrait Dossier Layout**: Clean printable document generating high-resolution A4 single-household sheets for pastoral visits, archives, and official records.
+- **Print Themes**:
+  - **🎨 Formatted (Colour)**: Delicate emerald (`#86efac`) and amber (`#fde68a`) thin card outlines, sacred green titles, and soft sand containers.
+  - **🖨️ Flat (B&W Ink-Saver)**: High-contrast pure black-and-white borders for low-cost laser printing.
+- **Ecclesiastical Identity & Member Grid**:
+  - Head of Family and Spouse highlighted in dedicated top hierarchy cards.
+  - Ordered grid of children and dependents with dates of birth, calculated ages, and relationships.
+  - Australian address card alongside Native Indian Eparchy / Origin Parish details.
+  - Optional inclusion of Pastoral & Administration remarks.
+- **Single-Parish Focused Branding**: Parish letterhead and crest without distracting diocesan gateway headers, optimized for parish-level operational independence.
+
+### 9.8 Parish Register Directory Print Preview ([`ParishRegisterListPrintModal.tsx`](file:///c:/Dev/PARISH_REGISTER/client/src/components/families/ParishRegisterListPrintModal.tsx))
+- **A4 Continuous Register Report**: Formats active directory records into clean, printable A4 pages for committee meetings, annual general body reviews, and ward rosters.
+- **Filter-Aware Generation**: Automatically respects active search queries, ward filters, and registration type filters when generating the document.
+- **Hidden Iframe Printing**: Seamless browser printing triggered via a detached sandbox iframe, ensuring exact paper dimensions without UI toolbar interference.
+
+### 9.9 Batch Import & Excel Export Engines
+- **Forminator / CSV Import (`/import`)**: Drag-and-drop batch ingestion for parish registration spreadsheets with header mapping, auto-cleaning of Australian mobile numbers, Indian diocese normalization, and automated family code allocation (`SABN100xxx`).
+- **Excel Export**: Full directory `.xlsx` generation using ExcelJS, delivering structured multi-column workbooks with Head of Family, House Name, Ward, Phone, Address, and Member Counts.
+
 
 
 

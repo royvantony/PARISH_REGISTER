@@ -41,6 +41,23 @@ enum UserRole {
 // 1. GLOBAL & TENANT MASTERS
 // ----------------------------------------------------
 
+model Diocese {
+  id              Int      @id @default(autoincrement())
+  dioceseName     String   @default("Diocese of St. Thomas the Apostle, Melbourne")
+  rite            String   @default("Syro-Malabar")
+  bishopName      String?  @default("Bishop Bosco Puthur")
+  chanceryAddress String?  @default("62 Moore Rd, Mill Park VIC 3082, Australia")
+  city            String?  @default("Melbourne")
+  state           String?  @default("VIC")
+  postalCode      String?  @default("3082")
+  contactPhone    String?  @default("+61 3 9404 1533")
+  contactEmail    String?  @default("chancery@syromalabar.org.au")
+  website         String?  @default("https://syromalabar.org.au")
+  logoUrl         String?  @default("/branding/logo.png")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
 model NativeDiocese {
   id           Int      @id @default(autoincrement())
   parishId     Int

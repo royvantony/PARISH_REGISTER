@@ -24,6 +24,22 @@ export interface Parish {
   parishCode: string;
   parishName: string;
   city?: string;
+  state?: string;
+}
+
+export interface DioceseInfo {
+  id?: number;
+  dioceseName: string;
+  rite?: string;
+  bishopName?: string | null;
+  chanceryAddress?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+  contactPhone?: string | null;
+  contactEmail?: string | null;
+  website?: string | null;
+  logoUrl?: string | null;
 }
 
 // ============================================================================
@@ -55,6 +71,7 @@ export interface ModulePermission {
 export interface AuthContextType {
   user: User | null;
   token: string | null;
+  diocese: DioceseInfo | null;
   activeParish: Parish | null;
   availableParishes: Parish[];
   permissions: Record<string, ModulePermission>;
@@ -62,9 +79,17 @@ export interface AuthContextType {
   isAuthenticated: boolean;
   isWarningOpen: boolean;
   remainingSeconds: number;
+  isLogoutConfirmOpen: boolean;
+  openLogoutConfirm: () => void;
+  closeLogoutConfirm: () => void;
+  requestLogout: () => void;
   hasPermission: (moduleKey: string, action?: PermissionAction) => boolean;
   staySignedIn: () => void;
-  login: (email: string, password: string, overrideParishId?: number) => Promise<{ success: boolean; error?: string }>;
+  login: (
+    email: string,
+    password: string,
+    overrideParishId?: number
+  ) => Promise<{ success: boolean; needsParishSelection?: boolean; error?: string }>;
   logout: () => void;
   setActiveParishById: (parishId: number) => void;
   updatePassword: (newPassword: string) => Promise<{ success: boolean; error?: string }>;
@@ -76,29 +101,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(localStorage.getItem('parish_token'));
   const [permissions, setPermissions] = useState<Record<string, ModulePermission>>({});
-  const [availableParishes, setAvailableParishes] = useState<Parish[]>([
+  const DEFAULT_PARISH_LIST: Parish[] = [
     { id: 1, parishCode: 'SABN', parishName: 'St. Alphonsa Syro-Malabar Parish Brisbane', city: 'Brisbane North' },
     { id: 4, parishCode: 'SMEL', parishName: 'St. Thomas Cathedral Melbourne', city: 'Melbourne' },
     { id: 5, parishCode: 'SSYD', parishName: 'St. Marys Parish Sydney', city: 'Sydney' },
     { id: 6, parishCode: 'SPER', parishName: 'St. Joseph Parish Perth', city: 'Perth' },
     { id: 7, parishCode: 'SADL', parishName: 'St. Euphrasia Parish Adelaide', city: 'Adelaide' },
-  ]);
-  const [activeParish, setActiveParish] = useState<Parish | null>(null);
+  ];
+  const [availableParishes, setAvailableParishes] = useState<Parish[]>(DEFAULT_PARISH_LIST);
+  const [diocese, setDiocese] = useState<DioceseInfo | null>(null);
+  const [activeParish, setActiveParish] = useState<Parish | null>(() => {
+    const savedParishId = localStorage.getItem('parish_active_id');
+    const matched = DEFAULT_PARISH_LIST.find((p) => p.id === Number(savedParishId));
+    return matched || DEFAULT_PARISH_LIST[0];
+  });
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch active parishes from backend public endpoint on boot
+  // Fetch active parishes and official diocese details on boot
   useEffect(() => {
-    const fetchPublicParishes = async () => {
+    const fetchPublicData = async () => {
       try {
-        const res = await api.get('/auth/parishes');
-        if (Array.isArray(res.data) && res.data.length > 0) {
-          setAvailableParishes(res.data);
+        const [parishesRes, dioceseRes] = await Promise.all([
+          api.get('/auth/parishes'),
+          api.get('/auth/diocese').catch(() => ({ data: null })),
+        ]);
+        if (Array.isArray(parishesRes.data) && parishesRes.data.length > 0) {
+          setAvailableParishes(parishesRes.data);
+        }
+        if (dioceseRes.data) {
+          setDiocese(dioceseRes.data);
         }
       } catch (e) {
         // Fall back to seeded initial state
       }
     };
-    fetchPublicParishes();
+    fetchPublicData();
   }, []);
 
   // Initialize active parish from local storage or default to Brisbane
@@ -106,10 +143,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const savedParishId = localStorage.getItem('parish_active_id');
     const matched = availableParishes.find((p) => p.id === Number(savedParishId));
     if (matched) {
-      setActiveParish(matched);
+      setActiveParish((prev) => (prev?.id === matched.id && prev?.parishName === matched.parishName ? prev : matched));
     } else if (availableParishes.length > 0) {
-      setActiveParish(availableParishes[0]);
-      localStorage.setItem('parish_active_id', String(availableParishes[0].id));
+      const fallback = availableParishes[0];
+      setActiveParish((prev) => (prev?.id === fallback.id && prev?.parishName === fallback.parishName ? prev : fallback));
+      localStorage.setItem('parish_active_id', String(fallback.id));
     }
   }, [availableParishes]);
 
@@ -161,7 +199,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const found =
               res.data.availableParishes.find((p: Parish) => p.id === Number(savedId)) ||
               res.data.availableParishes[0];
-            setActiveParish(found);
+            setActiveParish((prev) => (prev?.id === found.id && prev?.parishName === found.parishName ? prev : found));
             localStorage.setItem('parish_active_id', String(found.id));
           }
 
@@ -190,10 +228,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [activeParish?.id]);
 
-  const login = async (email: string, password: string, overrideParishId?: number) => {
+  const login = async (
+    email: string,
+    password: string,
+    overrideParishId?: number
+  ): Promise<{ success: boolean; needsParishSelection?: boolean; error?: string }> => {
     try {
       const res = await api.post('/auth/login', { email, password });
-      const { token: receivedToken, user: receivedUser, availableParishes: returnedParishes, defaultParishId } = res.data;
+      const {
+        token: receivedToken,
+        user: receivedUser,
+        availableParishes: returnedParishes,
+        defaultParishId,
+      } = res.data;
 
       // Persist auth
       localStorage.setItem('parish_token', receivedToken);
@@ -202,9 +249,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setToken(receivedToken);
       setUser(receivedUser);
 
-      // Setup available parishes
       if (returnedParishes && returnedParishes.length > 0) {
         setAvailableParishes(returnedParishes);
+      }
+
+      const isGlobal =
+        receivedUser.role === 'SUPER_ADMIN' ||
+        receivedUser.role === 'DIOCESAN_ADMIN' ||
+        receivedUser.role === 'DIOCESAN_USER' ||
+        receivedUser.parishId === null;
+
+      // If global role and no override supplied, prompt user to choose parish in intermediate window
+      if (isGlobal && !overrideParishId) {
+        fetchPermissions();
+        return { success: true, needsParishSelection: true };
+      }
+
+      // Parish user or explicit override
+      if (returnedParishes && returnedParishes.length > 0) {
         const targetId = overrideParishId || defaultParishId || returnedParishes[0].id;
         const targetParish = returnedParishes.find((p: Parish) => p.id === targetId) || returnedParishes[0];
         setActiveParish(targetParish);
@@ -217,7 +279,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Fetch user permissions
       fetchPermissions();
 
-      return { success: true };
+      return { success: true, needsParishSelection: false };
     } catch (err: any) {
       const errorMsg = err.response?.data?.error || 'Invalid email or password. Please try again.';
       return { success: false, error: errorMsg };
@@ -226,6 +288,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [isWarningOpen, setIsWarningOpen] = useState(false);
   const [remainingSeconds, setRemainingSeconds] = useState(WARNING_BEFORE_LOGOUT_SECONDS);
+  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
+
+  const openLogoutConfirm = () => setIsLogoutConfirmOpen(true);
+  const closeLogoutConfirm = () => setIsLogoutConfirmOpen(false);
+  const requestLogout = () => setIsLogoutConfirmOpen(true);
 
   const staySignedIn = () => {
     localStorage.setItem('parish_last_activity', String(Date.now()));
@@ -234,14 +301,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
+    // 1. Remove all authentication tokens and stored keys completely
     localStorage.removeItem('parish_token');
     localStorage.removeItem('parish_user');
     localStorage.removeItem('parish_last_activity');
+    localStorage.removeItem('parish_active_id');
+
+    // 2. Clear state
     setUser(null);
     setToken(null);
     setPermissions({});
     setIsWarningOpen(false);
-    window.location.href = '/login';
+    setIsLogoutConfirmOpen(false);
+
+    // 3. Immediately replace location so user cannot use browser 'Back' button
+    window.location.replace('/login');
   };
 
   // --------------------------------------------------------------------------
@@ -280,8 +354,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     activityEvents.forEach((ev) => window.addEventListener(ev, recordUserActivity, { passive: true }));
 
-    // Accurate 1-second interval to track remaining seconds and trigger pre-logout warning
-    const checkInterval = setInterval(() => {
+    const checkSessionStatus = () => {
       const storedLast = Number(localStorage.getItem('parish_last_activity') || Date.now());
       const elapsedSeconds = Math.floor((Date.now() - storedLast) / 1000);
       const totalTimeoutSeconds = INACTIVITY_TIMEOUT_MINUTES * 60;
@@ -295,18 +368,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         );
         logout();
       } else if (secondsLeft <= WARNING_BEFORE_LOGOUT_SECONDS) {
-        setRemainingSeconds(secondsLeft);
+        setRemainingSeconds(Math.max(0, secondsLeft));
         setIsWarningOpen(true);
       } else {
         if (isWarningOpen) {
           setIsWarningOpen(false);
         }
       }
-    }, 1000);
+    };
+
+    // Accurate 1-second interval to track remaining seconds and trigger pre-logout warning
+    const checkInterval = setInterval(checkSessionStatus, 1000);
+
+    // Immediate check when tab becomes visible or gains focus (handles background throttling / sleep wake-up)
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        checkSessionStatus();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+
+    // Cross-tab synchronization: if another tab signs out or clears token, immediately log out this tab too
+    const handleStorageEvent = (e: StorageEvent) => {
+      if (e.key === 'parish_token' && !e.newValue) {
+        logout();
+      }
+    };
+    window.addEventListener('storage', handleStorageEvent);
 
     return () => {
       activityEvents.forEach((ev) => window.removeEventListener(ev, recordUserActivity));
       clearInterval(checkInterval);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      window.removeEventListener('storage', handleStorageEvent);
       if (throttleTimer) clearTimeout(throttleTimer);
     };
   }, [token, user, isWarningOpen]);
@@ -341,6 +437,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         user,
         token,
+        diocese,
         activeParish,
         availableParishes,
         permissions,
@@ -348,6 +445,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthenticated: !!token && !!user,
         isWarningOpen,
         remainingSeconds,
+        isLogoutConfirmOpen,
+        openLogoutConfirm,
+        closeLogoutConfirm,
+        requestLogout,
         hasPermission,
         staySignedIn,
         login,

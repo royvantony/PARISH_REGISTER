@@ -119,8 +119,8 @@ export const VerifyRegistrationModal: React.FC<VerifyRegistrationModalProps> = (
 
   // Address
   const [streetAddress, setStreetAddress] = useState<string>(record.data.streetAddress || '');
-  const [city, setCity] = useState<string>(record.data.city || 'Brisbane');
-  const [state, setState] = useState<string>(record.data.state || 'QLD');
+  const [city, setCity] = useState<string>(record.data.city || '');
+  const [state, setState] = useState<string>(record.data.state || '');
   const [postalCode, setPostalCode] = useState<string>(record.data.postalCode || '');
 
   // Roots
@@ -153,8 +153,8 @@ export const VerifyRegistrationModal: React.FC<VerifyRegistrationModalProps> = (
       setSpouseEmail(record.data.spouseEmail || '');
       setChildren(record.data.children || []);
       setStreetAddress(record.data.streetAddress || '');
-      setCity(record.data.city || 'Brisbane');
-      setState(record.data.state || 'QLD');
+      setCity(record.data.city || '');
+      setState(record.data.state || '');
       setPostalCode(record.data.postalCode || '');
       setOriginParish(record.data.originParish || '');
       setOriginDiocese(record.data.originDiocese || '');
@@ -270,11 +270,10 @@ export const VerifyRegistrationModal: React.FC<VerifyRegistrationModalProps> = (
                   {' — '}
                   <span className="font-semibold">{record.duplicateInfo?.houseName}</span>
                   {record.duplicateInfo?.status && (
-                    <span className={`ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
-                      record.duplicateInfo.status === 'PENDING'
-                        ? 'bg-amber-200 text-amber-900 border border-amber-300'
-                        : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                    }`}>
+                    <span className={`ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${record.duplicateInfo.status === 'PENDING'
+                      ? 'bg-amber-200 text-amber-900 border border-amber-300'
+                      : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                      }`}>
                       {record.duplicateInfo.status}
                     </span>
                   )}
@@ -408,7 +407,7 @@ export const VerifyRegistrationModal: React.FC<VerifyRegistrationModalProps> = (
               <Input
                 value={houseName}
                 onChange={(e) => setHouseName(e.target.value)}
-                placeholder="e.g. Valiyaveettil"
+                placeholder="e.g. Vadakumpadan"
                 required
               />
             </div>

@@ -66,7 +66,7 @@ export const ReactivateFamilyModal: React.FC<ReactivateFamilyModalProps> = ({
               Restore to Active Parish Directory
             </p>
             <p className="text-emerald-800 leading-relaxed">
-              Are you sure you want to restore <strong>{houseName}</strong> back to <strong>ACTIVE</strong> status? They will immediately reappear in the active directory, census counts, ward rosters, and parish communications.
+              Are you sure you want to restore <strong>{houseName}</strong> back to <strong>ACTIVE</strong> status? They will immediately reappear in the active directory, census counts and parish communications.
             </p>
           </div>
         </div>

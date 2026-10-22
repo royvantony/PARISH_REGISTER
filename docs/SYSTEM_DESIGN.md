@@ -8,9 +8,9 @@ The application modernizes flat-file registration forms (WordPress Forminator ex
 - **Traditional Family Registrations**: Normalized structure for Head, Spouse, Children, and Dependents.
 - **Individual Students & Singles**: Independent 1-person household records capable of sharing physical residential addresses without data collision.
 - **Temporal & Lifecycle Tracking**: Preserving parishioner historical status across marriages, student-to-family transitions, and ward moves without hard deletions.
-- **Executive Analytics & Visual Charts**: Interactive dashboards powered by Recharts showing ward distributions, demographic breakdowns, Kerala diocese origin trends, and stewardship pledges.
+- **Executive Analytics & Visual Charts**: Interactive dashboards powered by Recharts showing generational splits (Adults vs. Kids), age cohorts, household sizes, parish timeline growth, suburban density, ward distributions, and Kerala diocese origins.
 - **Document & Media Vault**: Archiving parish release letters from India and digital signatures.
-- **Access Control (RBAC)**: 7-Tier Hierarchy: Super Admin (Developer), Diocesan Admin (Bishop/Chancellor), Diocesan User (Auditor/Staff), Parish Super Admin (Priest - supreme parish authority), Parish Admin (Trustees/Executives), Parish User (Secretary/General), and Ward User (Ward-Isolated Unit Leader).
+- **Print & Export Engine**: A4 Single-Household Dossiers, Full Parish Register Directory Print Preview, and Excel exports.
 
 ---
 
@@ -519,19 +519,19 @@ model UserPermissionOverride {
 ```mermaid
 flowchart LR
     P1["Phase 1: Local Foundation & Data Migration<br/>✅ COMPLETED"] --> P2["Phase 2: Backend REST API & Business Logic<br/>✅ COMPLETED"]
-    P2 --> P3["Phase 3: React Frontend & Modern Dashboard<br/>🔄 NEXT STEP"]
-    P3 --> P4["Phase 4: Excel Import & Roster Export Engine"]
-    P4 --> P5["Phase 5: Local Testing & Priest/Committee Sign-Off"]
+    P2 --> P3["Phase 3: React Frontend & Analytics Dashboard<br/>✅ COMPLETED"]
+    P3 --> P4["Phase 4: Excel Import & Directory Print Engines<br/>✅ COMPLETED"]
+    P4 --> P5["Phase 5: Local Testing & Priest/Committee Sign-Off<br/>🔄 ACTIVE"]
     P5 --> P6["Phase 6: Future Cloud Deployment (Free Tier)"]
-
 ```
 
 | Phase | Milestone | Scope & Deliverables |
 | :--- | :--- | :--- |
-| **Phase 1** | **Local Foundation & Data Migration** | ✅ **COMPLETED**: PostgreSQL in Docker, Prisma migrations, 73 families & 147 members ingested from CSV, Prisma Studio tested. |
-| **Phase 2** | **Backend REST API & Logic** | ✅ **COMPLETED**: Express API on port 5000, JWT Auth, Active Parish Middleware, Dashboard stats, Parish Register search API tested. |
-| **Phase 3** | **React Frontend & Modern Dashboard** | • **Sub-Phase 3.1: Design System & Shell** (✅ **COMPLETED**: Warm Linen & Sacred Green tokens, reusable `<Button>`, `<Badge>`, `<Input>`, `<Modal>`, `<Drawer>`, `<ConfirmDialog>`, frosted `<AppNavbar>` with Diocesan Parish Switcher).<br/>• **Sub-Phase 3.2: Auth & Protected Routes** (✅ **COMPLETED**: Modern `/login` screen, Diocesan Admin working parish selector, `AuthContext` with JWT persistence, `ProtectedRoute` guards, automatic `x-parish-id` header).<br/>• **Sub-Phase 3.3: Master Data Screens & RBAC Matrix** (✅ **COMPLETED**: Wards `/units` with live add/edit modals; Users & Access Rights `/users` with 3 sub-tabs: Authorized Users table & mobile cards, Role Permissions Matrix across 8 modules [View, Create, Edit, Archive, Delete, Export], and Granular User Overrides with strict Ward Coordinator database isolation).<br/>• **Sub-Phase 3.4: Executive Dashboard** (✅ **COMPLETED**: Live KPI cards, Recharts responsive charts for Ward Distribution & Registration Types, Top Kerala Dioceses, and Activity Feed).<br/>• **Sub-Phase 3.5: Parish Register Directory & Drawer** (✅ **COMPLETED**: Live searchable directory, priority Family Head first with house name underneath, multi-filter by ward/status/type, slide-over `<Drawer>` with dedicated Direct Debit section, member breakdown, and mobile responsive card view).<br/>• **Sub-Phase 3.6: Registration Wizard & Merge** (🔄 **NEXT**: Multi-step forms, dynamic child repeater, non-destructive marriage merge). |
-| **Phase 4** | **Import / Export Tools** | • Drag-and-drop Excel/CSV importer for new Forminator files.<br/>• One-click export of printable rosters (PDF/Excel) for parish priests and ward leaders. |
-| **Phase 5** | **Local Testing & UAT** | • End-to-end acceptance testing strictly on `localhost`.<br/>• Validation with parish committee and data sanity verification. |
+| **Phase 1** | **Local Foundation & Data Migration** | ✅ **COMPLETED**: PostgreSQL in Docker, Prisma migrations, 497 families & 1,626 members ingested, Prisma Studio tested. |
+| **Phase 2** | **Backend REST API & Logic** | ✅ **COMPLETED**: Express API on port 5000, JWT Auth, Active Parish Middleware, Dashboard stats, demographic aggregations, and Parish Register search API. |
+| **Phase 3** | **React Frontend & Modern Dashboard** | • **Sub-Phase 3.1: Design System & Shell** (✅ **COMPLETED**: Warm Linen & Sacred Green tokens, reusable `<Button>`, `<Badge>`, `<Input>`, `<Modal>`, `<Drawer>`, `<ConfirmDialog>`, locked parish badge).<br/>• **Sub-Phase 3.2: Auth & Protected Routes** (✅ **COMPLETED**: Clean `/login` screen without pre-login parish picker, intermediate parish selector for global admin roles, `AuthContext` with JWT persistence, `ProtectedRoute` guards, automatic `x-parish-id` header).<br/>• **Sub-Phase 3.3: Master Data Screens & RBAC Matrix** (✅ **COMPLETED**: Wards `/units` with live add/edit modals; Users & Access Rights `/users` with 3 sub-tabs: Authorized Users table & mobile cards, Role Permissions Matrix across 8 modules, and Granular User Overrides with strict Ward Coordinator database isolation. Automatic logged-in parish inheritance).<br/>• **Sub-Phase 3.4: Executive Dashboard** (✅ **COMPLETED**: 5 People/Community KPI cards, Recharts suite with 7 vibrant charts: Adults vs. Kids Donut, Household Types Donut, Age Generations Column Bar, Household Size Frequency Column Bar, Registration Timeline Gradient Area, Top Suburbs Horizontal Bar, Ward Jurisdictions Rainbow Bar, and Kerala Dioceses Ranked List).<br/>• **Sub-Phase 3.5: Parish Register Directory & Drawer** (✅ **COMPLETED**: Live searchable directory, priority Family Head first with house name underneath, multi-filter by ward/status/type, slide-over `<Drawer>` with member breakdown, and mobile responsive card view).<br/>• **Sub-Phase 3.6: Registration Wizard & Merge** (✅ **COMPLETED**: Multi-step registration forms `/register/new`, dynamic child repeater, non-destructive marriage merge). |
+| **Phase 4** | **Import / Export Tools & Print Engines** | ✅ **COMPLETED**: Drag-and-drop Forminator XLSX/CSV importer (`/import`), Full Directory Excel export, Household Dossier A4 Print Engine with Formatted Colour & B&W Ink-Saver themes, and Multi-page Parish Register Directory Print Preview. |
+| **Phase 5** | **Local Testing & UAT** | 🔄 **ACTIVE**: End-to-end acceptance testing strictly on `localhost`. Validation with parish committee and data sanity verification. |
 | **Phase 6** | **Future Cloud Deployment** | • Push to private GitHub.<br/>• Deploy to Supabase (PostgreSQL in Sydney, Australia) + Vercel with automated SSL for zero cost. |
+
 

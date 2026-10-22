@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
+import { calculateMonthlyEquivalent } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -26,12 +27,17 @@ import {
   RotateCcw,
   History,
   CreditCard,
+  Printer,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { InactivateFamilyModal } from '../components/families/InactivateFamilyModal';
 import { ApproveFamilyModal } from '../components/families/ApproveFamilyModal';
 import { ReactivateFamilyModal } from '../components/families/ReactivateFamilyModal';
 import { RejectFamilyModal } from '../components/families/RejectFamilyModal';
 import { DirectDebitModal } from '../components/families/DirectDebitModal';
+import { HouseholdDossierModal } from '../components/families/HouseholdDossierModal';
+import type { DossierMember, DossierFamily } from '../components/families/HouseholdDossierModal';
 
 interface MemberFormData {
   id?: number;
@@ -97,7 +103,7 @@ export const EditFamilyPage: React.FC = () => {
   // Australian Address
   const [streetAddress, setStreetAddress] = useState('');
   const [city, setCity] = useState('');
-  const [state, setState] = useState('QLD');
+  const [state, setState] = useState('');
   const [postalCode, setPostalCode] = useState('');
 
   // Roots in India
@@ -119,8 +125,118 @@ export const EditFamilyPage: React.FC = () => {
   const [directDebitData, setDirectDebitData] = useState<any>(null);
   const [directDebitPerms, setDirectDebitPerms] = useState<{ canView: boolean; canEdit: boolean }>({ canView: false, canEdit: false });
   const [auditNotes, setAuditNotes] = useState<Array<{ id: number; noteDate: string; noteContent: string; recordedBy: string }>>([]);
+  const [isAllAuditNotesShown, setIsAllAuditNotesShown] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Print Dossier State
+  const [isDossierModalOpen, setIsDossierModalOpen] = useState(false);
+
+  const currentFamilyDossier = useMemo((): DossierFamily => {
+    const selectedUnitObj =
+      selectedUnitId === 'UNASSIGNED'
+        ? null
+        : units.find((u) => String(u.id) === String(selectedUnitId)) || null;
+
+    const dossierMembers: DossierMember[] = [];
+    if (headName.trim()) {
+      dossierMembers.push({
+        id: headMemberId || 1,
+        role: 'HEAD',
+        fullName: headName.trim(),
+        dateOfBirth: headDob || null,
+        placeOfBirth: headPob.trim() || null,
+        phone: headPhone.trim() || null,
+        email: headEmail.trim() || null,
+        isPrimaryContact: true,
+      });
+    }
+
+    if (registrationType === 'FAMILY' && hasSpouse && spouseName.trim()) {
+      dossierMembers.push({
+        id: spouseMemberId || 2,
+        role: 'SPOUSE',
+        fullName: spouseName.trim(),
+        dateOfBirth: spouseDob || null,
+        placeOfBirth: spousePob.trim() || null,
+        phone: spousePhone.trim() || null,
+        email: spouseEmail.trim() || null,
+        isPrimaryContact: false,
+      });
+    }
+
+    if (registrationType === 'FAMILY') {
+      children.forEach((c, idx) => {
+        if (c.fullName.trim()) {
+          dossierMembers.push({
+            id: c.id || 10 + idx,
+            role: c.role || 'CHILD',
+            fullName: c.fullName.trim(),
+            dateOfBirth: c.dateOfBirth || null,
+            placeOfBirth: c.placeOfBirth.trim() || null,
+            phone: c.phone.trim() || null,
+            email: c.email.trim() || null,
+            isPrimaryContact: false,
+          });
+        }
+      });
+    }
+
+    return {
+      id: Number(id),
+      familyCode: familyCode || null,
+      houseName,
+      registrationType,
+      status,
+      unit: selectedUnitObj
+        ? {
+            id: selectedUnitObj.id,
+            unitName: selectedUnitObj.unitName,
+          }
+        : null,
+      streetAddress: streetAddress.trim() || null,
+      city: city.trim() || null,
+      state: state.trim() || null,
+      postalCode: postalCode.trim() || null,
+      primaryPhone: headPhone.trim() || null,
+      primaryEmail: headEmail.trim() || null,
+      originParish: originParish.trim() || null,
+      originDiocese: originDiocese.trim() || null,
+      members: dossierMembers,
+      generalNotes: generalNotes.trim() || null,
+      directDebit: directDebitData,
+    };
+  }, [
+    id,
+    familyCode,
+    houseName,
+    registrationType,
+    status,
+    selectedUnitId,
+    units,
+    streetAddress,
+    city,
+    state,
+    postalCode,
+    headName,
+    headDob,
+    headPob,
+    headPhone,
+    headEmail,
+    headMemberId,
+    hasSpouse,
+    spouseName,
+    spouseDob,
+    spousePob,
+    spousePhone,
+    spouseEmail,
+    spouseMemberId,
+    children,
+    originParish,
+    originDiocese,
+    generalNotes,
+    directDebitData,
+  ]);
 
   // Load family data
   const loadFamilyData = async () => {
@@ -154,8 +270,9 @@ export const EditFamilyPage: React.FC = () => {
       setSelectedUnitId(f.unitId ? String(f.unitId) : 'UNASSIGNED');
 
       setStreetAddress(f.streetAddress || '');
-      setCity(f.city || 'Brisbane');
-      setState(f.state || 'QLD');
+      setCity(f.city || '');
+      const rawState = (f.state || '').trim().toUpperCase();
+      setState(rawState === 'QUEENSLAND' || rawState === 'QLD' ? 'QLD' : rawState);
       setPostalCode(f.postalCode || '');
 
       setOriginParish(f.originParish || '');
@@ -479,6 +596,18 @@ export const EditFamilyPage: React.FC = () => {
               Approve & Allocate Code
             </Button>
           )}
+
+          {/* Print Dossier Action Button */}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setIsDossierModalOpen(true)}
+            icon={<Printer className="w-3.5 h-3.5 text-parish-primary" />}
+            className="border-parish-border text-parish-primary hover:bg-parish-primary-light"
+          >
+            <span>Print Family Details</span>
+          </Button>
 
           {/* Direct Debit Action Button */}
           {directDebitPerms.canView && (
@@ -959,7 +1088,7 @@ export const EditFamilyPage: React.FC = () => {
                           Place of Birth
                         </label>
                         <Input
-                          placeholder="e.g. Brisbane"
+                          placeholder="e.g. Suburb / City or Hospital"
                           value={child.placeOfBirth}
                           onChange={(e) => handleChildChange(index, 'placeOfBirth', e.target.value)}
                         />
@@ -1001,10 +1130,10 @@ export const EditFamilyPage: React.FC = () => {
             <Home className="w-5 h-5 text-parish-primary" />
             <div>
               <h2 className="text-base font-bold text-parish-text">
-                {registrationType === 'FAMILY' ? '5.' : '3.'} Residential Address (Queensland, Australia)
+                {registrationType === 'FAMILY' ? '5.' : '3.'} Residential Address (Australia)
               </h2>
               <p className="text-xs text-parish-text-muted">
-                Physical dwelling location in greater Brisbane or Queensland.
+                Australian residential address details.
               </p>
             </div>
           </div>
@@ -1022,7 +1151,7 @@ export const EditFamilyPage: React.FC = () => {
             <div className="sm:col-span-2">
               <label className="block text-xs font-bold text-parish-text mb-1">Suburb / City</label>
               <Input
-                placeholder="e.g. Brisbane"
+                placeholder="e.g. Suburb / City"
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
               />
@@ -1035,6 +1164,7 @@ export const EditFamilyPage: React.FC = () => {
                 onChange={(e) => setState(e.target.value)}
                 className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-parish-border bg-parish-surface text-parish-text focus:outline-none focus:ring-2 focus:ring-parish-primary"
               >
+                <option value="">Select State (Optional)</option>
                 <option value="QLD">QLD (Queensland)</option>
                 <option value="NSW">NSW</option>
                 <option value="VIC">VIC</option>
@@ -1123,7 +1253,10 @@ export const EditFamilyPage: React.FC = () => {
                 <p className="text-xs text-parish-text-muted">
                   {hasDirectDebit && directDebitData ? (
                     <span>
-                      Contributing <strong>${directDebitData.amount} AUD</strong> ({directDebitData.frequency || 'Monthly'})
+                      Contributing <strong>${directDebitData.amount} AUD</strong> ({directDebitData.frequency || 'Monthly'}
+                      {directDebitData.frequency && directDebitData.frequency.toLowerCase() !== 'monthly'
+                        ? `, ≈ $${Math.round(calculateMonthlyEquivalent(directDebitData.amount, directDebitData.frequency)).toLocaleString()}/mo avg`
+                        : ''})
                       {directDebitData.comments ? ` • ${directDebitData.comments}` : ''}
                     </span>
                   ) : (
@@ -1172,41 +1305,75 @@ export const EditFamilyPage: React.FC = () => {
         </div>
 
         {/* Record History & Audit Trail (Only visible to admin roles) */}
-        {canViewAuditTrail && auditNotes.length > 0 && (
-          <div className="bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4">
-            <div className="flex items-center gap-2.5 pb-3 border-b border-parish-border">
-              <History className="w-5 h-5 text-parish-primary" />
-              <div>
-                <h2 className="text-base font-bold text-parish-text">Record History & Audit Trail</h2>
-                <p className="text-xs text-parish-text-muted">
-                  Chronological system audit trail of registrations, status transitions, and administrative updates.
-                </p>
-              </div>
-            </div>
+        {canViewAuditTrail && auditNotes.length > 0 && (() => {
+          const hasMore = auditNotes.length > 5;
+          const displayedNotes = isAllAuditNotesShown ? auditNotes : auditNotes.slice(0, 5);
 
-            <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
-              {auditNotes.map((n) => (
-                <div key={n.id} className="p-3.5 rounded-xl bg-parish-surface-subtle border border-parish-border text-xs space-y-1.5">
-                  <p className="text-parish-text font-medium leading-relaxed">{n.noteContent}</p>
-                  <div className="text-[11px] text-parish-text-muted flex items-center justify-between pt-1.5 border-t border-parish-border/60">
-                    <span>Recorded by: <strong>{n.recordedBy || 'System'}</strong></span>
-                    <span className="flex items-center gap-1 font-medium text-parish-text-muted">
-                      <Clock className="w-3 h-3 text-parish-text-muted/70" />
-                      {new Date(n.noteDate).toLocaleString([], {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        hour12: true,
-                      })}
-                    </span>
+          return (
+            <div className="bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-parish-border">
+                <div className="flex items-center gap-2.5">
+                  <History className="w-5 h-5 text-parish-primary" />
+                  <div>
+                    <h2 className="text-base font-bold text-parish-text">Record History & Audit Trail</h2>
+                    <p className="text-xs text-parish-text-muted">
+                      Chronological system audit trail of registrations, status transitions, and administrative updates.
+                    </p>
                   </div>
                 </div>
-              ))}
+                {hasMore && (
+                  <span className="text-xs font-medium text-parish-text-muted shrink-0">
+                    Showing {displayedNotes.length} of {auditNotes.length}
+                  </span>
+                )}
+              </div>
+
+              <div className="space-y-2.5">
+                {displayedNotes.map((n) => (
+                  <div key={n.id} className="p-3.5 rounded-xl bg-parish-surface-subtle border border-parish-border text-xs space-y-1.5">
+                    <p className="text-parish-text font-medium leading-relaxed">{n.noteContent}</p>
+                    <div className="text-[11px] text-parish-text-muted flex items-center justify-between pt-1.5 border-t border-parish-border/60">
+                      <span>Recorded by: <strong>{n.recordedBy || 'System'}</strong></span>
+                      <span className="flex items-center gap-1 font-medium text-parish-text-muted">
+                        <Clock className="w-3 h-3 text-parish-text-muted/70" />
+                        {new Date(n.noteDate).toLocaleString([], {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          hour12: true,
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {hasMore && (
+                <div className="pt-1 text-center">
+                  <button
+                    type="button"
+                    onClick={() => setIsAllAuditNotesShown(!isAllAuditNotesShown)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-parish-primary bg-parish-surface hover:bg-parish-surface-subtle border border-parish-border shadow-2xs transition-colors cursor-pointer"
+                  >
+                    {isAllAuditNotesShown ? (
+                      <>
+                        <span>Show less (Top 5 only)</span>
+                        <ChevronUp className="w-3.5 h-3.5" />
+                      </>
+                    ) : (
+                      <>
+                        <span>Show all ({auditNotes.length}) audit records</span>
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Form Bottom Actions */}
         <div className="flex items-center justify-between pt-2">
@@ -1333,6 +1500,13 @@ export const EditFamilyPage: React.FC = () => {
           }}
         />
       )}
+
+      {/* Household Registration Dossier Print Preview Modal */}
+      <HouseholdDossierModal
+        isOpen={isDossierModalOpen}
+        onClose={() => setIsDossierModalOpen(false)}
+        family={currentFamilyDossier}
+      />
     </div>
   );
 };

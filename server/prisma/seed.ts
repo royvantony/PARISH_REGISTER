@@ -6,6 +6,33 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Starting Parish Register Database Seeding...');
 
+  // 0. Seed Governing Diocese (1-Row Master Table)
+  try {
+    const existingDiocese: any[] = await prisma.$queryRawUnsafe(`SELECT * FROM "Diocese" LIMIT 1;`);
+    if (existingDiocese.length === 0) {
+      await prisma.$queryRawUnsafe(`
+        INSERT INTO "Diocese" ("dioceseName", rite, "bishopName", "chanceryAddress", city, state, "postalCode", "contactPhone", "contactEmail", website, "logoUrl", "updatedAt")
+        VALUES (
+          'Diocese of St. Thomas the Apostle, Melbourne',
+          'Syro-Malabar',
+          'Bishop Bosco Puthur',
+          '62 Moore Rd, Mill Park VIC 3082, Australia',
+          'Melbourne',
+          'VIC',
+          '3082',
+          '+61 3 9404 1533',
+          'chancery@syromalabar.org.au',
+          'https://syromalabar.org.au',
+          '/branding/logo.png',
+          CURRENT_TIMESTAMP
+        );
+      `);
+      console.log('✅ Governing Diocese seeded: Diocese of St. Thomas the Apostle, Melbourne');
+    }
+  } catch (err) {
+    console.warn('Could not seed Diocese table:', err);
+  }
+
   // 1. Seed Australian Diocesan Parishes
   const parishesData = [
     { parishCode: 'SABN', parishName: 'St. Alphonsa Syro-Malabar Catholic Parish', city: 'Brisbane North', state: 'QLD', postalCode: '4034', contactEmail: 'admin@stalphonsaparishbrisbane.org.au', contactPhone: '0488752642', idPrefix: 'SABN', nextFamilyNumber: 100450 },

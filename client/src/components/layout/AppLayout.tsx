@@ -17,9 +17,19 @@ import {
 import { cn } from '../../lib/utils';
 import { ChangePasswordModal } from '../auth/ChangePasswordModal';
 import { SessionTimeoutWarningModal } from '../auth/SessionTimeoutWarningModal';
+import { LogoutConfirmModal } from '../auth/LogoutConfirmModal';
+import { CLIENT_BRANDING } from '../../config/branding';
 
 export const AppLayout: React.FC = () => {
-  const { user, activeParish, availableParishes, setActiveParishById, logout, hasPermission } = useAuth();
+  const {
+    user,
+    activeParish,
+    logout,
+    requestLogout,
+    isLogoutConfirmOpen,
+    closeLogoutConfirm,
+    hasPermission,
+  } = useAuth();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
@@ -96,10 +106,8 @@ export const AppLayout: React.FC = () => {
         activeParishName={activeParish?.parishName || 'St. Alphonsa Parish Brisbane'}
         activeParishCode={activeParish?.parishCode || 'SABN'}
         userName={user?.fullName || 'Super Admin'}
-        userRole={user?.role || 'DIOCESAN_ADMIN'}
-        availableParishes={availableParishes}
-        onSelectParish={(id) => setActiveParishById(id)}
-        onLogout={logout}
+        userRole={user?.role || 'PARISH_ADMIN'}
+        onLogout={requestLogout}
         onGoHome={() => handleSelectTab('dashboard')}
       />
 
@@ -117,12 +125,21 @@ export const AppLayout: React.FC = () => {
             <div className="space-y-4">
               {/* Header with Close */}
               <div className="flex items-center justify-between pb-3 border-b border-parish-border">
-                <div>
-                  <span className="font-extrabold text-sm tracking-tight text-parish-text uppercase">
-                    PARISH REGISTER
-                  </span>
-                  <div className="text-[10px] text-parish-text-muted">
-                    {activeParish?.parishName || 'St. Alphonsa Brisbane'}
+                <div className="flex items-center gap-2.5">
+                  <div className="h-8 px-1.5 py-0.5 rounded-lg bg-white border border-parish-border shadow-xs flex items-center justify-center shrink-0">
+                    <img
+                      src={CLIENT_BRANDING.logoUrl}
+                      alt={CLIENT_BRANDING.logoAlt}
+                      className="h-6 w-auto object-contain shrink-0"
+                    />
+                  </div>
+                  <div>
+                    <span className="font-extrabold text-sm tracking-tight text-parish-text uppercase">
+                      PARISH REGISTER
+                    </span>
+                    <div className="text-[10px] text-parish-text-muted">
+                      {activeParish?.parishName || 'St. Alphonsa Brisbane'}
+                    </div>
                   </div>
                 </div>
                 <button
@@ -171,8 +188,11 @@ export const AppLayout: React.FC = () => {
             {/* Mobile Footer: Logout */}
             <div className="pt-4 border-t border-parish-border">
               <button
-                onClick={logout}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-red-200 bg-red-50 text-red-700 text-xs font-bold hover:bg-red-100 transition-colors"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  requestLogout();
+                }}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-red-200 bg-red-50 text-red-700 text-xs font-bold hover:bg-red-100 transition-colors cursor-pointer"
               >
                 <LogOut className="w-4 h-4" />
                 <span>Sign Out ({user?.fullName || 'Super Admin'})</span>
@@ -193,7 +213,7 @@ export const AppLayout: React.FC = () => {
         />
 
         <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-6 sm:space-y-8 overflow-x-hidden">
-          <Outlet key={activeParish?.id || 'default'} />
+          <Outlet />
         </main>
       </div>
 
@@ -202,6 +222,16 @@ export const AppLayout: React.FC = () => {
 
       {/* 5. Pre-Logout Inactivity Warning Modal (Live Countdown) */}
       <SessionTimeoutWarningModal />
+
+      {/* 6. User Logout Confirmation Modal */}
+      <LogoutConfirmModal
+        isOpen={isLogoutConfirmOpen}
+        onClose={closeLogoutConfirm}
+        onConfirm={logout}
+        userName={user?.fullName}
+        userRole={user?.role}
+        parishName={activeParish?.parishName}
+      />
     </div>
   );
 };

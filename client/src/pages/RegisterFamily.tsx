@@ -80,8 +80,8 @@ export const RegisterFamilyPage: React.FC = () => {
 
   // Address in Australia
   const [streetAddress, setStreetAddress] = useState('');
-  const [city, setCity] = useState('Brisbane');
-  const [state, setState] = useState('QLD');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
   const [postalCode, setPostalCode] = useState('');
 
   // Roots in India
@@ -373,7 +373,7 @@ export const RegisterFamilyPage: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {[
               { type: 'FAMILY', label: 'Family Household', desc: 'Married couple & children', icon: <Users className="w-4 h-4" /> },
-              { type: 'INDIVIDUAL_STUDENT', label: 'International Student', desc: 'Student studying in Brisbane', icon: <GraduationCap className="w-4 h-4" /> },
+              { type: 'INDIVIDUAL_STUDENT', label: 'International Student', desc: 'Student studying in Australia', icon: <GraduationCap className="w-4 h-4" /> },
               { type: 'INDIVIDUAL', label: 'Single Individual', desc: 'Single adult parishioner', icon: <User className="w-4 h-4" /> },
             ].map((t) => (
               <button
@@ -381,8 +381,8 @@ export const RegisterFamilyPage: React.FC = () => {
                 type="button"
                 onClick={() => setRegistrationType(t.type as any)}
                 className={`p-3.5 rounded-xl border text-left transition-all ${registrationType === t.type
-                    ? 'border-parish-primary bg-parish-primary-light/50 ring-1 ring-parish-primary text-parish-text'
-                    : 'border-parish-border bg-white text-parish-text-muted hover:border-parish-text-muted/60'
+                  ? 'border-parish-primary bg-parish-primary-light/50 ring-1 ring-parish-primary text-parish-text'
+                  : 'border-parish-border bg-white text-parish-text-muted hover:border-parish-text-muted/60'
                   }`}
               >
                 <div className="flex items-center gap-2 font-bold text-xs text-parish-text">
@@ -720,7 +720,7 @@ export const RegisterFamilyPage: React.FC = () => {
                 Suburb / City
               </label>
               <Input
-                placeholder="Brisbane"
+                placeholder="e.g. Suburb / City"
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
               />
@@ -729,10 +729,21 @@ export const RegisterFamilyPage: React.FC = () => {
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-xs font-bold text-parish-text mb-1">State</label>
-                <Input
+                <select
                   value={state}
                   onChange={(e) => setState(e.target.value)}
-                />
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-parish-border bg-parish-surface text-parish-text focus:outline-none focus:ring-2 focus:ring-parish-primary"
+                >
+                  <option value="">Select State</option>
+                  <option value="QLD">QLD (Queensland)</option>
+                  <option value="NSW">NSW</option>
+                  <option value="VIC">VIC</option>
+                  <option value="WA">WA</option>
+                  <option value="SA">SA</option>
+                  <option value="TAS">TAS</option>
+                  <option value="ACT">ACT</option>
+                  <option value="NT">NT</option>
+                </select>
               </div>
 
               <div>
@@ -760,7 +771,7 @@ export const RegisterFamilyPage: React.FC = () => {
                 Home Parish in India
               </label>
               <Input
-                placeholder="e.g. St. Mary's Forane Church, Kuravilangad"
+                placeholder="e.g. St. Mary's Forane Church, Kottayam"
                 value={originParish}
                 onChange={(e) => setOriginParish(e.target.value)}
               />
