@@ -6,7 +6,7 @@ import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 import {
   Lock,
-  Mail,
+  User,
   ArrowRight,
   ShieldAlert,
   Sparkles,
@@ -175,13 +175,13 @@ export const LoginPage: React.FC = () => {
             {/* Main Form */}
             <form onSubmit={handleSubmit} className="space-y-4">
               <Input
-                label="Email Address"
-                type="email"
+                label="Email or Username"
+                type="text"
                 required
-                placeholder="e.g. priest@stalphonsabrisbane.org.au"
+                placeholder="e.g. fr.abraham or priest@stalphonsabrisbane.org.au"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                icon={<Mail className="w-4 h-4" />}
+                icon={<User className="w-4 h-4" />}
               />
 
               <Input
@@ -223,8 +223,8 @@ export const LoginPage: React.FC = () => {
                 >
                   <div>
                     <div className="font-bold text-parish-text flex items-center gap-1.5">
-                      <span>⛪ Parish Super Admin</span>
-                      <span className="text-[10px] text-parish-text-muted font-normal">(Parish Priest)</span>
+                      <span>⛪ Parish Priest</span>
+                      <span className="text-[10px] text-parish-text-muted font-normal">(PARISH_PRIEST)</span>
                     </div>
                     <div className="text-[11px] text-parish-text-muted">priest@stalphonsabrisbane.org.au</div>
                   </div>

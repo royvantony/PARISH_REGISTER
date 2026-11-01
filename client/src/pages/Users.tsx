@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../lib/api';
 import { useAuth, type UserRole } from '../context/AuthContext';
+import { useFeatures } from '../context/FeatureContext';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { ConfirmButton } from '../components/ui/ConfirmButton';
@@ -30,12 +31,13 @@ import {
   Copy,
   Check,
   Pencil,
-  Lock,
+  Sparkles,
 } from 'lucide-react';
 
 interface ParishUserItem {
   id: number;
   fullName: string;
+  username?: string | null;
   email: string;
   role: UserRole;
   isActive: boolean;
@@ -95,8 +97,22 @@ interface UserEffectivePerm {
 }
 
 export const UsersPage: React.FC = () => {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, activeParish, hasPermission } = useAuth();
+  const { isFeatureEnabled } = useFeatures();
+
+  const canCreateUser = hasPermission('USERS', 'canCreate');
+  const canEditUsers = hasPermission('USERS', 'canEdit');
+  const canArchiveUsers = hasPermission('USERS', 'canArchive');
+
   const [activeTab, setActiveTab] = useState<'users' | 'matrix' | 'overrides'>('users');
+
+  useEffect(() => {
+    if (activeTab === 'matrix' && !isFeatureEnabled('USERS_TAB_MATRIX')) {
+      setActiveTab('users');
+    } else if (activeTab === 'overrides' && !isFeatureEnabled('USERS_TAB_OVERRIDES')) {
+      setActiveTab('users');
+    }
+  }, [activeTab, isFeatureEnabled]);
 
   // Users List State
   const [users, setUsers] = useState<ParishUserItem[]>([]);
@@ -128,6 +144,7 @@ export const UsersPage: React.FC = () => {
   // Invite Modal
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [inviteFullName, setInviteFullName] = useState('');
+  const [inviteUsername, setInviteUsername] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
   const [invitePassword, setInvitePassword] = useState('Parish2026!');
   const [inviteRole, setInviteRole] = useState<UserRole>('PARISH_USER');
@@ -136,6 +153,7 @@ export const UsersPage: React.FC = () => {
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [createdSuccessData, setCreatedSuccessData] = useState<{
     fullName: string;
+    username?: string;
     email: string;
     role: string;
     password: string;
@@ -146,6 +164,7 @@ export const UsersPage: React.FC = () => {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<ParishUserItem | null>(null);
   const [editFullName, setEditFullName] = useState('');
+  const [editUsername, setEditUsername] = useState('');
   const [editRole, setEditRole] = useState<UserRole>('PARISH_USER');
   const [editUnitId, setEditUnitId] = useState<string>('');
   const [editPassword, setEditPassword] = useState('');
@@ -259,6 +278,7 @@ export const UsersPage: React.FC = () => {
 
   const handleOpenInvite = () => {
     setInviteFullName('');
+    setInviteUsername('');
     setInviteEmail('');
     setInvitePassword('Parish2026!');
     setInviteRole('PARISH_USER');
@@ -267,6 +287,41 @@ export const UsersPage: React.FC = () => {
     setCreatedSuccessData(null);
     setCopiedInvite(false);
     setIsInviteOpen(true);
+  };
+
+  const handleLinkParishPriest = () => {
+    if (activeParish?.priestName) {
+      setInviteFullName(activeParish.priestName);
+    }
+    if (activeParish?.priestEmail) {
+      setInviteEmail(activeParish.priestEmail);
+    }
+    setInviteRole('PARISH_PRIEST');
+    if (!inviteUsername) {
+      const clean = (activeParish?.priestName || activeParish?.priestEmail || 'priest')
+        .toLowerCase()
+        .replace(/^fr\.?\s*/, '')
+        .replace(/[^a-z0-9]/g, '.')
+        .replace(/\.+/g, '.')
+        .replace(/^\.|\.$/g, '');
+      setInviteUsername(clean || 'priest');
+    }
+  };
+
+  const handleLinkParishPriestInEdit = () => {
+    if (activeParish?.priestName) {
+      setEditFullName(activeParish.priestName);
+      setEditRole('PARISH_PRIEST');
+      if (!editUsername) {
+        const clean = (activeParish.priestName || activeParish.priestEmail || 'priest')
+          .toLowerCase()
+          .replace(/^fr\.?\s*/, '')
+          .replace(/[^a-z0-9]/g, '.')
+          .replace(/\.+/g, '.')
+          .replace(/^\.|\.$/g, '');
+        setEditUsername(clean || 'priest');
+      }
+    }
   };
 
   const handleCreateUser = async (e: React.FormEvent) => {
@@ -281,6 +336,7 @@ export const UsersPage: React.FC = () => {
       setInviteError(null);
       await api.post('/masters/users', {
         fullName: inviteFullName.trim(),
+        username: inviteUsername.trim() || undefined,
         email: inviteEmail.trim().toLowerCase(),
         password: invitePassword,
         role: inviteRole,
@@ -289,6 +345,7 @@ export const UsersPage: React.FC = () => {
 
       setCreatedSuccessData({
         fullName: inviteFullName.trim(),
+        username: inviteUsername.trim() || undefined,
         email: inviteEmail.trim().toLowerCase(),
         role: inviteRole,
         password: invitePassword,
@@ -306,6 +363,7 @@ export const UsersPage: React.FC = () => {
     const text = `⛪ St. Alphonsa Parish Register - Official Login
 Hello ${createdSuccessData.fullName}, your account has been provisioned:
 • Role: ${formatRoleLabel(createdSuccessData.role)}
+• Username: ${createdSuccessData.username || createdSuccessData.email}
 • Login Email: ${createdSuccessData.email}
 • Temporary Password: ${createdSuccessData.password}
 • Portal Link: ${window.location.origin}/login
@@ -334,10 +392,10 @@ Upon logging in, you will be prompted to set your own permanent password.`;
 
   // Hierarchy Helpers for Editing
   const canEditUser = (targetUser: ParishUserItem) => {
-    if (!currentUser) return false;
+    if (!currentUser || !canEditUsers) return false;
     if (currentUser.role === 'SUPER_ADMIN') return true;
     if (targetUser.role === 'SUPER_ADMIN') return false;
-    if (currentUser.role === 'PARISH_SUPER_ADMIN') return true;
+    if (currentUser.role === 'PARISH_PRIEST') return true;
     if (currentUser.role === 'PARISH_ADMIN') {
       return targetUser.role === 'PARISH_USER' || targetUser.role === 'WARD_USER' || targetUser.id === currentUser.id;
     }
@@ -345,10 +403,10 @@ Upon logging in, you will be prompted to set your own permanent password.`;
   };
 
   const canChangeRole = (targetUser: ParishUserItem) => {
-    if (!currentUser) return false;
+    if (!currentUser || !canEditUsers) return false;
     if (targetUser.id === currentUser.id) return false; // Cannot change own role
     if (currentUser.role === 'SUPER_ADMIN') return true;
-    if (currentUser.role === 'PARISH_SUPER_ADMIN' && targetUser.role !== 'PARISH_SUPER_ADMIN') return true;
+    if (currentUser.role === 'PARISH_PRIEST' && targetUser.role !== 'PARISH_PRIEST') return true;
     if (currentUser.role === 'PARISH_ADMIN' && (targetUser.role === 'PARISH_USER' || targetUser.role === 'WARD_USER')) return true;
     return false;
   };
@@ -356,6 +414,7 @@ Upon logging in, you will be prompted to set your own permanent password.`;
   const handleOpenEdit = (user: ParishUserItem) => {
     setEditingUser(user);
     setEditFullName(user.fullName);
+    setEditUsername(user.username || '');
     setEditRole(user.role);
     setEditUnitId(user.assignedUnitId ? String(user.assignedUnitId) : '');
     setEditPassword('');
@@ -386,6 +445,7 @@ Upon logging in, you will be prompted to set your own permanent password.`;
 
       const payload: any = {
         fullName: editFullName.trim(),
+        username: editUsername.trim() || null,
         role: editRole,
         assignedUnitId: editRole === 'WARD_USER' ? parseInt(editUnitId, 10) : null,
       };
@@ -412,6 +472,7 @@ Upon logging in, you will be prompted to set your own permanent password.`;
     moduleKey: string,
     action: 'canView' | 'canCreate' | 'canEdit' | 'canArchive' | 'canDelete' | 'canExport' | 'canApprove'
   ) => {
+    if (!canEditUsers) return;
     setRoleMatrix((prev) => {
       const currentRoleObj = { ...(prev[selectedRole] || {}) };
       const currentModuleRecord = currentRoleObj[moduleKey] || {
@@ -426,10 +487,36 @@ Upon logging in, you will be prompted to set your own permanent password.`;
         canApprove: false,
       };
 
-      currentRoleObj[moduleKey] = {
-        ...currentModuleRecord,
-        [action]: !currentModuleRecord[action],
-      };
+      const nextVal = !currentModuleRecord[action];
+      let updatedRecord: RolePermRecord;
+
+      if (action === 'canView' && !nextVal) {
+        // Toggling view OFF must turn off all other actions
+        updatedRecord = {
+          ...currentModuleRecord,
+          canView: false,
+          canCreate: false,
+          canEdit: false,
+          canArchive: false,
+          canDelete: false,
+          canExport: false,
+          canApprove: false,
+        };
+      } else if (action !== 'canView' && nextVal && !currentModuleRecord.canView) {
+        // Turning an action ON requires turning canView ON
+        updatedRecord = {
+          ...currentModuleRecord,
+          [action]: true,
+          canView: true,
+        };
+      } else {
+        updatedRecord = {
+          ...currentModuleRecord,
+          [action]: nextVal,
+        };
+      }
+
+      currentRoleObj[moduleKey] = updatedRecord;
 
       return {
         ...prev,
@@ -461,13 +548,43 @@ Upon logging in, you will be prompted to set your own permanent password.`;
     moduleKey: string,
     action: 'canView' | 'canCreate' | 'canEdit' | 'canArchive' | 'canDelete' | 'canExport' | 'canApprove'
   ) => {
+    if (!canEditUsers) return;
     setUserOverrides((prev) => {
       const current = prev[moduleKey] || {};
+      const nextVal = !current[action];
+
+      if (action === 'canView' && !nextVal) {
+        // Toggling view OFF must turn off all other actions
+        return {
+          ...prev,
+          [moduleKey]: {
+            ...current,
+            canView: false,
+            canCreate: false,
+            canEdit: false,
+            canArchive: false,
+            canDelete: false,
+            canExport: false,
+            canApprove: false,
+          },
+        };
+      } else if (action !== 'canView' && nextVal && !current.canView) {
+        // Turning an action ON requires turning canView ON
+        return {
+          ...prev,
+          [moduleKey]: {
+            ...current,
+            [action]: true,
+            canView: true,
+          },
+        };
+      }
+
       return {
         ...prev,
         [moduleKey]: {
           ...current,
-          [action]: !current[action],
+          [action]: nextVal,
         },
       };
     });
@@ -524,7 +641,7 @@ Upon logging in, you will be prompted to set your own permanent password.`;
         return 'default';
       case 'DIOCESAN_USER':
         return 'subtle';
-      case 'PARISH_SUPER_ADMIN':
+      case 'PARISH_PRIEST':
         return 'default';
       case 'PARISH_ADMIN':
         return 'success';
@@ -545,8 +662,8 @@ Upon logging in, you will be prompted to set your own permanent password.`;
         return 'Diocesan Admin';
       case 'DIOCESAN_USER':
         return 'Diocesan User';
-      case 'PARISH_SUPER_ADMIN':
-        return 'Parish Super Admin (Priest)';
+      case 'PARISH_PRIEST':
+        return 'Parish Priest';
       case 'PARISH_ADMIN':
         return 'Parish Admin';
       case 'PARISH_USER':
@@ -583,7 +700,7 @@ Upon logging in, you will be prompted to set your own permanent password.`;
 
   const parishUsers = users.filter(
     (u) =>
-      u.role === 'PARISH_SUPER_ADMIN' ||
+      u.role === 'PARISH_PRIEST' ||
       u.role === 'PARISH_ADMIN' ||
       u.role === 'PARISH_USER' ||
       u.role === 'WARD_USER'
@@ -592,6 +709,7 @@ Upon logging in, you will be prompted to set your own permanent password.`;
   const filteredUsers = parishUsers.filter((u) => {
     const matchesSearch =
       u.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (u.username && u.username.toLowerCase().includes(searchQuery.toLowerCase())) ||
       u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (u.unitName && u.unitName.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesRole = roleFilter === 'ALL' || u.role === roleFilter;
@@ -617,7 +735,7 @@ Upon logging in, you will be prompted to set your own permanent password.`;
         </div>
 
         <div className="flex items-center gap-2">
-          {activeTab === 'users' && (
+          {activeTab === 'users' && canCreateUser && (
             <Button
               variant="primary"
               onClick={handleOpenInvite}
@@ -632,38 +750,44 @@ Upon logging in, you will be prompted to set your own permanent password.`;
 
       {/* 2. Sub-Navigation Tabs */}
       <div className="flex border-b border-parish-border gap-2 overflow-x-auto">
-        <button
-          onClick={() => setActiveTab('users')}
-          className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap min-h-[42px] ${activeTab === 'users'
-            ? 'border-parish-primary text-parish-primary'
-            : 'border-transparent text-parish-text-muted hover:text-parish-text'
-            }`}
-        >
-          <UsersIcon className="w-4 h-4" />
-          <span>Authorized Users ({parishUsers.length})</span>
-        </button>
+        {isFeatureEnabled('USERS_TAB_LIST') && (
+          <button
+            onClick={() => setActiveTab('users')}
+            className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap min-h-[42px] ${activeTab === 'users'
+              ? 'border-parish-primary text-parish-primary'
+              : 'border-transparent text-parish-text-muted hover:text-parish-text'
+              }`}
+          >
+            <UsersIcon className="w-4 h-4" />
+            <span>Authorized Users ({parishUsers.length})</span>
+          </button>
+        )}
 
-        <button
-          onClick={() => setActiveTab('matrix')}
-          className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap min-h-[42px] ${activeTab === 'matrix'
-            ? 'border-parish-primary text-parish-primary'
-            : 'border-transparent text-parish-text-muted hover:text-parish-text'
-            }`}
-        >
-          <Sliders className="w-4 h-4" />
-          <span>Role Permissions Matrix</span>
-        </button>
+        {isFeatureEnabled('USERS_TAB_MATRIX') && (
+          <button
+            onClick={() => setActiveTab('matrix')}
+            className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap min-h-[42px] ${activeTab === 'matrix'
+              ? 'border-parish-primary text-parish-primary'
+              : 'border-transparent text-parish-text-muted hover:text-parish-text'
+              }`}
+          >
+            <Sliders className="w-4 h-4" />
+            <span>Role Permissions Matrix</span>
+          </button>
+        )}
 
-        <button
-          onClick={() => setActiveTab('overrides')}
-          className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap min-h-[42px] ${activeTab === 'overrides'
-            ? 'border-parish-primary text-parish-primary'
-            : 'border-transparent text-parish-text-muted hover:text-parish-text'
-            }`}
-        >
-          <UserCog className="w-4 h-4" />
-          <span>Custom User Overrides</span>
-        </button>
+        {isFeatureEnabled('USERS_TAB_OVERRIDES') && (
+          <button
+            onClick={() => setActiveTab('overrides')}
+            className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap min-h-[42px] ${activeTab === 'overrides'
+              ? 'border-parish-primary text-parish-primary'
+              : 'border-transparent text-parish-text-muted hover:text-parish-text'
+              }`}
+          >
+            <UserCog className="w-4 h-4" />
+            <span>Custom User Overrides</span>
+          </button>
+        )}
       </div>
 
       {/* ========================================================================= */}
@@ -686,9 +810,9 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                 Parish Priests
               </div>
               <div className="text-xl sm:text-2xl font-extrabold text-parish-primary mt-1">
-                {parishUsers.filter((u) => u.role === 'PARISH_SUPER_ADMIN').length}
+                {parishUsers.filter((u) => u.role === 'PARISH_PRIEST').length}
               </div>
-              <div className="text-[11px] text-parish-text-muted mt-0.5">Parish Super Admin</div>
+              <div className="text-[11px] text-parish-text-muted mt-0.5">Parish Priest</div>
             </div>
 
             <div className="bg-parish-surface border border-parish-border rounded-xl p-3.5 sm:p-4 shadow-xs">
@@ -738,7 +862,7 @@ Upon logging in, you will be prompted to set your own permanent password.`;
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
               {[
                 { key: 'ALL', label: 'All Roles' },
-                { key: 'PARISH_SUPER_ADMIN', label: 'Priests' },
+                { key: 'PARISH_PRIEST', label: 'Priests' },
                 { key: 'PARISH_ADMIN', label: 'Admins' },
                 { key: 'PARISH_USER', label: 'Users' },
                 { key: 'WARD_USER', label: 'Ward Leaders' },
@@ -793,8 +917,13 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                           {u.fullName.substring(0, 2).toUpperCase()}
                         </div>
                         <div>
-                          <div className="text-sm font-bold text-parish-text flex items-center gap-1.5">
+                          <div className="text-sm font-bold text-parish-text flex items-center gap-1.5 flex-wrap">
                             <span>{u.fullName}</span>
+                            {u.username && (
+                              <span className="text-[10px] font-mono text-parish-primary bg-parish-primary-light/60 px-1.5 py-0.2 rounded">
+                                @{u.username}
+                              </span>
+                            )}
                             {isSelf && (
                               <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded">
                                 You
@@ -844,19 +973,21 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                           </button>
                         )}
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedOverrideUserId(u.id);
-                            setActiveTab('overrides');
-                          }}
-                          className="inline-flex items-center justify-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border border-parish-border bg-white text-parish-text hover:bg-parish-surface-subtle transition-colors shadow-2xs"
-                        >
-                          <ShieldCheck className="w-3 h-3 text-parish-text-muted" />
-                          <span>Permissions</span>
-                        </button>
+                        {isFeatureEnabled('USERS_TAB_OVERRIDES') && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedOverrideUserId(u.id);
+                              setActiveTab('overrides');
+                            }}
+                            className="inline-flex items-center justify-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border border-parish-border bg-white text-parish-text hover:bg-parish-surface-subtle transition-colors shadow-2xs"
+                          >
+                            <ShieldCheck className="w-3 h-3 text-parish-text-muted" />
+                            <span>Permissions</span>
+                          </button>
+                        )}
 
-                        {!isSelf && (
+                        {!isSelf && canArchiveUsers && (
                           <button
                             type="button"
                             onClick={() => {
@@ -919,8 +1050,13 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                                 {u.fullName.substring(0, 2).toUpperCase()}
                               </div>
                               <div>
-                                <div className="font-bold text-parish-text flex items-center gap-1.5">
+                                <div className="font-bold text-parish-text flex items-center gap-1.5 flex-wrap">
                                   <span>{u.fullName}</span>
+                                  {u.username && (
+                                    <span className="text-[10px] font-mono text-parish-primary bg-parish-primary-light/60 px-1.5 py-0.2 rounded">
+                                      @{u.username}
+                                    </span>
+                                  )}
                                   {isSelf && (
                                     <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded">
                                       You
@@ -971,23 +1107,25 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                                 </button>
                               )}
 
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedOverrideUserId(u.id);
-                                  setActiveTab('overrides');
-                                }}
-                                className="w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg border border-parish-border bg-white text-parish-text hover:bg-parish-surface-subtle hover:border-parish-primary/40 transition-colors shadow-2xs"
-                              >
-                                <ShieldCheck className="w-3 h-3 text-parish-text-muted" />
-                                <span>Permissions</span>
-                              </button>
+                              {isFeatureEnabled('USERS_TAB_OVERRIDES') && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedOverrideUserId(u.id);
+                                    setActiveTab('overrides');
+                                  }}
+                                  className="w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg border border-parish-border bg-white text-parish-text hover:bg-parish-surface-subtle hover:border-parish-primary/40 transition-colors shadow-2xs"
+                                >
+                                  <ShieldCheck className="w-3 h-3 text-parish-text-muted" />
+                                  <span>Permissions</span>
+                                </button>
+                              )}
 
                               {isSelf ? (
                                 <span className="w-full text-center py-1 text-[11px] text-parish-text-muted italic bg-parish-surface-subtle rounded-lg border border-parish-border/60">
                                   Current session
                                 </span>
-                              ) : (
+                              ) : canArchiveUsers ? (
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -1001,7 +1139,7 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                                 >
                                   <span>{u.isActive ? 'Deactivate' : 'Activate'}</span>
                                 </button>
-                              )}
+                              ) : null}
                             </div>
                           </td>
                         </tr>
@@ -1039,23 +1177,25 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                     {matrixSuccessMsg}
                   </span>
                 )}
-                <ConfirmButton
-                  variant="primary"
-                  size="sm"
-                  onConfirm={handleSaveRoleMatrix}
-                  isLoading={isSavingMatrix}
-                  icon={<Save className="w-3.5 h-3.5" />}
-                  confirmLabel="Confirm Save"
-                >
-                  Save Matrix
-                </ConfirmButton>
+                {canEditUsers && (
+                  <ConfirmButton
+                    variant="primary"
+                    size="sm"
+                    onConfirm={handleSaveRoleMatrix}
+                    isLoading={isSavingMatrix}
+                    icon={<Save className="w-3.5 h-3.5" />}
+                    confirmLabel="Confirm Save"
+                  >
+                    Save Matrix
+                  </ConfirmButton>
+                )}
               </div>
             </div>
 
             {/* Role Pills */}
             <div className="flex items-center gap-2 overflow-x-auto pt-1">
               {[
-                { role: 'PARISH_SUPER_ADMIN', label: 'Parish Super Admin (Priest)' },
+                { role: 'PARISH_PRIEST', label: 'Parish Priest' },
                 { role: 'PARISH_ADMIN', label: 'Parish Admin' },
                 { role: 'PARISH_USER', label: 'Parish User' },
                 { role: 'WARD_USER', label: 'Ward User' },
@@ -1074,8 +1214,8 @@ Upon logging in, you will be prompted to set your own permanent password.`;
               ))}
             </div>
 
-            {/* Parish Super Admin (Priest) Policy Callout */}
-            {selectedRole === 'PARISH_SUPER_ADMIN' && (
+            {/* Parish Priest Policy Callout */}
+            {selectedRole === 'PARISH_PRIEST' && (
               <div className="p-3.5 rounded-xl bg-parish-primary-light/60 border border-parish-border text-parish-text text-xs flex items-start gap-2.5">
                 <Church className="w-4 h-4 shrink-0 text-parish-primary mt-0.5" />
                 <div className="leading-relaxed">
@@ -1158,12 +1298,12 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                           <td className="py-3.5 px-4 text-center">
                             <button
                               type="button"
-                              disabled={isLockedRole}
+                              disabled={isLockedRole || !canEditUsers}
                               onClick={() => handleToggleMatrixCell(mod.key, 'canView')}
                               className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${rec.canView
                                 ? 'bg-emerald-600 text-white shadow-xs'
                                 : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border hover:border-parish-text-muted'
-                                }`}
+                                } ${isLockedRole || !canEditUsers ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
                               {rec.canView ? 'ON' : 'OFF'}
                             </button>
@@ -1173,12 +1313,12 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                           <td className="py-3.5 px-4 text-center">
                             <button
                               type="button"
-                              disabled={isLockedRole}
+                              disabled={isLockedRole || !canEditUsers || !rec.canView}
                               onClick={() => handleToggleMatrixCell(mod.key, 'canCreate')}
                               className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${rec.canCreate
                                 ? 'bg-emerald-600 text-white shadow-xs'
                                 : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border hover:border-parish-text-muted'
-                                }`}
+                                } ${isLockedRole || !canEditUsers || !rec.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
                             >
                               {rec.canCreate ? 'ON' : 'OFF'}
                             </button>
@@ -1188,12 +1328,12 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                           <td className="py-3.5 px-4 text-center">
                             <button
                               type="button"
-                              disabled={isLockedRole}
+                              disabled={isLockedRole || !canEditUsers || !rec.canView}
                               onClick={() => handleToggleMatrixCell(mod.key, 'canEdit')}
                               className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${rec.canEdit
                                 ? 'bg-amber-600 text-white shadow-xs'
                                 : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border hover:border-parish-text-muted'
-                                }`}
+                                } ${isLockedRole || !canEditUsers || !rec.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
                             >
                               {rec.canEdit ? 'ON' : 'OFF'}
                             </button>
@@ -1203,12 +1343,12 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                           <td className="py-3.5 px-4 text-center">
                             <button
                               type="button"
-                              disabled={isLockedRole}
+                              disabled={isLockedRole || !canEditUsers || !rec.canView}
                               onClick={() => handleToggleMatrixCell(mod.key, 'canArchive')}
                               className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${rec.canArchive
                                 ? 'bg-orange-600 text-white shadow-xs'
                                 : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border hover:border-parish-text-muted'
-                                }`}
+                                } ${isLockedRole || !canEditUsers || !rec.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
                             >
                               {rec.canArchive ? 'ON' : 'OFF'}
                             </button>
@@ -1218,12 +1358,12 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                           <td className="py-3.5 px-4 text-center">
                             <button
                               type="button"
-                              disabled={isLockedRole}
+                              disabled={isLockedRole || !canEditUsers || !rec.canView}
                               onClick={() => handleToggleMatrixCell(mod.key, 'canDelete')}
                               className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${rec.canDelete
                                 ? 'bg-red-600 text-white shadow-xs'
                                 : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border hover:border-parish-text-muted'
-                                }`}
+                                } ${isLockedRole || !canEditUsers || !rec.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
                             >
                               {rec.canDelete ? 'ON' : 'OFF'}
                             </button>
@@ -1233,12 +1373,12 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                           <td className="py-3.5 px-4 text-center">
                             <button
                               type="button"
-                              disabled={isLockedRole}
+                              disabled={isLockedRole || !canEditUsers || !rec.canView}
                               onClick={() => handleToggleMatrixCell(mod.key, 'canExport')}
                               className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${rec.canExport
                                 ? 'bg-sky-600 text-white shadow-xs'
                                 : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border hover:border-parish-text-muted'
-                                }`}
+                                } ${isLockedRole || !canEditUsers || !rec.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
                             >
                               {rec.canExport ? 'ON' : 'OFF'}
                             </button>
@@ -1248,12 +1388,12 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                           <td className="py-3.5 px-4 text-center">
                             <button
                               type="button"
-                              disabled={isLockedRole}
+                              disabled={isLockedRole || !canEditUsers || !rec.canView}
                               onClick={() => handleToggleMatrixCell(mod.key, 'canApprove')}
                               className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${rec.canApprove
                                 ? 'bg-emerald-700 text-white shadow-xs'
                                 : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border hover:border-parish-text-muted'
-                                }`}
+                                } ${isLockedRole || !canEditUsers || !rec.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
                             >
                               {rec.canApprove ? 'ON' : 'OFF'}
                             </button>
@@ -1293,25 +1433,29 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                     {overrideSuccessMsg}
                   </span>
                 )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleClearUserOverrides}
-                  disabled={!overrideUserData?.effective.some((e) => e.isOverridden)}
-                  icon={<RotateCcw className="w-3.5 h-3.5" />}
-                >
-                  Reset to Role Defaults
-                </Button>
-                <ConfirmButton
-                  variant="primary"
-                  size="sm"
-                  onConfirm={handleSaveUserOverrides}
-                  isLoading={isSavingOverride}
-                  icon={<Save className="w-3.5 h-3.5" />}
-                  confirmLabel="Confirm Save"
-                >
-                  Save Overrides
-                </ConfirmButton>
+                {canEditUsers && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleClearUserOverrides}
+                    disabled={!overrideUserData?.effective.some((e) => e.isOverridden)}
+                    icon={<RotateCcw className="w-3.5 h-3.5" />}
+                  >
+                    Reset to Role Defaults
+                  </Button>
+                )}
+                {canEditUsers && (
+                  <ConfirmButton
+                    variant="primary"
+                    size="sm"
+                    onConfirm={handleSaveUserOverrides}
+                    isLoading={isSavingOverride}
+                    icon={<Save className="w-3.5 h-3.5" />}
+                    confirmLabel="Confirm Save"
+                  >
+                    Save Overrides
+                  </ConfirmButton>
+                )}
               </div>
             </div>
 
@@ -1413,11 +1557,12 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                           <td className="py-3.5 px-4 text-center">
                             <button
                               type="button"
+                              disabled={!canEditUsers}
                               onClick={() => handleToggleUserOverrideCell(item.module, 'canView')}
                               className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${current.canView
                                 ? 'bg-emerald-600 text-white shadow-xs'
                                 : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border'
-                                }`}
+                                } ${!canEditUsers ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
                               {current.canView ? 'ON' : 'OFF'}
                             </button>
@@ -1427,11 +1572,12 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                           <td className="py-3.5 px-4 text-center">
                             <button
                               type="button"
+                              disabled={!canEditUsers || !current.canView}
                               onClick={() => handleToggleUserOverrideCell(item.module, 'canCreate')}
                               className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${current.canCreate
                                 ? 'bg-emerald-600 text-white shadow-xs'
                                 : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border'
-                                }`}
+                                } ${!canEditUsers || !current.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
                             >
                               {current.canCreate ? 'ON' : 'OFF'}
                             </button>
@@ -1441,11 +1587,12 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                           <td className="py-3.5 px-4 text-center">
                             <button
                               type="button"
+                              disabled={!canEditUsers || !current.canView}
                               onClick={() => handleToggleUserOverrideCell(item.module, 'canEdit')}
                               className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${current.canEdit
                                 ? 'bg-amber-600 text-white shadow-xs'
                                 : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border'
-                                }`}
+                                } ${!canEditUsers || !current.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
                             >
                               {current.canEdit ? 'ON' : 'OFF'}
                             </button>
@@ -1455,11 +1602,12 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                           <td className="py-3.5 px-4 text-center">
                             <button
                               type="button"
+                              disabled={!canEditUsers || !current.canView}
                               onClick={() => handleToggleUserOverrideCell(item.module, 'canArchive')}
                               className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${current.canArchive
                                 ? 'bg-orange-600 text-white shadow-xs'
                                 : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border'
-                                }`}
+                                } ${!canEditUsers || !current.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
                             >
                               {current.canArchive ? 'ON' : 'OFF'}
                             </button>
@@ -1469,11 +1617,12 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                           <td className="py-3.5 px-4 text-center">
                             <button
                               type="button"
+                              disabled={!canEditUsers || !current.canView}
                               onClick={() => handleToggleUserOverrideCell(item.module, 'canDelete')}
                               className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${current.canDelete
                                 ? 'bg-red-600 text-white shadow-xs'
                                 : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border'
-                                }`}
+                                } ${!canEditUsers || !current.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
                             >
                               {current.canDelete ? 'ON' : 'OFF'}
                             </button>
@@ -1483,11 +1632,12 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                           <td className="py-3.5 px-4 text-center">
                             <button
                               type="button"
+                              disabled={!canEditUsers || !current.canView}
                               onClick={() => handleToggleUserOverrideCell(item.module, 'canExport')}
                               className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${current.canExport
                                 ? 'bg-sky-600 text-white shadow-xs'
                                 : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border'
-                                }`}
+                                } ${!canEditUsers || !current.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
                             >
                               {current.canExport ? 'ON' : 'OFF'}
                             </button>
@@ -1497,11 +1647,12 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                           <td className="py-3.5 px-4 text-center">
                             <button
                               type="button"
+                              disabled={!canEditUsers || !current.canView}
                               onClick={() => handleToggleUserOverrideCell(item.module, 'canApprove')}
                               className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${current.canApprove
                                 ? 'bg-emerald-700 text-white shadow-xs'
                                 : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border'
-                                }`}
+                                } ${!canEditUsers || !current.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
                             >
                               {current.canApprove ? 'ON' : 'OFF'}
                             </button>
@@ -1527,6 +1678,7 @@ Upon logging in, you will be prompted to set your own permanent password.`;
             ? 'Account credentials have been created. Copy and share these details with the user.'
             : 'Create credentials and assign access permissions for parish clergy or staff.'
         }
+        maxWidth="lg"
       >
         {createdSuccessData ? (
           <div className="space-y-4">
@@ -1537,8 +1689,14 @@ Upon logging in, you will be prompted to set your own permanent password.`;
               </div>
 
               <div className="bg-white rounded-xl p-3 border border-emerald-200/60 font-mono text-xs space-y-1.5 text-parish-text">
+                {createdSuccessData.username && (
+                  <div className="flex justify-between">
+                    <span className="text-parish-text-muted">Username:</span>
+                    <span className="font-bold text-parish-primary font-mono">@{createdSuccessData.username}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
-                  <span className="text-parish-text-muted">Name:</span>
+                  <span className="text-parish-text-muted">Full Name:</span>
                   <span className="font-bold">{createdSuccessData.fullName}</span>
                 </div>
                 <div className="flex justify-between">
@@ -1556,7 +1714,7 @@ Upon logging in, you will be prompted to set your own permanent password.`;
               </div>
 
               <p className="text-[11px] text-emerald-800 leading-relaxed">
-                🔒 The user will be automatically prompted to set their own permanent password on their first login.
+                🔒 The user can log in using either their <strong>Username</strong> or <strong>Email address</strong>, and will set a permanent password upon first login.
               </p>
             </div>
 
@@ -1590,33 +1748,7 @@ Upon logging in, you will be prompted to set your own permanent password.`;
               </div>
             )}
 
-            <div>
-              <label className="block text-xs font-semibold text-parish-text mb-1">
-                Full Name <span className="text-red-500">*</span>
-              </label>
-              <Input
-                placeholder="e.g. Fr. Abraham Mathew, Maria Jose"
-                value={inviteFullName}
-                onChange={(e) => setInviteFullName(e.target.value)}
-                required
-                className="w-full"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-parish-text mb-1">
-                Official Email Address <span className="text-red-500">*</span>
-              </label>
-              <Input
-                type="email"
-                placeholder="e.g. priest@stalphonsabrisbane.org.au"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                required
-                className="w-full"
-              />
-            </div>
-
+            {/* 1. Role & Responsibility (At the top of the form) */}
             <div>
               <label className="block text-xs font-semibold text-parish-text mb-1">
                 Role & Responsibility <span className="text-red-500">*</span>
@@ -1626,13 +1758,69 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                 onChange={(e) => setInviteRole(e.target.value as any)}
                 className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-parish-border bg-parish-surface text-parish-text focus:outline-none focus:ring-2 focus:ring-parish-primary"
               >
-                <option value="PARISH_USER">Parish User</option>
-                <option value="PARISH_ADMIN">Parish Admin</option>
-                <option value="PARISH_SUPER_ADMIN">Parish Super Admin (Priest)</option>
+                <option value="PARISH_USER">Parish User (Secretary / Office)</option>
+                <option value="PARISH_ADMIN">Parish Admin (Trustee / Executive)</option>
+                <option value="PARISH_PRIEST">Parish Priest</option>
                 <option value="WARD_USER">Ward User (Ward Coordinator)</option>
               </select>
             </div>
 
+            {/* 2. Link Parish Priest Profile ONLY when Role is Parish Priest */}
+            {inviteRole === 'PARISH_PRIEST' && (
+              activeParish?.priestName ? (
+                <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200 shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-xl bg-amber-100 border border-amber-300/60 flex items-center justify-center shrink-0">
+                        <Church className="w-4 h-4 text-amber-800" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-bold text-amber-950">Link Parish Priest Profile</span>
+                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-200/80 font-semibold text-amber-900">
+                            Settings
+                          </span>
+                        </div>
+                        <p className="text-xs font-semibold text-amber-900 truncate">
+                          {activeParish.priestName}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="primary"
+                      size="sm"
+                      onClick={handleLinkParishPriest}
+                      icon={<Sparkles className="w-3.5 h-3.5" />}
+                      className="shrink-0 bg-amber-700 hover:bg-amber-800 text-white border-none shadow-2xs text-xs font-semibold"
+                    >
+                      Sync Priest Details
+                    </Button>
+                  </div>
+                  {activeParish.priestEmail && (
+                    <div className="text-[11px] text-amber-800 flex items-center gap-1.5 pt-1.5 border-t border-amber-200/60 font-mono">
+                      <Mail className="w-3 h-3 text-amber-700 shrink-0" />
+                      <span>{activeParish.priestEmail}</span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-3 bg-slate-50 border border-slate-200/70 rounded-xl flex items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-2 text-slate-600 text-[11px]">
+                    <Church className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span>Priest profile not yet set in Parish Settings.</span>
+                  </div>
+                  <a
+                    href="/settings"
+                    className="text-[11px] font-semibold text-parish-primary hover:underline shrink-0"
+                  >
+                    Configure in Settings →
+                  </a>
+                </div>
+              )
+            )}
+
+            {/* 3. Assigned Ward (if WARD_USER) */}
             {inviteRole === 'WARD_USER' && (
               <div>
                 <label className="block text-xs font-semibold text-parish-text mb-1">
@@ -1653,6 +1841,54 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                 </select>
               </div>
             )}
+
+            {/* 4. Username */}
+            <div>
+              <label className="block text-xs font-semibold text-parish-text mb-1">
+                User Name <span className="text-xs text-parish-text-muted font-normal">(Login identifier)</span>
+              </label>
+              <Input
+                placeholder="e.g. fr.abraham, maria.jose"
+                value={inviteUsername}
+                onChange={(e) => setInviteUsername(e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, ''))}
+                className="w-full font-mono text-xs"
+              />
+              <p className="text-[10px] text-parish-text-muted mt-1">
+                Unique username for quick sign-in. Can contain lowercase letters, numbers, dots, and hyphens.
+              </p>
+            </div>
+
+            {/* 5. Full Name */}
+            <div>
+              <label className="block text-xs font-semibold text-parish-text mb-1">
+                Full Name <span className="text-red-500">*</span>
+              </label>
+              <Input
+                placeholder="e.g. Fr. Abraham Mathew, Maria Jose"
+                value={inviteFullName}
+                onChange={(e) => setInviteFullName(e.target.value)}
+                required
+                className="w-full"
+              />
+              <p className="text-[10px] text-parish-text-muted mt-1">
+                Official ecclesiastical or full legal name used in reports, certificates, and registry records.
+              </p>
+            </div>
+
+            {/* 6. Email */}
+            <div>
+              <label className="block text-xs font-semibold text-parish-text mb-1">
+                Official Email Address <span className="text-red-500">*</span>
+              </label>
+              <Input
+                type="email"
+                placeholder="e.g. priest@stalphonsabrisbane.org.au"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                required
+                className="w-full"
+              />
+            </div>
 
             <div>
               <label className="block text-xs font-semibold text-parish-text mb-1">
@@ -1694,7 +1930,8 @@ Upon logging in, you will be prompted to set your own permanent password.`;
         isOpen={isEditOpen}
         onClose={() => setIsEditOpen(false)}
         title="Edit User Profile & Role"
-        description="Update editable profile attributes, role assignments, or ward jurisdictions. Fixed system identifiers (email and parish) remain locked."
+        description="Update user credentials, roles, and access parameters."
+        maxWidth="lg"
       >
         {editingUser && (
           <form onSubmit={handleSaveEditUser} className="space-y-4">
@@ -1705,50 +1942,7 @@ Upon logging in, you will be prompted to set your own permanent password.`;
               </div>
             )}
 
-            {/* Read-Only Account Identifiers Card */}
-            <div className="p-3 bg-parish-surface-subtle border border-parish-border rounded-xl space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="text-[11px] font-bold uppercase tracking-wider text-parish-text-muted flex items-center gap-1.5">
-                  <Lock className="w-3.5 h-3.5 text-parish-text-muted" />
-                  <span>Fixed Account Identifiers (Non-Editable)</span>
-                </div>
-                <Badge variant={editingUser.isActive ? 'success' : 'subtle'} size="sm">
-                  {editingUser.isActive ? 'Active' : 'Inactive'}
-                </Badge>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                <div>
-                  <div className="text-[10px] text-parish-text-muted font-medium">Official Login Email:</div>
-                  <div className="font-mono font-bold text-parish-text truncate" title={editingUser.email}>
-                    {editingUser.email}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[10px] text-parish-text-muted font-medium">Parish Jurisdiction:</div>
-                  <div className="font-semibold text-parish-text flex items-center gap-1">
-                    <Church className="w-3 h-3 text-parish-primary" />
-                    <span className="truncate">{editingUser.parishName}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Editable Field: Full Name */}
-            <div>
-              <label className="block text-xs font-semibold text-parish-text mb-1">
-                Full Name <span className="text-red-500">*</span>
-              </label>
-              <Input
-                value={editFullName}
-                onChange={(e) => setEditFullName(e.target.value)}
-                required
-                className="w-full"
-                placeholder="e.g. Fr. Abraham Mathew, Thomas Trustee"
-              />
-            </div>
-
-            {/* Editable Field: Role */}
+            {/* 1. Role & Responsibility (At the top of the form) */}
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="block text-xs font-semibold text-parish-text">
@@ -1768,20 +1962,72 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                   }`}
               >
                 {currentUser?.role === 'SUPER_ADMIN' && (
-                  <option value="PARISH_SUPER_ADMIN">Parish Super Admin (Priest - Supreme Authority)</option>
+                  <option value="PARISH_PRIEST">Parish Priest</option>
                 )}
-                {(currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'PARISH_SUPER_ADMIN') && (
+                {(currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'PARISH_PRIEST') && (
                   <option value="PARISH_ADMIN">Parish Admin (Trustee / Executive)</option>
                 )}
                 <option value="PARISH_USER">Parish User (Secretary / Office)</option>
                 <option value="WARD_USER">Ward User (Ward Coordinator)</option>
               </select>
-              <p className="text-[10px] text-parish-text-muted mt-1">
-                Determines access permissions, confidential finance visibility, and approval privileges.
-              </p>
             </div>
 
-            {/* Editable Field: Assigned Ward (if WARD_USER) */}
+            {/* 2. Link Priest Details Option ONLY when Role is Parish Priest */}
+            {editRole === 'PARISH_PRIEST' && (
+              activeParish?.priestName ? (
+                <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200 shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-xl bg-amber-100 border border-amber-300/60 flex items-center justify-center shrink-0">
+                        <Church className="w-4 h-4 text-amber-800" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-bold text-amber-950">Link Parish Priest Profile</span>
+                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-200/80 font-semibold text-amber-900">
+                            Settings
+                          </span>
+                        </div>
+                        <p className="text-xs font-semibold text-amber-900 truncate">
+                          {activeParish.priestName}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="primary"
+                      size="sm"
+                      onClick={handleLinkParishPriestInEdit}
+                      icon={<Sparkles className="w-3.5 h-3.5" />}
+                      className="shrink-0 bg-amber-700 hover:bg-amber-800 text-white border-none shadow-2xs text-xs font-semibold"
+                    >
+                      Sync Priest Details
+                    </Button>
+                  </div>
+                  {activeParish.priestEmail && (
+                    <div className="text-[11px] text-amber-800 flex items-center gap-1.5 pt-1.5 border-t border-amber-200/60 font-mono">
+                      <Mail className="w-3 h-3 text-amber-700 shrink-0" />
+                      <span>{activeParish.priestEmail}</span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-3 bg-slate-50 border border-slate-200/70 rounded-xl flex items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-2 text-slate-600 text-[11px]">
+                    <Church className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span>Priest profile not yet set in Parish Settings.</span>
+                  </div>
+                  <a
+                    href="/settings"
+                    className="text-[11px] font-semibold text-parish-primary hover:underline shrink-0"
+                  >
+                    Configure in Settings →
+                  </a>
+                </div>
+              )
+            )}
+
+            {/* 3. Assigned Ward (if WARD_USER) */}
             {editRole === 'WARD_USER' && (
               <div>
                 <label className="block text-xs font-semibold text-parish-text mb-1">
@@ -1805,6 +2051,61 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                 </p>
               </div>
             )}
+
+            {/* 4. Username */}
+            <div>
+              <label className="block text-xs font-semibold text-parish-text mb-1">
+                User Name <span className="text-xs text-parish-text-muted font-normal">(Login identifier)</span>
+              </label>
+              <Input
+                value={editUsername}
+                onChange={(e) => setEditUsername(e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, ''))}
+                placeholder="e.g. fr.abraham, maria.jose"
+                className="w-full font-mono text-xs"
+              />
+              <p className="text-[10px] text-parish-text-muted mt-1">
+                Optional unique username identifier for sign-in.
+              </p>
+            </div>
+
+            {/* 5. Full Name */}
+            <div>
+              <label className="block text-xs font-semibold text-parish-text mb-1">
+                Full Name <span className="text-red-500">*</span>
+              </label>
+              <Input
+                value={editFullName}
+                onChange={(e) => setEditFullName(e.target.value)}
+                required
+                className="w-full"
+                placeholder="e.g. Fr. Abraham Mathew, Thomas Trustee"
+              />
+              <p className="text-[10px] text-parish-text-muted mt-1">
+                Official name displayed on certificates and register records.
+              </p>
+            </div>
+
+            {/* 6. Official Login Email */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-parish-text">
+                  Official Login Email
+                </label>
+                <Badge variant={editingUser.isActive ? 'success' : 'subtle'} size="sm">
+                  {editingUser.isActive ? 'Active User' : 'Inactive'}
+                </Badge>
+              </div>
+              <Input
+                value={editingUser.email}
+                disabled={true}
+                readOnly
+                icon={<Mail className="w-4 h-4 text-parish-text-muted" />}
+                className="w-full bg-slate-50 text-slate-700 font-mono text-xs cursor-not-allowed"
+              />
+              <p className="text-[10px] text-parish-text-muted mt-1">
+                Primary system identifier for {editingUser.parishName}.
+              </p>
+            </div>
 
             {/* Optional Field: Reset Password */}
             <div className="pt-2 border-t border-parish-border">

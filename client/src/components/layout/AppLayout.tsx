@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useFeatures } from '../../context/FeatureContext';
 import { AppNavbar } from './AppNavbar';
 import { AppSidebar } from './AppSidebar';
 import {
@@ -79,26 +80,81 @@ export const AppLayout: React.FC = () => {
     }
   };
 
+  const { isFeatureEnabled, isDeveloper, isSimulatingClient, setIsSimulatingClient } = useFeatures();
+  const isDevUser = isDeveloper || user?.role === 'SUPER_ADMIN';
+
   const allMobileNavItems: Array<{
     id: string;
     label: string;
     icon: React.ReactNode;
     count?: string | number;
     module?: string;
+    featureKey?: string;
+    action?: 'canView' | 'canCreate';
   }> = [
     { id: 'dashboard', label: 'Home', icon: <Home className="w-5 h-5" /> },
-    { id: 'register', label: 'Parish Register', icon: <Users className="w-5 h-5" />, module: 'REGISTER' },
-    { id: 'register-family', label: 'Register New Family', icon: <UserPlus className="w-5 h-5" />, module: 'REGISTER_NEW' },
-    { id: 'import-registrations', label: 'Import Registrations', icon: <FileSpreadsheet className="w-5 h-5" />, module: 'IMPORT_REGISTRATIONS' },
-    { id: 'units', label: 'Wards & Units', icon: <MapPin className="w-5 h-5" />, module: 'WARDS' },
-    { id: 'users', label: 'Users & Roles', icon: <Shield className="w-5 h-5" />, module: 'USERS' },
-    { id: 'settings', label: 'Settings', icon: <Settings className="w-5 h-5" />, module: 'SETTINGS' },
+    { id: 'register', label: 'Parish Register', icon: <Users className="w-5 h-5" />, module: 'REGISTER', featureKey: 'PAGE_REGISTER' },
+    { id: 'register-family', label: 'Register New Family', icon: <UserPlus className="w-5 h-5" />, module: 'REGISTER_NEW', featureKey: 'PAGE_REGISTER_NEW', action: 'canCreate' },
+    { id: 'import-registrations', label: 'Import Registrations', icon: <FileSpreadsheet className="w-5 h-5" />, module: 'IMPORT_REGISTRATIONS', featureKey: 'PAGE_REGISTER_IMPORT', action: 'canCreate' },
+    { id: 'units', label: 'Wards & Units', icon: <MapPin className="w-5 h-5" />, module: 'WARDS', featureKey: 'PAGE_UNITS' },
+    { id: 'users', label: 'Users & Roles', icon: <Shield className="w-5 h-5" />, module: 'USERS', featureKey: 'PAGE_USERS' },
+    { id: 'settings', label: 'Settings', icon: <Settings className="w-5 h-5" />, module: 'SETTINGS', featureKey: 'PAGE_SETTINGS' },
   ];
 
-  const mobileNavItems = allMobileNavItems.filter((item) => !item.module || hasPermission(item.module, 'canView'));
+  const mobileNavItems = allMobileNavItems.filter((item) => {
+    // Platform Developer is never restricted unless explicitly simulating client view
+    if (isDevUser && !isSimulatingClient) return true;
+    // 1. Feature Toggle Check: If this page feature is disabled for the parish, hide it!
+    if (item.featureKey && !isFeatureEnabled(item.featureKey)) return false;
+    // 2. Role Permissions Matrix Check from database:
+    if (item.module && !hasPermission(item.module, item.action || 'canView')) return false;
+    return true;
+  });
+
 
   return (
     <div className="min-h-screen bg-parish-bg text-parish-text flex flex-col font-sans selection:bg-parish-primary-light selection:text-parish-primary">
+      {/* Simulation Active Top Banner - Persistent across all screens so developer can always return */}
+      {isSimulatingClient && (
+        <aside
+          aria-label="Simulation Mode Banner"
+          className="bg-gradient-to-r from-amber-600 via-amber-700 to-amber-800 text-white px-4 py-2 text-xs font-semibold shadow-md flex items-center justify-between gap-3 z-50 sticky top-0 border-b border-amber-500/50 flex-wrap"
+        >
+          <div className="flex items-center gap-2.5 min-w-0 flex-wrap">
+            <span className="flex h-2.5 w-2.5 relative shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-200"></span>
+            </span>
+            <span className="truncate">
+              <strong className="tracking-wide uppercase text-[11px] bg-amber-900/60 px-1.5 py-0.5 rounded border border-amber-400/40 mr-1.5">
+                Simulating Client View
+              </strong>
+              Parish:{' '}
+              <span className="font-bold underline decoration-amber-300">
+                {activeParish?.parishName || 'Parish'} ({activeParish?.parishCode || ''})
+              </span>
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => navigate('/settings?tab=developer')}
+              className="px-2.5 py-1 rounded-lg bg-amber-900/60 hover:bg-amber-900 text-white text-[11px] font-bold border border-amber-400/50 transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5"
+            >
+              <Settings className="w-3.5 h-3.5 text-amber-200" />
+              <span>Developer Controls</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsSimulatingClient(false)}
+              className="px-3 py-1 rounded-lg bg-white text-amber-950 hover:bg-amber-100 text-[11px] font-extrabold shadow-sm transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+            >
+              <X className="w-3.5 h-3.5 text-amber-900" />
+              <span>Exit Simulation (Return to Normal)</span>
+            </button>
+          </div>
+        </aside>
+      )}
       {/* 1. Frosted Glass Top Navbar with Mobile Hamburger Button */}
       <AppNavbar
         onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}

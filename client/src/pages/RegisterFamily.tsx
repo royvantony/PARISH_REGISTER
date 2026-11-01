@@ -47,7 +47,7 @@ interface DioceseOption {
 
 export const RegisterFamilyPage: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
 
   // Reference Data
   const [units, setUnits] = useState<UnitOption[]>([]);
@@ -111,8 +111,9 @@ export const RegisterFamilyPage: React.FC = () => {
         ]);
         setUnits(unitsRes.data);
         setDioceses(diocesesRes.data);
-        setCanApprove(approveRes.data.canApprove);
-        if (!approveRes.data.canApprove) {
+        const allowedToApprove = Boolean(approveRes.data.canApprove && hasPermission('REGISTER', 'canApprove'));
+        setCanApprove(allowedToApprove);
+        if (!allowedToApprove) {
           setActivateImmediately(false);
         }
       } catch (err: any) {

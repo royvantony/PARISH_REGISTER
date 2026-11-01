@@ -48,10 +48,13 @@ export const THEME_OPTIONS: ThemeOption[] = [
   },
 ];
 
+import { useFeatures } from './FeatureContext';
+
 interface ThemeContextType {
   theme: ThemeId;
   setTheme: (theme: ThemeId) => void;
   availableThemes: ThemeOption[];
+  isThemeSwitchAllowed: boolean;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -59,27 +62,44 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 const STORAGE_KEY = 'parish_register_theme';
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isFeatureEnabled } = useFeatures();
+  const isThemeSwitchAllowed = isFeatureEnabled('FEATURE_THEME_SELECTOR');
+
   const [theme, setThemeState] = useState<ThemeId>(() => {
     const saved = localStorage.getItem(STORAGE_KEY) as ThemeId;
     return saved && THEME_OPTIONS.some((t) => t.id === saved) ? saved : 'emerald';
   });
 
   const setTheme = (newTheme: ThemeId) => {
+    if (!isThemeSwitchAllowed) return; // Locked to burgundy when hidden
     setThemeState(newTheme);
     localStorage.setItem(STORAGE_KEY, newTheme);
     document.documentElement.setAttribute('data-theme', newTheme);
   };
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
+    if (!isThemeSwitchAllowed) {
+      // Force Cathedral Burgundy as default when theme selector is hidden
+      document.documentElement.setAttribute('data-theme', 'burgundy');
+    } else {
+      document.documentElement.setAttribute('data-theme', theme);
+    }
+  }, [isThemeSwitchAllowed, theme]);
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, availableThemes: THEME_OPTIONS }}>
+    <ThemeContext.Provider
+      value={{
+        theme: !isThemeSwitchAllowed ? 'burgundy' : theme,
+        setTheme,
+        availableThemes: THEME_OPTIONS,
+        isThemeSwitchAllowed,
+      }}
+    >
       {children}
     </ThemeContext.Provider>
   );
 };
+
 
 export const useTheme = () => {
   const context = useContext(ThemeContext);

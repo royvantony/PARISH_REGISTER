@@ -5,7 +5,7 @@ export type UserRole =
   | 'SUPER_ADMIN'
   | 'DIOCESAN_ADMIN'
   | 'DIOCESAN_USER'
-  | 'PARISH_SUPER_ADMIN'
+  | 'PARISH_PRIEST'
   | 'PARISH_ADMIN'
   | 'PARISH_USER'
   | 'WARD_USER';
@@ -13,6 +13,7 @@ export type UserRole =
 export interface User {
   id: number;
   fullName: string;
+  username?: string | null;
   email: string;
   role: UserRole;
   parishId: number | null;
@@ -25,6 +26,15 @@ export interface Parish {
   parishName: string;
   city?: string;
   state?: string;
+  postalCode?: string | null;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+  idPrefix?: string;
+  nextFamilyNumber?: number;
+  isActive?: boolean;
+  priestName?: string | null;
+  priestEmail?: string | null;
+  priestPhone?: string | null;
 }
 
 export interface DioceseInfo {
@@ -93,12 +103,21 @@ export interface AuthContextType {
   logout: () => void;
   setActiveParishById: (parishId: number) => void;
   updatePassword: (newPassword: string) => Promise<{ success: boolean; error?: string }>;
+  refreshDiocese: () => Promise<void>;
+  refreshParishes: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const saved = localStorage.getItem('parish_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [token, setToken] = useState<string | null>(localStorage.getItem('parish_token'));
   const [permissions, setPermissions] = useState<Record<string, ModulePermission>>({});
   const DEFAULT_PARISH_LIST: Parish[] = [
@@ -164,19 +183,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const hasPermission = (moduleKey: string, action: PermissionAction = 'canView'): boolean => {
     if (!user) return false;
-    if (user.role === 'SUPER_ADMIN' || user.role === 'DIOCESAN_ADMIN') return true;
+    // Platform Developer (SUPER_ADMIN) has unrestricted access in code
+    if (user.role === 'SUPER_ADMIN') return true;
     const mod = permissions[moduleKey];
     if (!mod) {
-      if (user.role === 'PARISH_SUPER_ADMIN' || user.role === 'PARISH_ADMIN') return true;
-      if (user.role === 'PARISH_USER') {
-        if (moduleKey === 'REGISTER' || moduleKey === 'REGISTER_NEW' || moduleKey === 'IMPORT_REGISTRATIONS' || moduleKey === 'WARDS') {
-          return action === 'canView' || action === 'canCreate' || action === 'canEdit';
-        }
-      }
+      return false;
+    }
+    // CRITICAL RULE: If canView is false, user has NO access or rights for any action in this module
+    if (!mod.canView) {
       return false;
     }
     return Boolean(mod[action]);
   };
+
 
   // Check existing session on boot
   useEffect(() => {
@@ -432,6 +451,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const refreshDiocese = async () => {
+    try {
+      const res = await api.get('/auth/diocese');
+      if (res.data) {
+        setDiocese(res.data);
+      }
+    } catch (e) {
+      console.error('Failed to refresh diocese:', e);
+    }
+  };
+
+  const refreshParishes = async () => {
+    try {
+      const res = await api.get('/auth/parishes');
+      if (Array.isArray(res.data) && res.data.length > 0) {
+        setAvailableParishes(res.data);
+        const currentActiveId = activeParish?.id;
+        const matched = res.data.find((p: Parish) => p.id === currentActiveId);
+        if (matched) {
+          setActiveParish(matched);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to refresh parishes:', e);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -455,6 +501,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         logout,
         setActiveParishById,
         updatePassword,
+        refreshDiocese,
+        refreshParishes,
       }}
     >
       {children}

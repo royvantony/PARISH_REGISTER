@@ -62,7 +62,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, {
     DASHBOARD_ACTIVITY: { canView: true, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: false, canApprove: false },
     SETTINGS: { canView: false, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: false, canApprove: false },
   },
-  [UserRole.PARISH_SUPER_ADMIN]: { // Parish Priest (Supreme Parish Authority - approvals, block admins, full finance)
+  [UserRole.PARISH_PRIEST]: { // Parish Priest (Supreme Parish Authority - approvals, block admins, full finance)
     REGISTER: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
     REGISTER_NEW: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
     IMPORT_REGISTRATIONS: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
@@ -275,16 +275,22 @@ permissionsRouter.get('/my-permissions', async (req: Request, res: Response) => 
       const base = rolePermissions.find((r) => r.module === mod.key) || defaultRolePerm;
       const override = user.overrides.find((o) => o.module === mod.key);
 
+      const canView = Boolean(
+        override?.canView !== null && override?.canView !== undefined ? override.canView : base.canView
+      );
+
+      // CRITICAL RULE: If canView is false, user has NO access or action rights in this module
       permissionsMap[mod.key] = {
-        canView: override?.canView !== null && override?.canView !== undefined ? override.canView : base.canView,
-        canCreate: override?.canCreate !== null && override?.canCreate !== undefined ? override.canCreate : base.canCreate,
-        canEdit: override?.canEdit !== null && override?.canEdit !== undefined ? override.canEdit : base.canEdit,
-        canArchive: override?.canArchive !== null && override?.canArchive !== undefined ? override.canArchive : base.canArchive,
-        canDelete: override?.canDelete !== null && override?.canDelete !== undefined ? override.canDelete : base.canDelete,
-        canExport: override?.canExport !== null && override?.canExport !== undefined ? override.canExport : base.canExport,
-        canApprove: (override as any)?.canApprove !== null && (override as any)?.canApprove !== undefined ? (override as any).canApprove : (base as any).canApprove || false,
+        canView,
+        canCreate: canView ? Boolean(override?.canCreate !== null && override?.canCreate !== undefined ? override.canCreate : base.canCreate) : false,
+        canEdit: canView ? Boolean(override?.canEdit !== null && override?.canEdit !== undefined ? override.canEdit : base.canEdit) : false,
+        canArchive: canView ? Boolean(override?.canArchive !== null && override?.canArchive !== undefined ? override.canArchive : base.canArchive) : false,
+        canDelete: canView ? Boolean(override?.canDelete !== null && override?.canDelete !== undefined ? override.canDelete : base.canDelete) : false,
+        canExport: canView ? Boolean(override?.canExport !== null && override?.canExport !== undefined ? override.canExport : base.canExport) : false,
+        canApprove: canView ? Boolean((override as any)?.canApprove !== null && (override as any)?.canApprove !== undefined ? (override as any).canApprove : (base as any).canApprove || false) : false,
       };
     }
+
 
     return res.json({ permissions: permissionsMap });
   } catch (err: any) {
@@ -327,22 +333,26 @@ permissionsRouter.get('/users/:userId', async (req: Request, res: Response) => {
       };
 
       const override = user.overrides.find((o) => o.module === mod.key);
+      const canView = Boolean(
+        override?.canView !== null && override?.canView !== undefined ? override.canView : base.canView
+      );
 
       return {
         module: mod.key,
         name: mod.name,
         category: mod.category,
-        canView: override?.canView !== null && override?.canView !== undefined ? override.canView : base.canView,
-        canCreate: override?.canCreate !== null && override?.canCreate !== undefined ? override.canCreate : base.canCreate,
-        canEdit: override?.canEdit !== null && override?.canEdit !== undefined ? override.canEdit : base.canEdit,
-        canArchive: override?.canArchive !== null && override?.canArchive !== undefined ? override.canArchive : base.canArchive,
-        canDelete: override?.canDelete !== null && override?.canDelete !== undefined ? override.canDelete : base.canDelete,
-        canExport: override?.canExport !== null && override?.canExport !== undefined ? override.canExport : base.canExport,
-        canApprove: (override as any)?.canApprove !== null && (override as any)?.canApprove !== undefined ? (override as any).canApprove : (base as any).canApprove || false,
+        canView,
+        canCreate: canView ? Boolean(override?.canCreate !== null && override?.canCreate !== undefined ? override.canCreate : base.canCreate) : false,
+        canEdit: canView ? Boolean(override?.canEdit !== null && override?.canEdit !== undefined ? override.canEdit : base.canEdit) : false,
+        canArchive: canView ? Boolean(override?.canArchive !== null && override?.canArchive !== undefined ? override.canArchive : base.canArchive) : false,
+        canDelete: canView ? Boolean(override?.canDelete !== null && override?.canDelete !== undefined ? override.canDelete : base.canDelete) : false,
+        canExport: canView ? Boolean(override?.canExport !== null && override?.canExport !== undefined ? override.canExport : base.canExport) : false,
+        canApprove: canView ? Boolean((override as any)?.canApprove !== null && (override as any)?.canApprove !== undefined ? (override as any).canApprove : (base as any).canApprove || false) : false,
         isOverridden: Boolean(override),
         base,
       };
     });
+
 
     return res.json({
       user: {
@@ -435,38 +445,33 @@ export async function canUserApproveRegistration(userId: number, role: UserRole,
     return true;
   }
 
-  // 2. Check for explicit user permission override
-  const override = await prisma.userPermissionOverride.findUnique({
-    where: {
-      userId_module: {
-        userId,
-        module: 'REGISTER',
-      },
-    },
-  });
-
-  if (override && (override as any).canApprove !== null && (override as any).canApprove !== undefined) {
-    return Boolean((override as any).canApprove);
-  }
-
-  // 3. Check role permission from database
   const targetParishId = parishId || 1;
-  const rolePerm = await prisma.rolePermission.findUnique({
-    where: {
-      parishId_role_module: {
-        parishId: targetParishId,
-        role,
-        module: 'REGISTER',
-      },
-    },
-  });
 
-  if (rolePerm && (rolePerm as any).canApprove !== undefined && (rolePerm as any).canApprove !== null) {
-    return Boolean((rolePerm as any).canApprove);
+  // 2. First verify user has canView for REGISTER
+  const viewOverride = await prisma.userPermissionOverride.findUnique({
+    where: { userId_module: { userId, module: 'REGISTER' } },
+  });
+  const viewRolePerm = await prisma.rolePermission.findUnique({
+    where: { parishId_role_module: { parishId: targetParishId, role, module: 'REGISTER' } },
+  });
+  const canView = viewOverride?.canView !== null && viewOverride?.canView !== undefined
+    ? viewOverride.canView
+    : (viewRolePerm?.canView ?? DEFAULT_ROLE_PERMISSIONS[role]?.REGISTER?.canView ?? false);
+
+  if (!canView) return false;
+
+  // 3. Check for explicit user permission override
+  if (viewOverride && (viewOverride as any).canApprove !== null && (viewOverride as any).canApprove !== undefined) {
+    return Boolean((viewOverride as any).canApprove);
   }
 
-  // 4. Default fallback: Parish Priest and Trustees
-  return role === UserRole.PARISH_SUPER_ADMIN || role === UserRole.PARISH_ADMIN;
+  // 4. Check role permission from database
+  if (viewRolePerm && (viewRolePerm as any).canApprove !== undefined && (viewRolePerm as any).canApprove !== null) {
+    return Boolean((viewRolePerm as any).canApprove);
+  }
+
+  // 5. Default fallback: Parish Priest and Trustees
+  return role === UserRole.PARISH_PRIEST || role === UserRole.PARISH_ADMIN;
 }
 
 // GET /api/permissions/can-approve - Check if current user has approval authority
@@ -474,7 +479,7 @@ permissionsRouter.get('/can-approve', async (req: Request, res: Response) => {
   try {
     const user = req.user;
     if (!user) return res.json({ canApprove: false });
-    const canApprove = await canUserApproveRegistration(user.userId, user.role);
+    const canApprove = await canUserApproveRegistration(user.userId, user.role, req.activeParishId);
     return res.json({ canApprove });
   } catch (err: any) {
     console.error('Error checking can-approve:', err);
@@ -521,11 +526,15 @@ export async function getUserDirectDebitPermissions(
   if (canView === null) {
     canView = rolePerm?.canView ?? DEFAULT_ROLE_PERMISSIONS[role]?.DIRECT_DEBIT?.canView ?? false;
   }
+  if (!canView) {
+    return { canView: false, canEdit: false };
+  }
+
   if (canEdit === null) {
     canEdit = rolePerm?.canEdit ?? DEFAULT_ROLE_PERMISSIONS[role]?.DIRECT_DEBIT?.canEdit ?? false;
   }
 
-  return { canView: Boolean(canView), canEdit: Boolean(canEdit) };
+  return { canView: true, canEdit: Boolean(canEdit) };
 }
 
 // GET /api/permissions/direct-debit - Check current user's direct debit permissions
@@ -581,15 +590,19 @@ export async function canUserImportRegistrations(
   if (canView === null) {
     canView = rolePerm?.canView ?? DEFAULT_ROLE_PERMISSIONS[role]?.IMPORT_REGISTRATIONS?.canView ?? false;
   }
+  if (!canView) {
+    return { canView: false, canCreate: false, canApprove: false };
+  }
+
   if (canCreate === null) {
     canCreate = rolePerm?.canCreate ?? DEFAULT_ROLE_PERMISSIONS[role]?.IMPORT_REGISTRATIONS?.canCreate ?? false;
   }
   if (canApprove === null) {
-    canApprove = rolePerm?.canApprove ?? DEFAULT_ROLE_PERMISSIONS[role]?.IMPORT_REGISTRATIONS?.canApprove ?? (role === UserRole.PARISH_SUPER_ADMIN || role === UserRole.PARISH_ADMIN);
+    canApprove = rolePerm?.canApprove ?? DEFAULT_ROLE_PERMISSIONS[role]?.IMPORT_REGISTRATIONS?.canApprove ?? (role === UserRole.PARISH_PRIEST || role === UserRole.PARISH_ADMIN);
   }
 
   return {
-    canView: Boolean(canView),
+    canView: true,
     canCreate: Boolean(canCreate),
     canApprove: Boolean(canApprove),
   };
@@ -617,9 +630,11 @@ export async function canUserExportModule(
   parishId: number,
   module: string = 'REGISTER'
 ): Promise<boolean> {
-  if (role === UserRole.SUPER_ADMIN || role === UserRole.DIOCESAN_ADMIN || role === UserRole.PARISH_SUPER_ADMIN) {
+  if (role === UserRole.SUPER_ADMIN || role === UserRole.DIOCESAN_ADMIN || role === UserRole.PARISH_PRIEST) {
     return true;
   }
+
+  const targetParishId = parishId || 1;
   const override = await prisma.userPermissionOverride.findUnique({
     where: {
       userId_module: {
@@ -628,10 +643,7 @@ export async function canUserExportModule(
       },
     },
   });
-  if (override?.canExport !== null && override?.canExport !== undefined) {
-    return Boolean(override.canExport);
-  }
-  const targetParishId = parishId || 1;
+
   const rolePerm = await prisma.rolePermission.findUnique({
     where: {
       parishId_role_module: {
@@ -641,11 +653,23 @@ export async function canUserExportModule(
       },
     },
   });
+
+  // Verify canView first
+  const canView = override?.canView !== null && override?.canView !== undefined
+    ? override.canView
+    : (rolePerm?.canView ?? DEFAULT_ROLE_PERMISSIONS[role]?.[module]?.canView ?? false);
+
+  if (!canView) return false;
+
+  if (override?.canExport !== null && override?.canExport !== undefined) {
+    return Boolean(override.canExport);
+  }
   if (rolePerm?.canExport !== null && rolePerm?.canExport !== undefined) {
     return Boolean(rolePerm.canExport);
   }
   return Boolean(DEFAULT_ROLE_PERMISSIONS[role]?.[module]?.canExport ?? false);
 }
+
 
 
 

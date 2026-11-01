@@ -159,17 +159,17 @@ async function main() {
     },
   });
 
-  // Parish Super Admin (Parish Priest)
+  // Parish Priest
   await prisma.parishUser.upsert({
     where: { email: 'priest@stalphonsabrisbane.org.au' },
     update: {
-      role: UserRole.PARISH_SUPER_ADMIN,
+      role: UserRole.PARISH_PRIEST,
     },
     create: {
       fullName: 'Fr. Parish Priest',
       email: 'priest@stalphonsabrisbane.org.au',
       passwordHash: defaultPassword,
-      role: UserRole.PARISH_SUPER_ADMIN,
+      role: UserRole.PARISH_PRIEST,
       parishId: parish.id,
       isActive: true,
       mustChangePassword: false,

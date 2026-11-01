@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { calculateMonthlyEquivalent } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
+import { useFeatures } from '../context/FeatureContext';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { ConfirmButton } from '../components/ui/ConfirmButton';
@@ -62,9 +63,15 @@ interface DioceseOption {
 export const EditFamilyPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
+  const { isFeatureEnabled } = useFeatures();
+
+  const canEdit = hasPermission('REGISTER', 'canEdit');
+  const canArchive = hasPermission('REGISTER', 'canArchive');
+  const canPrintDossier = isFeatureEnabled('REGISTER_PRINT_DOSSIER') && hasPermission('REGISTER', 'canExport');
+
   const canViewAuditTrail = Boolean(
-    user && ['SUPER_ADMIN', 'DIOCESAN_ADMIN', 'PARISH_SUPER_ADMIN', 'PARISH_ADMIN'].includes(user.role)
+    user?.role === 'SUPER_ADMIN' || hasPermission('REGISTER', 'canApprove')
   );
 
   // Reference Data
@@ -128,6 +135,9 @@ export const EditFamilyPage: React.FC = () => {
   const [isAllAuditNotesShown, setIsAllAuditNotesShown] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const canApproveAction = canApprove && hasPermission('REGISTER', 'canApprove');
+  const canViewDirectDebit = isFeatureEnabled('REGISTER_DIRECT_DEBIT') && hasPermission('DIRECT_DEBIT', 'canView') && directDebitPerms.canView;
 
   // Print Dossier State
   const [isDossierModalOpen, setIsDossierModalOpen] = useState(false);
@@ -558,7 +568,7 @@ export const EditFamilyPage: React.FC = () => {
           </Button>
 
           {/* Inactivate Button for ACTIVE families */}
-          {status === 'ACTIVE' && canApprove && (
+          {status === 'ACTIVE' && canArchive && (
             <Button
               type="button"
               variant="outline"
@@ -572,7 +582,7 @@ export const EditFamilyPage: React.FC = () => {
           )}
 
           {/* Reactivate Button for INACTIVE families */}
-          {status === 'INACTIVE' && canApprove && (
+          {status === 'INACTIVE' && canArchive && (
             <Button
               type="button"
               variant="primary"
@@ -585,7 +595,7 @@ export const EditFamilyPage: React.FC = () => {
           )}
 
           {/* Approve Button for PENDING registrations */}
-          {status === 'PENDING' && canApprove && (
+          {status === 'PENDING' && canApproveAction && (
             <Button
               type="button"
               variant="primary"
@@ -598,19 +608,21 @@ export const EditFamilyPage: React.FC = () => {
           )}
 
           {/* Print Dossier Action Button */}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setIsDossierModalOpen(true)}
-            icon={<Printer className="w-3.5 h-3.5 text-parish-primary" />}
-            className="border-parish-border text-parish-primary hover:bg-parish-primary-light"
-          >
-            <span>Print Family Details</span>
-          </Button>
+          {canPrintDossier && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsDossierModalOpen(true)}
+              icon={<Printer className="w-3.5 h-3.5 text-parish-primary" />}
+              className="border-parish-border text-parish-primary hover:bg-parish-primary-light"
+            >
+              <span>Print Family Details</span>
+            </Button>
+          )}
 
           {/* Direct Debit Action Button */}
-          {directDebitPerms.canView && (
+          {canViewDirectDebit && (
             <Button
               type="button"
               variant="outline"
@@ -619,24 +631,26 @@ export const EditFamilyPage: React.FC = () => {
               icon={<CreditCard className="w-3.5 h-3.5 text-parish-primary" />}
               className="border-parish-border text-parish-primary hover:bg-parish-primary-light"
             >
-              <span>Direct Debit</span>
+              <span>{hasDirectDebit ? 'Direct Debit' : 'Setup Direct Debit'}</span>
               {hasDirectDebit && (
                 <span className="w-1.5 h-1.5 rounded-full bg-parish-primary inline-block ml-1" title="Active Direct Debit" />
               )}
             </Button>
           )}
 
-          <ConfirmButton
-            variant="primary"
-            size="sm"
-            onConfirm={handleSubmit}
-            beforeConfirm={validateBeforeSave}
-            isLoading={isSubmitting}
-            icon={<Save className="w-4 h-4" />}
-            confirmLabel="Confirm Save"
-          >
-            Save Changes
-          </ConfirmButton>
+          {canEdit && (
+            <ConfirmButton
+              variant="primary"
+              size="sm"
+              onConfirm={handleSubmit}
+              beforeConfirm={validateBeforeSave}
+              isLoading={isSubmitting}
+              icon={<Save className="w-4 h-4" />}
+              confirmLabel="Confirm Save"
+            >
+              Save Changes
+            </ConfirmButton>
+          )}
         </div>
       </div>
 
@@ -658,7 +672,7 @@ export const EditFamilyPage: React.FC = () => {
             </div>
           </div>
 
-          {canApprove && (
+          {canArchive && (
             <div className="pt-2 flex flex-wrap items-center gap-2.5 border-t border-slate-300 dark:border-slate-800">
               <Button
                 type="button"
@@ -693,7 +707,7 @@ export const EditFamilyPage: React.FC = () => {
             </div>
           </div>
 
-          {canApprove ? (
+          {canApproveAction ? (
             <div className="pt-2 flex flex-wrap items-center gap-2.5 border-t border-amber-200/70">
               <Button
                 variant="primary"
@@ -1006,20 +1020,7 @@ export const EditFamilyPage: React.FC = () => {
                 </div>
               </div>
 
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleAddChild}
-                icon={<Plus className="w-3.5 h-3.5" />}
-              >
-                Add Member
-              </Button>
-            </div>
-
-            {children.length === 0 ? (
-              <div className="p-6 rounded-xl border border-dashed border-parish-border text-center text-xs text-parish-text-muted space-y-2">
-                <div>No children or dependents currently listed.</div>
+              {canEdit && (
                 <Button
                   type="button"
                   variant="outline"
@@ -1027,8 +1028,25 @@ export const EditFamilyPage: React.FC = () => {
                   onClick={handleAddChild}
                   icon={<Plus className="w-3.5 h-3.5" />}
                 >
-                  Add First Child / Dependent
+                  Add Member
                 </Button>
+              )}
+            </div>
+
+            {children.length === 0 ? (
+              <div className="p-6 rounded-xl border border-dashed border-parish-border text-center text-xs text-parish-text-muted space-y-2">
+                <div>No children or dependents currently listed.</div>
+                {canEdit && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAddChild}
+                    icon={<Plus className="w-3.5 h-3.5" />}
+                  >
+                    Add First Child / Dependent
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="space-y-3">
@@ -1052,12 +1070,14 @@ export const EditFamilyPage: React.FC = () => {
                         </select>
                       </div>
 
-                      <ConfirmDeleteButton
-                        onDelete={() => handleRemoveChild(index)}
-                        hasContent={Boolean(child.fullName.trim() || child.dateOfBirth || child.placeOfBirth || child.phone || child.email)}
-                        confirmLabel="Remove?"
-                        title="Remove member"
-                      />
+                      {canEdit && (
+                        <ConfirmDeleteButton
+                          onDelete={() => handleRemoveChild(index)}
+                          hasContent={Boolean(child.fullName.trim() || child.dateOfBirth || child.placeOfBirth || child.phone || child.email)}
+                          confirmLabel="Remove?"
+                          title="Remove member"
+                        />
+                      )}
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -1233,7 +1253,7 @@ export const EditFamilyPage: React.FC = () => {
         </div>
 
         {/* Direct Debit Summary Card (Option B Modal Trigger) */}
-        {directDebitPerms.canView && (
+        {canViewDirectDebit && (
           <div className="bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-xl bg-parish-primary-light text-parish-primary flex items-center justify-center shrink-0">
@@ -1246,6 +1266,8 @@ export const EditFamilyPage: React.FC = () => {
                   </h3>
                   {hasDirectDebit ? (
                     <Badge variant="success" size="sm">Active</Badge>
+                  ) : directDebitData ? (
+                    <Badge variant="warning" size="sm">Paused / Inactive</Badge>
                   ) : (
                     <Badge variant="subtle" size="sm">No Direct Debit</Badge>
                   )}
@@ -1259,6 +1281,8 @@ export const EditFamilyPage: React.FC = () => {
                         : ''})
                       {directDebitData.comments ? ` • ${directDebitData.comments}` : ''}
                     </span>
+                  ) : directDebitData ? (
+                    <span>Direct debit is currently paused / inactive ({directDebitData.amount ? `$${directDebitData.amount} AUD ${directDebitData.frequency || 'Monthly'}` : 'Inactive'}).</span>
                   ) : (
                     <span>No direct debit details recorded for this household.</span>
                   )}
@@ -1274,7 +1298,9 @@ export const EditFamilyPage: React.FC = () => {
               icon={<CreditCard className="w-3.5 h-3.5 text-parish-primary" />}
               className="shrink-0 font-semibold text-parish-primary border-parish-border hover:bg-parish-primary-light"
             >
-              {directDebitPerms.canEdit ? 'Manage Direct Debit' : 'View Direct Debit'}
+              {directDebitPerms.canEdit
+                ? (hasDirectDebit || directDebitData ? 'Manage Direct Debit' : 'Setup Direct Debit')
+                : 'View Direct Debit'}
             </Button>
           </div>
         )}
@@ -1385,17 +1411,19 @@ export const EditFamilyPage: React.FC = () => {
             Back to Directory
           </Button>
 
-          <ConfirmButton
-            variant="primary"
-            size="lg"
-            onConfirm={handleSubmit}
-            beforeConfirm={validateBeforeSave}
-            isLoading={isSubmitting}
-            icon={<Save className="w-4 h-4" />}
-            confirmLabel="Confirm Save"
-          >
-            Save All Changes
-          </ConfirmButton>
+          {canEdit && (
+            <ConfirmButton
+              variant="primary"
+              size="lg"
+              onConfirm={handleSubmit}
+              beforeConfirm={validateBeforeSave}
+              isLoading={isSubmitting}
+              icon={<Save className="w-4 h-4" />}
+              confirmLabel="Confirm Save"
+            >
+              Save All Changes
+            </ConfirmButton>
+          )}
         </div>
       </form>
 
@@ -1483,7 +1511,7 @@ export const EditFamilyPage: React.FC = () => {
         />
       )}
       {/* Direct Debit Modal (Option B: Dedicated window with auditing) */}
-      {id && directDebitPerms.canView && (
+      {id && canViewDirectDebit && (
         <DirectDebitModal
           isOpen={isDirectDebitModalOpen}
           onClose={() => setIsDirectDebitModalOpen(false)}
@@ -1491,7 +1519,7 @@ export const EditFamilyPage: React.FC = () => {
           houseName={houseName}
           familyCode={familyCode}
           currentDirectDebit={directDebitData}
-          canEdit={directDebitPerms.canEdit}
+          canEdit={isFeatureEnabled('REGISTER_DIRECT_DEBIT') && hasPermission('DIRECT_DEBIT', 'canEdit') && directDebitPerms.canEdit}
           onSuccess={(updated) => {
             setDirectDebitData(updated);
             setHasDirectDebit(Boolean(updated?.active));

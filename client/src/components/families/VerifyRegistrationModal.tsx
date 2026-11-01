@@ -92,43 +92,41 @@ export const VerifyRegistrationModal: React.FC<VerifyRegistrationModalProps> = (
   canApprove,
   onSaveSuccess,
 }) => {
-  if (!record) return null;
-
   // Form State initialized from record
-  const [registrationType, setRegistrationType] = useState<string>(record.data.registrationType || 'FAMILY');
-  const [houseName, setHouseName] = useState<string>(record.data.houseName || '');
-  const [unitId, setUnitId] = useState<string>(record.data.unitId ? String(record.data.unitId) : 'UNASSIGNED');
+  const [registrationType, setRegistrationType] = useState<string>(record?.data?.registrationType || 'FAMILY');
+  const [houseName, setHouseName] = useState<string>(record?.data?.houseName || '');
+  const [unitId, setUnitId] = useState<string>(record?.data?.unitId ? String(record.data.unitId) : 'UNASSIGNED');
 
   // Head
-  const [headName, setHeadName] = useState<string>(record.data.headName || '');
-  const [headDob, setHeadDob] = useState<string>(record.data.headDob || '');
-  const [headPob, setHeadPob] = useState<string>(record.data.headPob || '');
-  const [headPhone, setHeadPhone] = useState<string>(record.data.headPhone || '');
-  const [headEmail, setHeadEmail] = useState<string>(record.data.headEmail || '');
+  const [headName, setHeadName] = useState<string>(record?.data?.headName || '');
+  const [headDob, setHeadDob] = useState<string>(record?.data?.headDob || '');
+  const [headPob, setHeadPob] = useState<string>(record?.data?.headPob || '');
+  const [headPhone, setHeadPhone] = useState<string>(record?.data?.headPhone || '');
+  const [headEmail, setHeadEmail] = useState<string>(record?.data?.headEmail || '');
 
   // Spouse
-  const [hasSpouse, setHasSpouse] = useState<boolean>(record.data.hasSpouse || Boolean(record.data.spouseName));
-  const [spouseName, setSpouseName] = useState<string>(record.data.spouseName || '');
-  const [spouseDob, setSpouseDob] = useState<string>(record.data.spouseDob || '');
-  const [spousePob, setSpousePob] = useState<string>(record.data.spousePob || '');
-  const [spousePhone, setSpousePhone] = useState<string>(record.data.spousePhone || '');
-  const [spouseEmail, setSpouseEmail] = useState<string>(record.data.spouseEmail || '');
+  const [hasSpouse, setHasSpouse] = useState<boolean>(record?.data?.hasSpouse || Boolean(record?.data?.spouseName));
+  const [spouseName, setSpouseName] = useState<string>(record?.data?.spouseName || '');
+  const [spouseDob, setSpouseDob] = useState<string>(record?.data?.spouseDob || '');
+  const [spousePob, setSpousePob] = useState<string>(record?.data?.spousePob || '');
+  const [spousePhone, setSpousePhone] = useState<string>(record?.data?.spousePhone || '');
+  const [spouseEmail, setSpouseEmail] = useState<string>(record?.data?.spouseEmail || '');
 
   // Children
-  const [children, setChildren] = useState<ChildItem[]>(record.data.children || []);
+  const [children, setChildren] = useState<ChildItem[]>(record?.data?.children || []);
 
   // Address
-  const [streetAddress, setStreetAddress] = useState<string>(record.data.streetAddress || '');
-  const [city, setCity] = useState<string>(record.data.city || '');
-  const [state, setState] = useState<string>(record.data.state || '');
-  const [postalCode, setPostalCode] = useState<string>(record.data.postalCode || '');
+  const [streetAddress, setStreetAddress] = useState<string>(record?.data?.streetAddress || '');
+  const [city, setCity] = useState<string>(record?.data?.city || '');
+  const [state, setState] = useState<string>(record?.data?.state || '');
+  const [postalCode, setPostalCode] = useState<string>(record?.data?.postalCode || '');
 
   // Roots
-  const [originParish, setOriginParish] = useState<string>(record.data.originParish || '');
-  const [originDiocese, setOriginDiocese] = useState<string>(record.data.originDiocese || '');
+  const [originParish, setOriginParish] = useState<string>(record?.data?.originParish || '');
+  const [originDiocese, setOriginDiocese] = useState<string>(record?.data?.originDiocese || '');
 
   // Notes
-  const [generalNotes, setGeneralNotes] = useState<string>(record.data.generalNotes || '');
+  const [generalNotes, setGeneralNotes] = useState<string>(record?.data?.generalNotes || '');
 
   // Loading & error
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -192,7 +190,7 @@ export const VerifyRegistrationModal: React.FC<VerifyRegistrationModalProps> = (
 
   // Submit Handler
   const handleSave = async (approveImmediately: boolean) => {
-    if (!validateInputs()) {
+    if (!record || !validateInputs()) {
       return;
     }
 
@@ -244,6 +242,8 @@ export const VerifyRegistrationModal: React.FC<VerifyRegistrationModalProps> = (
       setIsSubmitting(false);
     }
   };
+
+  if (!record) return null;
 
   return (
     <Modal

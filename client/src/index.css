@@ -172,3 +172,22 @@ body {
   background: #64748b;
 }
 
+/* Always-visible top scrollbar track for landscape preview */
+.top-scrollbar-track::-webkit-scrollbar {
+  height: 8px;
+}
+
+.top-scrollbar-track::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 9999px;
+}
+
+.top-scrollbar-track::-webkit-scrollbar-thumb {
+  background: #1b4332;
+  border-radius: 9999px;
+}
+
+.top-scrollbar-track::-webkit-scrollbar-thumb:hover {
+  background: #0f281e;
+}
+

@@ -31,7 +31,7 @@ enum UserRole {
   SUPER_ADMIN         // Developer / System Architect (Global wildcard)
   DIOCESAN_ADMIN      // Bishop / Chancellor (Diocesan governance)
   DIOCESAN_USER       // Diocesan Staff / Accountant (Diocesan read-only)
-  PARISH_SUPER_ADMIN  // Parish Priest (Supreme Parish Authority - approve registrations, block admins)
+  PARISH_PRIEST       // Parish Priest (Supreme Parish Authority - approve registrations, block admins)
   PARISH_ADMIN        // Parish Trustees / Executive Committee (Parish management)
   PARISH_USER         // Parish Secretary / Office Volunteers / General Users
   WARD_USER           // Ward Coordinator / Unit Representative (Ward-scoped)
@@ -83,6 +83,11 @@ model Parish {
   nextFamilyNumber   Int           @default(100001)
   isActive           Boolean       @default(true)
 
+  // Parish Priest Details
+  priestName         String?
+  priestEmail        String?
+  priestPhone        String?
+
   // Scoped Relations
   units              FamilyUnit[]
   families           Family[]
@@ -90,6 +95,7 @@ model Parish {
   directDebits       DirectDebit[]
   nativeDioceses     NativeDiocese[]
   rolePermissions    RolePermission[]
+  systemFeatureToggles SystemFeatureToggle[]
 
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
@@ -104,6 +110,7 @@ model ParishUser {
   parishId       Int?        // NULL for Diocesan Admins
   parish         Parish?     @relation(fields: [parishId], references: [id])
   fullName       String
+  username       String?     @unique
   email          String      @unique
   passwordHash   String
   role           UserRole    @default(PARISH_ADMIN)
@@ -300,3 +307,25 @@ model FamilyNote {
   recordedBy  String?
   createdAt   DateTime  @default(now())
 }
+
+// ----------------------------------------------------
+// 5. DEVELOPER SYSTEM FEATURE TOGGLES
+// ----------------------------------------------------
+
+model SystemFeatureToggle {
+  id          Int      @id @default(autoincrement())
+  parishId    Int      @default(1)
+  parish      Parish   @relation(fields: [parishId], references: [id], onDelete: Cascade)
+  key         String
+  name        String
+  category    String   // 'PAGE' | 'DASHBOARD' | 'SETTINGS' | 'USERS' | 'REGISTER' | 'GENERAL'
+  description String?
+  route       String?
+  isEnabled   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([parishId, key])
+  @@index([parishId])
+}
+

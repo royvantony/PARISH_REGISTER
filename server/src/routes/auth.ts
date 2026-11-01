@@ -12,14 +12,20 @@ const getJwtSecret = () => process.env.JWT_SECRET || 'st_alphonsa_parish_brisban
 // POST /api/auth/login
 authRouter.post('/login', async (req: Request, res: Response) => {
   try {
-    const { email, password } = req.body;
+    const { email, username, password } = req.body;
+    const identifier = ((email || username || '') as string).trim().toLowerCase();
 
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required.' });
+    if (!identifier || !password) {
+      return res.status(400).json({ error: 'Email / username and password are required.' });
     }
 
-    const user = await prisma.parishUser.findUnique({
-      where: { email: email.trim().toLowerCase() },
+    const user = await prisma.parishUser.findFirst({
+      where: {
+        OR: [
+          { email: identifier },
+          { username: identifier },
+        ],
+      },
       include: {
         parish: true,
       },
@@ -37,6 +43,7 @@ authRouter.post('/login', async (req: Request, res: Response) => {
     const payload: AuthenticatedUser = {
       userId: user.id,
       email: user.email,
+      username: user.username,
       fullName: user.fullName,
       role: user.role,
       parishId: user.parishId,
@@ -55,7 +62,22 @@ authRouter.post('/login', async (req: Request, res: Response) => {
     if (isGlobalRole) {
       availableParishes = await prisma.parish.findMany({
         where: { isActive: true },
-        select: { id: true, parishCode: true, parishName: true, city: true, state: true },
+        select: {
+          id: true,
+          parishCode: true,
+          parishName: true,
+          city: true,
+          state: true,
+          postalCode: true,
+          contactEmail: true,
+          contactPhone: true,
+          idPrefix: true,
+          nextFamilyNumber: true,
+          isActive: true,
+          priestName: true,
+          priestEmail: true,
+          priestPhone: true,
+        },
         orderBy: { id: 'asc' },
       });
     } else if (user.parish) {
@@ -66,6 +88,15 @@ authRouter.post('/login', async (req: Request, res: Response) => {
           parishName: user.parish.parishName,
           city: user.parish.city,
           state: user.parish.state,
+          postalCode: user.parish.postalCode,
+          contactEmail: user.parish.contactEmail,
+          contactPhone: user.parish.contactPhone,
+          idPrefix: user.parish.idPrefix,
+          nextFamilyNumber: user.parish.nextFamilyNumber,
+          isActive: user.parish.isActive,
+          priestName: user.parish.priestName,
+          priestEmail: user.parish.priestEmail,
+          priestPhone: user.parish.priestPhone,
         },
       ];
     }
@@ -76,6 +107,7 @@ authRouter.post('/login', async (req: Request, res: Response) => {
       user: {
         id: user.id,
         fullName: user.fullName,
+        username: user.username,
         email: user.email,
         role: user.role,
         parishId: user.parishId,
@@ -96,7 +128,22 @@ authRouter.get('/parishes', async (_req: Request, res: Response) => {
   try {
     const parishes = await prisma.parish.findMany({
       where: { isActive: true },
-      select: { id: true, parishCode: true, parishName: true, city: true, state: true },
+      select: {
+        id: true,
+        parishCode: true,
+        parishName: true,
+        city: true,
+        state: true,
+        postalCode: true,
+        contactEmail: true,
+        contactPhone: true,
+        idPrefix: true,
+        nextFamilyNumber: true,
+        isActive: true,
+        priestName: true,
+        priestEmail: true,
+        priestPhone: true,
+      },
       orderBy: { id: 'asc' },
     });
     return res.json(parishes);
@@ -109,14 +156,14 @@ authRouter.get('/parishes', async (_req: Request, res: Response) => {
 // GET /api/auth/diocese - Publicly accessible official governing diocese details
 authRouter.get('/diocese', async (_req: Request, res: Response) => {
   try {
-    const dioceseRows: any[] = await prisma.$queryRawUnsafe(`SELECT * FROM "Diocese" LIMIT 1;`);
-    if (dioceseRows.length > 0) {
-      return res.json(dioceseRows[0]);
+    const diocese = await prisma.diocese.findFirst();
+    if (diocese) {
+      return res.json(diocese);
     }
     return res.json({
       dioceseName: 'Diocese of St. Thomas the Apostle, Melbourne',
       rite: 'Syro-Malabar',
-      bishopName: 'Bishop Bosco Puthur',
+      bishopName: 'Bishop John Panamthottathil',
       chanceryAddress: '62 Moore Rd, Mill Park VIC 3082, Australia',
       city: 'Melbourne',
       state: 'VIC',
@@ -140,6 +187,7 @@ authRouter.get('/me', authenticateJWT, async (req: Request, res: Response) => {
       select: {
         id: true,
         fullName: true,
+        username: true,
         email: true,
         role: true,
         parishId: true,

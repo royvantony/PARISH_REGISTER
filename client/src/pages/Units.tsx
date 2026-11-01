@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { ConfirmButton } from '../components/ui/ConfirmButton';
@@ -26,6 +27,10 @@ interface UnitItem {
 }
 
 export const UnitsPage: React.FC = () => {
+  const { hasPermission } = useAuth();
+  const canCreateWard = hasPermission('WARDS', 'canCreate');
+  const canEditWard = hasPermission('WARDS', 'canEdit');
+
   const [units, setUnits] = useState<UnitItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -175,14 +180,16 @@ export const UnitsPage: React.FC = () => {
             Refresh
           </Button>
 
-          <Button
-            variant="primary"
-            onClick={handleOpenAdd}
-            icon={<Plus className="w-4 h-4" />}
-            className="w-full sm:w-auto"
-          >
-            Add New Ward
-          </Button>
+          {canCreateWard && (
+            <Button
+              variant="primary"
+              onClick={handleOpenAdd}
+              icon={<Plus className="w-4 h-4" />}
+              className="w-full sm:w-auto"
+            >
+              Add New Ward
+            </Button>
+          )}
         </div>
       </div>
 
@@ -365,15 +372,17 @@ export const UnitsPage: React.FC = () => {
                   ID #{ward.id}
                 </span>
 
-                <button
-                  type="button"
-                  onClick={() => handleOpenEdit(ward)}
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-parish-primary hover:text-parish-primary-hover p-1.5 rounded-lg hover:bg-parish-surface-subtle transition-colors min-h-[36px] min-w-[36px] justify-center"
-                  title="Edit Ward"
-                >
-                  <Edit2 className="w-3.5 h-3.5" />
-                  <span>Edit</span>
-                </button>
+                {canEditWard && (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEdit(ward)}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-parish-primary hover:text-parish-primary-hover p-1.5 rounded-lg hover:bg-parish-surface-subtle transition-colors min-h-[36px] min-w-[36px] justify-center"
+                    title="Edit Ward"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                    <span>Edit</span>
+                  </button>
+                )}
               </div>
             </div>
           ))}

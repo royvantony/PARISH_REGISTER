@@ -54,28 +54,22 @@ export const DirectDebitModal: React.FC<DirectDebitModalProps> = ({
   canEdit,
   onSuccess,
 }) => {
-  const [active, setActive] = useState(true);
+  const [active, setActive] = useState(false);
   const [amount, setAmount] = useState('');
   const [frequency, setFrequency] = useState('Monthly');
   const [comments, setComments] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Initialize or reset form when modal opens
+  // Initialize or reset form strictly based on the current status when modal opens
   useEffect(() => {
     if (isOpen) {
       setError(null);
-      if (currentDirectDebit) {
-        setActive(currentDirectDebit.active ?? true);
-        setAmount(currentDirectDebit.amount ? String(currentDirectDebit.amount) : '');
-        setFrequency(currentDirectDebit.frequency || 'Monthly');
-        setComments(currentDirectDebit.comments || '');
-      } else {
-        setActive(true);
-        setAmount('');
-        setFrequency('Monthly');
-        setComments('');
-      }
+      const isCurrentlyActive = Boolean(currentDirectDebit && currentDirectDebit.active === true);
+      setActive(isCurrentlyActive);
+      setAmount(currentDirectDebit?.amount ? String(currentDirectDebit.amount) : '');
+      setFrequency(currentDirectDebit?.frequency || 'Monthly');
+      setComments(currentDirectDebit?.comments || '');
     }
   }, [isOpen, currentDirectDebit]);
 
@@ -175,17 +169,29 @@ export const DirectDebitModal: React.FC<DirectDebitModalProps> = ({
         </div>
 
         {/* Active Toggle */}
-        <div className="p-3.5 rounded-xl border border-parish-border bg-parish-surface flex items-center justify-between">
-          <div className="space-y-0.5">
+        <div
+          className={cn(
+            "p-3.5 rounded-xl border transition-all flex items-center justify-between cursor-pointer",
+            active
+              ? "border-parish-primary/40 bg-parish-primary-light/20"
+              : "border-parish-border bg-parish-surface-subtle"
+          )}
+          onClick={() => canEdit && !isLoading && setActive(!active)}
+        >
+          <div className="space-y-0.5 select-none pr-3">
             <label htmlFor="dd-active-toggle" className="text-xs font-bold text-parish-text cursor-pointer">
               Direct Debit Contribution Status
             </label>
             <p className="text-[11px] text-parish-text-muted">
-              {active ? 'Direct debit is active.' : 'Direct debit is paused / inactive.'}
+              {active
+                ? 'Direct debit contribution is active.'
+                : currentDirectDebit
+                  ? 'Direct debit is paused / inactive.'
+                  : 'Direct debit is not set up (turn on to activate).'}
             </p>
           </div>
 
-          <label className="relative inline-flex items-center cursor-pointer">
+          <label className="relative inline-flex items-center cursor-pointer" onClick={(e) => e.stopPropagation()}>
             <input
               id="dd-active-toggle"
               type="checkbox"
@@ -194,7 +200,7 @@ export const DirectDebitModal: React.FC<DirectDebitModalProps> = ({
               disabled={!canEdit || isLoading}
               className="sr-only peer"
             />
-            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-parish-primary"></div>
+            <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-parish-primary"></div>
           </label>
         </div>
 
@@ -211,7 +217,7 @@ export const DirectDebitModal: React.FC<DirectDebitModalProps> = ({
               type="number"
               step="0.01"
               min="0"
-              placeholder="50.00"
+              placeholder={active ? "50.00" : "Turn status ON above to enter amount"}
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               disabled={!canEdit || isLoading || !active}
@@ -221,16 +227,19 @@ export const DirectDebitModal: React.FC<DirectDebitModalProps> = ({
           </div>
 
           {/* Amount Presets */}
-          {canEdit && active && (
+          {canEdit && (
             <div className="flex items-center flex-wrap gap-1.5 pt-1">
               <span className="text-[10px] font-medium text-parish-text-muted mr-0.5">Quick:</span>
               {PRESET_AMOUNTS.map((p) => {
-                const isSelected = amount === p;
+                const isSelected = amount === p && active;
                 return (
                   <button
                     key={p}
                     type="button"
-                    onClick={() => setAmount(p)}
+                    onClick={() => {
+                      setAmount(p);
+                      if (!active) setActive(true);
+                    }}
                     className={cn(
                       'px-2.5 py-0.5 text-[11px] font-semibold rounded-lg border transition-all cursor-pointer select-none',
                       isSelected

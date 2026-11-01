@@ -5,6 +5,7 @@ import { UserRole } from '@prisma/client';
 export interface AuthenticatedUser {
   userId: number;
   email: string;
+  username?: string | null;
   fullName: string;
   role: UserRole;
   parishId: number | null; // NULL for Diocesan Admins

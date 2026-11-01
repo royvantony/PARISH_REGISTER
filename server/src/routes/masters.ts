@@ -117,7 +117,7 @@ mastersRouter.get('/users', async (req: Request, res: Response) => {
     if (req.user?.role !== UserRole.SUPER_ADMIN) {
       whereClause.role = {
         in: [
-          UserRole.PARISH_SUPER_ADMIN,
+          UserRole.PARISH_PRIEST,
           UserRole.PARISH_ADMIN,
           UserRole.PARISH_USER,
           UserRole.WARD_USER,
@@ -144,6 +144,7 @@ mastersRouter.get('/users', async (req: Request, res: Response) => {
         return {
           id: u.id,
           fullName: u.fullName,
+          username: u.username,
           email: u.email,
           role: u.role,
           isActive: u.isActive,
@@ -165,15 +166,30 @@ mastersRouter.get('/users', async (req: Request, res: Response) => {
 mastersRouter.post('/users', async (req: Request, res: Response) => {
   try {
     const parishId = req.activeParishId;
-    const { fullName, email, password, role, assignedUnitId } = req.body;
+    const { fullName, username, email, password, role, assignedUnitId } = req.body;
 
     if (!fullName || !email || !password || !role) {
       return res.status(400).json({ error: 'Full name, email, temporary password, and role are required.' });
     }
 
+    let cleanUsername: string | undefined = undefined;
+    if (username && typeof username === 'string' && username.trim()) {
+      const formatted = username.trim().toLowerCase();
+      if (!/^[a-z0-9._-]+$/.test(formatted)) {
+        return res.status(400).json({ error: 'Username can only contain lowercase letters, numbers, dots, hyphens, and underscores.' });
+      }
+      const existingUsername = await prisma.parishUser.findUnique({
+        where: { username: formatted },
+      });
+      if (existingUsername) {
+        return res.status(400).json({ error: 'A user with this username already exists.' });
+      }
+      cleanUsername = formatted;
+    }
+
     // Only allow inviting parish roles from the parish portal
     const allowedInviteRoles: UserRole[] = [
-      UserRole.PARISH_SUPER_ADMIN,
+      UserRole.PARISH_PRIEST,
       UserRole.PARISH_ADMIN,
       UserRole.PARISH_USER,
       UserRole.WARD_USER,
@@ -199,6 +215,7 @@ mastersRouter.post('/users', async (req: Request, res: Response) => {
     const newUser = await prisma.parishUser.create({
       data: {
         fullName: fullName.trim(),
+        username: cleanUsername,
         email: email.trim().toLowerCase(),
         passwordHash,
         role: role as UserRole,
@@ -216,6 +233,7 @@ mastersRouter.post('/users', async (req: Request, res: Response) => {
     return res.status(201).json({
       id: newUser.id,
       fullName: newUser.fullName,
+      username: newUser.username,
       email: newUser.email,
       role: newUser.role,
       isActive: newUser.isActive,
@@ -232,7 +250,7 @@ mastersRouter.post('/users', async (req: Request, res: Response) => {
 mastersRouter.patch('/users/:id', async (req: Request, res: Response) => {
   try {
     const targetUserId = parseInt(req.params.id as string, 10);
-    const { fullName, role, assignedUnitId, newPassword } = req.body;
+    const { fullName, username, role, assignedUnitId, newPassword } = req.body;
     const callerRole = req.user?.role;
     const callerId = req.user?.userId;
 
@@ -250,16 +268,16 @@ mastersRouter.patch('/users/:id', async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Only Platform Super Admin can edit this account.' });
     }
 
-    // 2. Parish Super Admin (Priest) can only be modified by Super Admin (unless Priest editing their own full name)
-    if (targetUser.role === UserRole.PARISH_SUPER_ADMIN && callerRole !== UserRole.SUPER_ADMIN) {
+    // 2. Parish Priest can only be modified by Super Admin (unless Priest editing their own full name)
+    if (targetUser.role === UserRole.PARISH_PRIEST && callerRole !== UserRole.SUPER_ADMIN) {
       if (callerId !== targetUserId || (role && role !== targetUser.role)) {
-        return res.status(403).json({ error: 'Only Platform Super Admin can modify a Parish Priest (Parish Super Admin) role.' });
+        return res.status(403).json({ error: 'Only Platform Super Admin can modify a Parish Priest role.' });
       }
     }
 
-    // 3. Parish Admin cannot modify Parish Super Admin or Super Admin
+    // 3. Parish Admin cannot modify Parish Priest or Super Admin
     if (
-      (targetUser.role === UserRole.PARISH_SUPER_ADMIN || targetUser.role === UserRole.SUPER_ADMIN) &&
+      (targetUser.role === UserRole.PARISH_PRIEST || targetUser.role === UserRole.SUPER_ADMIN) &&
       callerRole === UserRole.PARISH_ADMIN
     ) {
       return res.status(403).json({ error: 'Parish Admins cannot modify superior accounts.' });
@@ -277,11 +295,11 @@ mastersRouter.patch('/users/:id', async (req: Request, res: Response) => {
         }
       }
 
-      if (role === UserRole.PARISH_SUPER_ADMIN && callerRole !== UserRole.SUPER_ADMIN) {
-        return res.status(403).json({ error: 'Only Platform Super Admin can assign the Parish Priest (Parish Super Admin) role.' });
+      if (role === UserRole.PARISH_PRIEST && callerRole !== UserRole.SUPER_ADMIN) {
+        return res.status(403).json({ error: 'Only Platform Super Admin can assign the Parish Priest role.' });
       }
 
-      if (callerRole === UserRole.PARISH_ADMIN && (role === UserRole.PARISH_ADMIN || role === UserRole.PARISH_SUPER_ADMIN)) {
+      if (callerRole === UserRole.PARISH_ADMIN && (role === UserRole.PARISH_ADMIN || role === UserRole.PARISH_PRIEST)) {
         return res.status(403).json({ error: 'Only the Parish Priest can promote users to Parish Admin.' });
       }
     }
@@ -289,6 +307,24 @@ mastersRouter.patch('/users/:id', async (req: Request, res: Response) => {
     const updateData: any = {};
     if (fullName && fullName.trim()) {
       updateData.fullName = fullName.trim();
+    }
+
+    if (username !== undefined) {
+      const clean = username ? username.trim().toLowerCase() : null;
+      if (clean && clean !== targetUser.username) {
+        if (!/^[a-z0-9._-]+$/.test(clean)) {
+          return res.status(400).json({ error: 'Username can only contain lowercase letters, numbers, dots, hyphens, and underscores.' });
+        }
+        const existingUsername = await prisma.parishUser.findUnique({
+          where: { username: clean },
+        });
+        if (existingUsername && existingUsername.id !== targetUserId) {
+          return res.status(400).json({ error: 'A user with this username already exists.' });
+        }
+        updateData.username = clean;
+      } else if (!clean) {
+        updateData.username = null;
+      }
     }
 
     if (role) {
@@ -319,6 +355,7 @@ mastersRouter.patch('/users/:id', async (req: Request, res: Response) => {
     return res.json({
       id: updated.id,
       fullName: updated.fullName,
+      username: updated.username,
       email: updated.email,
       role: updated.role,
       isActive: updated.isActive,
@@ -357,20 +394,20 @@ mastersRouter.patch('/users/:id/toggle-status', async (req: Request, res: Respon
       return res.status(403).json({ error: 'Platform Super Admin accounts cannot be deactivated.' });
     }
 
-    // 2. Only Super Admin can deactivate a Parish Super Admin (Parish Priest)
-    if (targetUser.role === UserRole.PARISH_SUPER_ADMIN && callerRole !== UserRole.SUPER_ADMIN) {
-      return res.status(403).json({ error: 'Only the Platform Super Admin can modify a Parish Priest (Parish Super Admin) account.' });
+    // 2. Only Super Admin can deactivate a Parish Priest
+    if (targetUser.role === UserRole.PARISH_PRIEST && callerRole !== UserRole.SUPER_ADMIN) {
+      return res.status(403).json({ error: 'Only the Platform Super Admin can modify a Parish Priest account.' });
     }
 
-    // 3. Parish Priest (PARISH_SUPER_ADMIN) has supreme authority to block Parish Admins (Trustees), Parish Users, and Ward Users.
-    // Lower roles cannot deactivate a Parish Admin or Parish Super Admin.
+    // 3. Parish Priest has supreme authority to block Parish Admins (Trustees), Parish Users, and Ward Users.
+    // Lower roles cannot deactivate a Parish Admin or Parish Priest.
     if (
       targetUser.role === UserRole.PARISH_ADMIN &&
       callerRole !== UserRole.SUPER_ADMIN &&
       callerRole !== UserRole.DIOCESAN_ADMIN &&
-      callerRole !== UserRole.PARISH_SUPER_ADMIN
+      callerRole !== UserRole.PARISH_PRIEST
     ) {
-      return res.status(403).json({ error: 'Only the Parish Priest (Parish Super Admin) or Diocesan Admin can deactivate Parish Admins (Trustees).' });
+      return res.status(403).json({ error: 'Only the Parish Priest or Diocesan Admin can deactivate Parish Admins (Trustees).' });
     }
 
     const updated = await prisma.parishUser.update({
@@ -571,4 +608,221 @@ mastersRouter.get('/parishes', async (req: Request, res: Response) => {
     return res.status(500).json({ error: 'Failed to fetch parishes' });
   }
 });
+
+// GET /api/masters/parishes/:id - Get specific parish details
+mastersRouter.get('/parishes/:id', async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: 'Invalid parish ID.' });
+    }
+
+    const isGlobal =
+      req.user?.role === UserRole.SUPER_ADMIN ||
+      req.user?.role === UserRole.DIOCESAN_ADMIN ||
+      req.user?.role === UserRole.DIOCESAN_USER;
+
+    // Non-global users can only access their assigned parish
+    if (!isGlobal && req.user?.parishId && req.user.parishId !== id) {
+      return res.status(403).json({ error: 'Access denied to this parish.' });
+    }
+
+    const parish = await prisma.parish.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: { families: true, units: true, users: true },
+        },
+      },
+    });
+
+    if (!parish) {
+      return res.status(404).json({ error: 'Parish not found.' });
+    }
+
+    return res.json(parish);
+  } catch (err: any) {
+    console.error('Fetch parish error:', err);
+    return res.status(500).json({ error: 'Failed to fetch parish details' });
+  }
+});
+
+// PUT /api/masters/parishes/:id - Update parish details
+mastersRouter.put('/parishes/:id', async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: 'Invalid parish ID.' });
+    }
+
+    const isGlobalAdmin =
+      req.user?.role === UserRole.SUPER_ADMIN ||
+      req.user?.role === UserRole.DIOCESAN_ADMIN;
+
+    const isParishAdmin =
+      (req.user?.role === UserRole.PARISH_PRIEST || req.user?.role === UserRole.PARISH_ADMIN) &&
+      req.user?.parishId === id;
+
+    if (!isGlobalAdmin && !isParishAdmin) {
+      return res.status(403).json({ error: 'You do not have permission to modify this parish.' });
+    }
+
+    const {
+      parishName,
+      city,
+      state,
+      postalCode,
+      contactEmail,
+      contactPhone,
+      idPrefix,
+      nextFamilyNumber,
+      isActive,
+      priestName,
+      priestEmail,
+      priestPhone,
+    } = req.body;
+
+    if (!parishName || !parishName.trim()) {
+      return res.status(400).json({ error: 'Parish name is required.' });
+    }
+    if (!city || !city.trim()) {
+      return res.status(400).json({ error: 'City is required.' });
+    }
+    if (!state || !state.trim()) {
+      return res.status(400).json({ error: 'State is required.' });
+    }
+
+    const existing = await prisma.parish.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Parish not found.' });
+    }
+
+    const updated = await prisma.parish.update({
+      where: { id },
+      data: {
+        parishName: parishName.trim(),
+        city: city.trim(),
+        state: state.trim(),
+        postalCode: postalCode?.trim() || null,
+        contactEmail: contactEmail?.trim() || null,
+        contactPhone: contactPhone?.trim() || null,
+        idPrefix: idPrefix?.trim() || existing.idPrefix,
+        nextFamilyNumber: nextFamilyNumber ? parseInt(nextFamilyNumber, 10) : existing.nextFamilyNumber,
+        priestName: priestName?.trim() || null,
+        priestEmail: priestEmail?.trim() || null,
+        priestPhone: priestPhone?.trim() || null,
+        ...(typeof isActive === 'boolean' && isGlobalAdmin ? { isActive } : {}),
+      },
+    });
+
+    return res.json(updated);
+  } catch (err: any) {
+    console.error('Update parish error:', err);
+    return res.status(500).json({ error: 'Failed to update parish details.' });
+  }
+});
+
+// GET /api/masters/governing-diocese - Get official governing diocese details
+mastersRouter.get('/governing-diocese', async (_req: Request, res: Response) => {
+  try {
+    let diocese = await prisma.diocese.findFirst();
+    if (!diocese) {
+      diocese = await prisma.diocese.create({
+        data: {
+          dioceseName: 'Diocese of St. Thomas the Apostle, Melbourne',
+          rite: 'Syro-Malabar',
+          bishopName: 'Bishop Bosco Puthur',
+          chanceryAddress: '62 Moore Rd, Mill Park VIC 3082, Australia',
+          city: 'Melbourne',
+          state: 'VIC',
+          postalCode: '3082',
+          contactPhone: '+61 3 9404 1533',
+          contactEmail: 'chancery@syromalabar.org.au',
+          website: 'https://syromalabar.org.au',
+          logoUrl: '/branding/logo.png',
+        },
+      });
+    }
+    return res.json(diocese);
+  } catch (err: any) {
+    console.error('Fetch governing diocese error:', err);
+    return res.status(500).json({ error: 'Failed to fetch governing diocese' });
+  }
+});
+
+// PUT /api/masters/governing-diocese - Update official governing diocese details
+mastersRouter.put('/governing-diocese', async (req: Request, res: Response) => {
+  try {
+    const isAllowed =
+      req.user?.role === UserRole.SUPER_ADMIN ||
+      req.user?.role === UserRole.DIOCESAN_ADMIN ||
+      req.user?.role === UserRole.PARISH_PRIEST ||
+      req.user?.role === UserRole.PARISH_ADMIN;
+
+    if (!isAllowed) {
+      return res.status(403).json({ error: 'You do not have permission to modify governing diocese details.' });
+    }
+
+    const {
+      dioceseName,
+      rite,
+      bishopName,
+      chanceryAddress,
+      city,
+      state,
+      postalCode,
+      contactPhone,
+      contactEmail,
+      website,
+      logoUrl,
+    } = req.body;
+
+    if (!dioceseName || !dioceseName.trim()) {
+      return res.status(400).json({ error: 'Diocese name is required.' });
+    }
+
+    const existing = await prisma.diocese.findFirst();
+    let updated;
+    if (existing) {
+      updated = await prisma.diocese.update({
+        where: { id: existing.id },
+        data: {
+          dioceseName: dioceseName.trim(),
+          rite: rite?.trim() || 'Syro-Malabar',
+          bishopName: bishopName?.trim() || null,
+          chanceryAddress: chanceryAddress?.trim() || null,
+          city: city?.trim() || null,
+          state: state?.trim() || null,
+          postalCode: postalCode?.trim() || null,
+          contactPhone: contactPhone?.trim() || null,
+          contactEmail: contactEmail?.trim() || null,
+          website: website?.trim() || null,
+          logoUrl: logoUrl?.trim() || null,
+        },
+      });
+    } else {
+      updated = await prisma.diocese.create({
+        data: {
+          dioceseName: dioceseName.trim(),
+          rite: rite?.trim() || 'Syro-Malabar',
+          bishopName: bishopName?.trim() || null,
+          chanceryAddress: chanceryAddress?.trim() || null,
+          city: city?.trim() || null,
+          state: state?.trim() || null,
+          postalCode: postalCode?.trim() || null,
+          contactPhone: contactPhone?.trim() || null,
+          contactEmail: contactEmail?.trim() || null,
+          website: website?.trim() || null,
+          logoUrl: logoUrl?.trim() || null,
+        },
+      });
+    }
+
+    return res.json(updated);
+  } catch (err: any) {
+    console.error('Update governing diocese error:', err);
+    return res.status(500).json({ error: 'Failed to update governing diocese' });
+  }
+});
+
 

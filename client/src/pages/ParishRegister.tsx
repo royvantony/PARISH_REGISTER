@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { calculateMonthlyEquivalent } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
+import { useFeatures } from '../context/FeatureContext';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Drawer } from '../components/ui/Drawer';
@@ -141,9 +142,17 @@ export const ParishRegisterPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, hasPermission } = useAuth();
+  const { isFeatureEnabled } = useFeatures();
+
+  const canCreateRegisterNew = isFeatureEnabled('PAGE_REGISTER_NEW') && hasPermission('REGISTER_NEW', 'canCreate');
+  const canEditRegister = hasPermission('REGISTER', 'canEdit');
+  const canExportRegister = hasPermission('REGISTER', 'canExport');
+  const canPrintDossier = isFeatureEnabled('REGISTER_PRINT_DOSSIER') && canExportRegister;
+  const canPrintList = isFeatureEnabled('REGISTER_PRINT_LIST') && canExportRegister;
+  const canViewDirectDebit = isFeatureEnabled('REGISTER_DIRECT_DEBIT') && hasPermission('DIRECT_DEBIT', 'canView');
 
   const canViewAuditTrail = Boolean(
-    user && ['SUPER_ADMIN', 'DIOCESAN_ADMIN', 'PARISH_SUPER_ADMIN', 'PARISH_ADMIN'].includes(user.role)
+    user?.role === 'SUPER_ADMIN' || hasPermission('REGISTER', 'canApprove')
   );
 
   // Export & Print Modal States
@@ -411,21 +420,23 @@ export const ParishRegisterPage: React.FC = () => {
             Refresh
           </Button>
 
-          <Button
-            variant="primary"
-            icon={<Plus className="w-4 h-4" />}
-            onClick={() => navigate('/register/new')}
-            className="w-full sm:w-auto"
-          >
-            Register Parishioner
-          </Button>
+          {canCreateRegisterNew && (
+            <Button
+              variant="primary"
+              icon={<Plus className="w-4 h-4" />}
+              onClick={() => navigate('/register/new')}
+              className="w-full sm:w-auto"
+            >
+              Register Parishioner
+            </Button>
+          )}
         </div>
       </div>
 
       {/* 2. Search and Multi-Filter Bar (Neat 3-Tier Responsive Layout) */}
       <div className="bg-parish-surface border border-parish-border rounded-2xl p-4 sm:p-5 shadow-soft space-y-4">
         {/* Tier 1: Search & Core Categorical Selectors */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[7fr_5fr_4fr_4fr] gap-3">
+        <div className={`grid grid-cols-1 sm:grid-cols-2 ${canViewDirectDebit ? 'lg:grid-cols-[7fr_5fr_4fr_4fr]' : 'lg:grid-cols-[8fr_5fr_4fr]'} gap-3`}>
           {/* Keyword Search */}
           <div className="relative min-w-0">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-parish-text-muted pointer-events-none" />
@@ -492,20 +503,22 @@ export const ParishRegisterPage: React.FC = () => {
           </div>
 
           {/* Direct Debit Selector */}
-          <div className="min-w-0">
-            <select
-              value={selectedDirectDebit}
-              onChange={(e) => {
-                setSelectedDirectDebit(e.target.value);
-                setPage(1);
-              }}
-              className="w-full px-3 py-2.5 text-xs rounded-xl border border-parish-border bg-parish-surface text-parish-text focus:outline-none focus:ring-2 focus:ring-parish-primary cursor-pointer transition-all shadow-xs truncate"
-            >
-              <option value="">All Direct Debit</option>
-              <option value="YES">💳 Direct Debit: Active</option>
-              <option value="NO">⚪ Direct Debit: None</option>
-            </select>
-          </div>
+          {canViewDirectDebit && (
+            <div className="min-w-0">
+              <select
+                value={selectedDirectDebit}
+                onChange={(e) => {
+                  setSelectedDirectDebit(e.target.value);
+                  setPage(1);
+                }}
+                className="w-full px-3 py-2.5 text-xs rounded-xl border border-parish-border bg-parish-surface text-parish-text focus:outline-none focus:ring-2 focus:ring-parish-primary cursor-pointer transition-all shadow-xs truncate"
+              >
+                <option value="">All Direct Debit</option>
+                <option value="YES">💳 Direct Debit: Active</option>
+                <option value="NO">⚪ Direct Debit: None</option>
+              </select>
+            </div>
+          )}
         </div>
 
         {/* Tier 2: Dedicated Full-Width Status Lifecycle Row */}
@@ -606,7 +619,7 @@ export const ParishRegisterPage: React.FC = () => {
             )}
 
             {/* Export Dropdown Menu Button */}
-            {hasPermission('REGISTER', 'canExport') && (
+            {(canExportRegister || canPrintList) && (
               <div className="relative">
                 <button
                   type="button"
@@ -635,75 +648,58 @@ export const ParishRegisterPage: React.FC = () => {
                         Export Filtered Scope ({totalCount})
                       </div>
 
-                      {/* 1. PDF Formatted (Colour) */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsExportDropdownOpen(false);
-                          setListPrintTheme('COLOUR');
-                          setIsListPrintModalOpen(true);
-                        }}
-                        className="w-full text-left px-3.5 py-2 hover:bg-parish-surface-subtle flex items-start gap-2.5 text-parish-text transition-colors cursor-pointer group"
-                      >
-                        <div className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-800 flex items-center justify-center shrink-0 mt-0.5 border border-emerald-200">
-                          <Printer className="w-3.5 h-3.5" />
-                        </div>
-                        <div>
-                          <div className="font-bold text-xs text-parish-text group-hover:text-parish-primary">
-                            PDF Formatted (Colour)
+                      {/* 1. PDF Directory Report (Colour) */}
+                      {canPrintList && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsExportDropdownOpen(false);
+                            setListPrintTheme('COLOUR');
+                            setIsListPrintModalOpen(true);
+                          }}
+                          className="w-full text-left px-3.5 py-2 hover:bg-parish-surface-subtle flex items-start gap-2.5 text-parish-text transition-colors cursor-pointer group"
+                        >
+                          <div className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-800 flex items-center justify-center shrink-0 mt-0.5 border border-emerald-200">
+                            <Printer className="w-3.5 h-3.5" />
                           </div>
-                          <p className="text-[10px] text-parish-text-muted leading-tight">
-                            Executive layout with parish crest, badges & colours
-                          </p>
-                        </div>
-                      </button>
-
-                      {/* 2. PDF Flat (Black & White) */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsExportDropdownOpen(false);
-                          setListPrintTheme('FLAT');
-                          setIsListPrintModalOpen(true);
-                        }}
-                        className="w-full text-left px-3.5 py-2 hover:bg-parish-surface-subtle flex items-start gap-2.5 text-parish-text transition-colors cursor-pointer group"
-                      >
-                        <div className="w-6 h-6 rounded-lg bg-slate-100 text-slate-800 flex items-center justify-center shrink-0 mt-0.5 border border-slate-300">
-                          <Printer className="w-3.5 h-3.5" />
-                        </div>
-                        <div>
-                          <div className="font-bold text-xs text-parish-text group-hover:text-parish-primary">
-                            PDF Flat (Black & White)
+                          <div>
+                            <div className="font-bold text-xs text-parish-text group-hover:text-parish-primary">
+                              PDF Directory Report
+                            </div>
+                            <p className="text-[10px] text-parish-text-muted leading-tight">
+                              Whole family roster with parishioner, spouse &amp; kids
+                            </p>
                           </div>
-                          <p className="text-[10px] text-parish-text-muted leading-tight">
-                            High-contrast monochrome, toner & photocopy friendly
-                          </p>
-                        </div>
-                      </button>
+                        </button>
+                      )}
 
-                      <div className="my-1 border-t border-parish-border/60" />
+                      {canPrintList && canExportRegister && (
+                        <div className="my-1 border-t border-parish-border/60" />
+                      )}
 
                       {/* 3. Excel (.xlsx) */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsExportDropdownOpen(false);
-                          handleDownloadExcel();
-                        }}
-                        className="w-full text-left px-3.5 py-2 hover:bg-parish-surface-subtle flex items-start gap-2.5 text-parish-text transition-colors cursor-pointer group"
-                      >
-                        <div className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-900 flex items-center justify-center shrink-0 mt-0.5 border border-emerald-300">
-                          <FileSpreadsheet className="w-3.5 h-3.5" />
-                        </div>
-                        <div>
-                          <div className="font-bold text-xs text-parish-text group-hover:text-parish-primary">
-                            Excel Spreadsheet (.xlsx)
+                      {canExportRegister && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsExportDropdownOpen(false);
+                            handleDownloadExcel();
+                          }}
+                          className="w-full text-left px-3.5 py-2 hover:bg-parish-surface-subtle flex items-start gap-2.5 text-parish-text transition-colors cursor-pointer group"
+                        >
+                          <div className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-900 flex items-center justify-center shrink-0 mt-0.5 border border-emerald-300">
+                            <FileSpreadsheet className="w-3.5 h-3.5" />
                           </div>
-                          <p className="text-[10px] text-parish-text-muted leading-tight">
-                            Directory & individual census workbooks
-                          </p>
-                        </div>
-                      </button>
+                          <div>
+                            <div className="font-bold text-xs text-parish-text group-hover:text-parish-primary">
+                              Excel Spreadsheet (.xlsx)
+                            </div>
+                            <p className="text-[10px] text-parish-text-muted leading-tight">
+                              Directory & individual census workbooks
+                            </p>
+                          </div>
+                        </button>
+                      )}
                     </div>
                   </>
                 )}
@@ -784,7 +780,7 @@ export const ParishRegisterPage: React.FC = () => {
                       <span className="text-[11px] font-mono text-parish-primary font-bold">
                         {f.familyCode || `ID #${f.id}`}
                       </span>
-                      {f.hasDirectDebit && (
+                      {canViewDirectDebit && f.hasDirectDebit && (
                         <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-200">
                           <CreditCard className="w-2.5 h-2.5" /> DD
                         </span>
@@ -834,18 +830,20 @@ export const ParishRegisterPage: React.FC = () => {
                   </span>
 
                   <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/register/${f.id}/edit`);
-                      }}
-                      className="px-2 py-1 rounded-lg text-parish-text-muted hover:text-parish-primary hover:bg-parish-surface-subtle transition-colors flex items-center gap-1 text-[11px] font-bold border border-parish-border"
-                      title="Edit Household"
-                    >
-                      <Edit2 className="w-3 h-3" />
-                      <span>Edit</span>
-                    </button>
+                    {canEditRegister && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/register/${f.id}/edit`);
+                        }}
+                        className="px-2 py-1 rounded-lg text-parish-text-muted hover:text-parish-primary hover:bg-parish-surface-subtle transition-colors flex items-center gap-1 text-[11px] font-bold border border-parish-border"
+                        title="Edit Household"
+                      >
+                        <Edit2 className="w-3 h-3" />
+                        <span>Edit</span>
+                      </button>
+                    )}
 
                     <span className="text-parish-primary font-bold flex items-center gap-1">
                       <span>Details</span>
@@ -960,7 +958,7 @@ export const ParishRegisterPage: React.FC = () => {
                           <span className="font-mono font-bold text-parish-primary bg-parish-surface-subtle px-2 py-0.5 rounded border border-parish-border text-xs">
                             {f.familyCode || `#${f.id}`}
                           </span>
-                          {f.hasDirectDebit && (
+                          {canViewDirectDebit && f.hasDirectDebit && (
                             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-200 shrink-0" title="Active Direct Debit">
                               <CreditCard className="w-2.5 h-2.5" /> DD
                             </span>
@@ -1005,17 +1003,19 @@ export const ParishRegisterPage: React.FC = () => {
                           <Badge variant={getStatusBadgeVariant(f.status)} size="sm">
                             {f.status}
                           </Badge>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`/register/${f.id}/edit`);
-                            }}
-                            className="p-1.5 rounded-lg text-parish-text-muted hover:text-parish-primary hover:bg-parish-surface-subtle border border-transparent hover:border-parish-border transition-colors cursor-pointer"
-                            title="Edit Household Details"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
+                          {canEditRegister && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/register/${f.id}/edit`);
+                              }}
+                              className="p-1.5 rounded-lg text-parish-text-muted hover:text-parish-primary hover:bg-parish-surface-subtle border border-transparent hover:border-parish-border transition-colors cursor-pointer"
+                              title="Edit Household Details"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1122,26 +1122,30 @@ export const ParishRegisterPage: React.FC = () => {
             {/* Drawer Top Action Bar */}
             <div className="flex items-center justify-between gap-2 pb-3 border-b border-parish-border flex-wrap">
               <div className="flex items-center gap-2 flex-wrap">
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => {
-                    setIsDrawerOpen(false);
-                    navigate(`/register/${familyDetail.id}/edit`);
-                  }}
-                  icon={<Edit2 className="w-3.5 h-3.5" />}
-                >
-                  Edit Details
-                </Button>
+                {canEditRegister && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => {
+                      setIsDrawerOpen(false);
+                      navigate(`/register/${familyDetail.id}/edit`);
+                    }}
+                    icon={<Edit2 className="w-3.5 h-3.5" />}
+                  >
+                    Edit Details
+                  </Button>
+                )}
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsDossierModalOpen(true)}
-                  icon={<Printer className="w-3.5 h-3.5 text-parish-primary" />}
-                >
-                  Print Family Details
-                </Button>
+                {canPrintDossier && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsDossierModalOpen(true)}
+                    icon={<Printer className="w-3.5 h-3.5 text-parish-primary" />}
+                  >
+                    Print Family Details
+                  </Button>
+                )}
               </div>
 
               {familyDetail.familyCode ? (
@@ -1165,18 +1169,20 @@ export const ParishRegisterPage: React.FC = () => {
                     </p>
                   </div>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setIsDrawerOpen(false);
-                    navigate(`/register/${familyDetail.id}/edit`);
-                  }}
-                  icon={<Edit2 className="w-3.5 h-3.5" />}
-                  className="shrink-0"
-                >
-                  Manage in Edit
-                </Button>
+                {canEditRegister && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setIsDrawerOpen(false);
+                      navigate(`/register/${familyDetail.id}/edit`);
+                    }}
+                    icon={<Edit2 className="w-3.5 h-3.5" />}
+                    className="shrink-0"
+                  >
+                    Manage in Edit
+                  </Button>
+                )}
               </div>
             )}
 
@@ -1192,18 +1198,20 @@ export const ParishRegisterPage: React.FC = () => {
                     </p>
                   </div>
                 </div>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => {
-                    setIsDrawerOpen(false);
-                    navigate(`/register/${familyDetail.id}/edit`);
-                  }}
-                  icon={<Edit2 className="w-3.5 h-3.5" />}
-                  className="bg-amber-700 hover:bg-amber-800 text-white shrink-0"
-                >
-                  Review in Edit Window
-                </Button>
+                {canEditRegister && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => {
+                      setIsDrawerOpen(false);
+                      navigate(`/register/${familyDetail.id}/edit`);
+                    }}
+                    icon={<Edit2 className="w-3.5 h-3.5" />}
+                    className="bg-amber-700 hover:bg-amber-800 text-white shrink-0"
+                  >
+                    Review in Edit Window
+                  </Button>
+                )}
               </div>
             )}
 
@@ -1373,7 +1381,7 @@ export const ParishRegisterPage: React.FC = () => {
             </div>
 
             {/* DEDICATED DIRECT DEBIT AREA - Only visible to users with view permission */}
-            {familyDetail.directDebitPermissions?.canView && (
+            {canViewDirectDebit && familyDetail.directDebitPermissions?.canView && (
               <div className="p-4 rounded-xl border border-parish-border bg-parish-surface-subtle space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -1543,26 +1551,30 @@ export const ParishRegisterPage: React.FC = () => {
                   </kbd>
                 </Button>
 
-                <Button
-                  variant="outline"
-                  size="md"
-                  onClick={() => setIsDossierModalOpen(true)}
-                  icon={<Printer className="w-4 h-4 text-parish-primary" />}
-                >
-                  Print Family Details
-                </Button>
+                {canPrintDossier && (
+                  <Button
+                    variant="outline"
+                    size="md"
+                    onClick={() => setIsDossierModalOpen(true)}
+                    icon={<Printer className="w-4 h-4 text-parish-primary" />}
+                  >
+                    Print Family Details
+                  </Button>
+                )}
 
-                <Button
-                  variant="primary"
-                  size="md"
-                  onClick={() => {
-                    setIsDrawerOpen(false);
-                    navigate(`/register/${familyDetail.id}/edit`);
-                  }}
-                  icon={<Edit2 className="w-4 h-4" />}
-                >
-                  Edit Household
-                </Button>
+                {canEditRegister && (
+                  <Button
+                    variant="primary"
+                    size="md"
+                    onClick={() => {
+                      setIsDrawerOpen(false);
+                      navigate(`/register/${familyDetail.id}/edit`);
+                    }}
+                    icon={<Edit2 className="w-4 h-4" />}
+                  >
+                    Edit Household
+                  </Button>
+                )}
               </div>
 
               <span className="text-[11px] text-parish-text-muted hidden sm:inline">
@@ -1574,28 +1586,32 @@ export const ParishRegisterPage: React.FC = () => {
       </Drawer>
 
       {/* 6. Household Registration Dossier Print Preview Modal */}
-      <HouseholdDossierModal
-        isOpen={isDossierModalOpen}
-        onClose={() => setIsDossierModalOpen(false)}
-        family={familyDetail}
-      />
+      {isDossierModalOpen && (
+        <HouseholdDossierModal
+          isOpen={isDossierModalOpen}
+          onClose={() => setIsDossierModalOpen(false)}
+          family={familyDetail}
+        />
+      )}
 
       {/* 7. Parish Register List Roster Print Preview Modal */}
-      <ParishRegisterListPrintModal
-        isOpen={isListPrintModalOpen}
-        onClose={() => setIsListPrintModalOpen(false)}
-        filters={{
-          search,
-          unitId: selectedUnit,
-          unitName: units.find((u) => String(u.id) === selectedUnit)?.unitName,
-          status: selectedStatus,
-          type: selectedType,
-          directDebit: selectedDirectDebit,
-          sortBy,
-          sortOrder,
-        }}
-        initialTheme={listPrintTheme}
-      />
+      {isListPrintModalOpen && (
+        <ParishRegisterListPrintModal
+          isOpen={isListPrintModalOpen}
+          onClose={() => setIsListPrintModalOpen(false)}
+          filters={{
+            search,
+            unitId: selectedUnit,
+            unitName: units.find((u) => String(u.id) === selectedUnit)?.unitName,
+            status: selectedStatus,
+            type: selectedType,
+            directDebit: selectedDirectDebit,
+            sortBy,
+            sortOrder,
+          }}
+          initialTheme={listPrintTheme}
+        />
+      )}
     </div>
   );
 };

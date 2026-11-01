@@ -3,10 +3,13 @@ import {
   LogOut,
   Menu,
   X,
+  Eye,
 } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { ThemeSelector } from './ThemeSelector';
 import { CLIENT_BRANDING } from '../../config/branding';
+import { useAuth } from '../../context/AuthContext';
+import { useFeatures } from '../../context/FeatureContext';
 
 export interface AppNavbarProps {
   onToggleMobileMenu?: () => void;
@@ -29,6 +32,34 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
   onLogout,
   onGoHome,
 }) => {
+  const { user, activeParish } = useAuth();
+  const { isSimulatingClient, setIsSimulatingClient } = useFeatures();
+  const isGlobalUser = user?.role === 'SUPER_ADMIN' || user?.role === 'DIOCESAN_ADMIN';
+
+  const formatRole = (role?: string) => {
+    switch (role) {
+      case 'PARISH_PRIEST':
+        return 'Parish Priest';
+      case 'PARISH_ADMIN':
+        return 'Parish Admin';
+      case 'PARISH_USER':
+        return 'Parish User';
+      case 'WARD_USER':
+        return 'Ward User';
+      case 'SUPER_ADMIN':
+        return 'Platform Developer';
+      case 'DIOCESAN_ADMIN':
+        return 'Diocesan Admin';
+      case 'DIOCESAN_USER':
+        return 'Diocesan User';
+      default:
+        return role || '';
+    }
+  };
+
+  const displayName = activeParish?.parishName || activeParishName;
+  const displayCode = activeParish?.parishCode || activeParishCode;
+
   return (
     <header className="sticky top-0 z-40 w-full glass-panel border-b border-parish-border transition-colors shadow-xs">
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
@@ -56,21 +87,35 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
 
           <div className="h-5 w-[1px] bg-parish-border hidden sm:block" />
 
-          {/* Active Parish Display (Locked per session - Selected during login) */}
+          {/* Active Parish Display (Locked in all cases - parish is chosen at login) */}
           <div
             className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-parish-surface-subtle text-parish-text text-xs font-semibold border border-parish-border select-none"
-            title={`Active Parish: ${activeParishName} (${activeParishCode})`}
+            title={`Active Parish: ${displayName} (${displayCode})`}
           >
             <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse shrink-0" />
-            <span className="truncate max-w-[225px] sm:max-w-[310px] md:max-w-[360px]">{activeParishName}</span>
+            <span className="truncate max-w-[225px] sm:max-w-[310px] md:max-w-[360px]">{displayName}</span>
             <Badge variant="subtle" size="sm" className="font-mono text-[10px] bg-white/70">
-              {activeParishCode}
+              {displayCode}
             </Badge>
           </div>
         </div>
 
         {/* Right: User Info, Theme Selector & Logout */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          {/* Client Simulation Active Indicator */}
+          {isGlobalUser && isSimulatingClient && (
+            <button
+              type="button"
+              onClick={() => setIsSimulatingClient(false)}
+              title="Currently simulating limited client/demo view. Click to exit and return to full developer view."
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition-all cursor-pointer animate-pulse"
+            >
+              <Eye className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <span className="hidden sm:inline">Simulating Client</span>
+              <span className="text-[10px] bg-amber-600 text-white px-1.5 py-0.2 rounded font-mono">EXIT</span>
+            </button>
+          )}
+
           {/* Theme Selector */}
           <ThemeSelector />
 
@@ -81,7 +126,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
             </div>
             <div className="hidden md:block text-left">
               <div className="text-xs font-bold text-parish-text leading-tight">{userName}</div>
-              <div className="text-[10px] text-parish-text-muted font-medium">{userRole}</div>
+              <div className="text-[10px] text-parish-text-muted font-medium">{formatRole(userRole)}</div>
             </div>
           </div>
 
@@ -89,7 +134,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
           <button
             onClick={onLogout}
             title="Sign Out"
-            className="text-parish-text-muted hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-colors"
+            className="text-parish-text-muted hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-colors cursor-pointer"
           >
             <LogOut className="w-4 h-4" />
           </button>
@@ -113,4 +158,3 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
     </header>
   );
 };
-

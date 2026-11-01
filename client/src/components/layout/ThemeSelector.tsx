@@ -7,11 +7,9 @@ interface ThemeSelectorProps {
 }
 
 export const ThemeSelector: React.FC<ThemeSelectorProps> = ({ className = '' }) => {
-  const { theme, setTheme, availableThemes } = useTheme();
+  const { theme, setTheme, availableThemes, isThemeSwitchAllowed } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  const activeTheme = availableThemes.find((t) => t.id === theme) || availableThemes[0];
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -27,6 +25,12 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = ({ className = '' }) 
       document.removeEventListener('mousedown', handleOutsideClick);
     };
   }, [isOpen]);
+
+  if (!isThemeSwitchAllowed) {
+    return null;
+  }
+
+  const activeTheme = availableThemes.find((t) => t.id === theme) || availableThemes[0];
 
   return (
     <div ref={containerRef} className={`relative ${className}`}>

@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useFeatures } from '../context/FeatureContext';
+
 import { api } from '../lib/api';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
+
 import {
   Church,
   Users,
@@ -169,8 +172,15 @@ const SUBURB_COLORS = [
 ];
 
 export const DashboardPage: React.FC = () => {
-  const { user, activeParish } = useAuth();
+  const { user, activeParish, hasPermission } = useAuth();
+  const { isFeatureEnabled } = useFeatures();
   const navigate = useNavigate();
+
+  const canCreateRegisterNew = isFeatureEnabled('PAGE_REGISTER_NEW') && hasPermission('REGISTER_NEW', 'canCreate');
+  const canViewRegister = isFeatureEnabled('PAGE_REGISTER') && hasPermission('REGISTER', 'canView');
+  const canViewUnits = isFeatureEnabled('PAGE_UNITS') && hasPermission('WARDS', 'canView');
+  const canViewUsers = isFeatureEnabled('PAGE_USERS') && hasPermission('USERS', 'canView');
+
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [wardDistribution, setWardDistribution] = useState<WardStat[]>([]);
@@ -203,6 +213,37 @@ export const DashboardPage: React.FC = () => {
   const totalFamiliesWithDiocese = useMemo(() => {
     return diocesesDistribution.reduce((acc, curr) => acc + curr.count, 0);
   }, [diocesesDistribution]);
+
+  // Determine active visualization cards in display order
+  const activeCardIds = useMemo(() => {
+    const list: string[] = [];
+    if (isFeatureEnabled('DASH_DEMO_COMPOSITION')) {
+      list.push('demo_ratio');
+      list.push('demo_types');
+    }
+    if (isFeatureEnabled('DASH_AGE_BRACKETS')) {
+      list.push('age_brackets');
+    }
+    if (isFeatureEnabled('DASH_FAMILY_SIZE')) {
+      list.push('family_size');
+    }
+    if (isFeatureEnabled('DASH_TREND_CHART')) {
+      list.push('trend_timeline');
+    }
+    if (isFeatureEnabled('DASH_SUBURB_CHART')) {
+      list.push('trend_suburbs');
+    }
+    if (isFeatureEnabled('DASH_WARD_CHART')) {
+      list.push('ward_chart');
+    }
+    if (isFeatureEnabled('DASH_ORIGIN_DIOCESES')) {
+      list.push('origin_dioceses');
+    }
+    return list;
+  }, [isFeatureEnabled]);
+
+  const lastActiveCardId = activeCardIds.length % 2 === 1 ? activeCardIds[activeCardIds.length - 1] : null;
+  const isSpanFull = (id: string) => lastActiveCardId === id;
 
   const fetchDashboardData = async () => {
     try {
@@ -272,150 +313,173 @@ export const DashboardPage: React.FC = () => {
           </p>
 
           {/* Quick Action Buttons (Touch Friendly) */}
-          <div className="flex items-center gap-2.5 pt-2 flex-wrap">
-            <Button
-              variant="primary"
-              size="sm"
-              icon={<Plus className="w-3.5 h-3.5" />}
-              onClick={() => navigate('/register/new')}
-            >
-              New Family
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              icon={<BookOpen className="w-3.5 h-3.5" />}
-              onClick={() => navigate('/register')}
-            >
-              Parish Directory
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={<RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />}
-              onClick={fetchDashboardData}
-            >
-              Sync Live
-            </Button>
-          </div>
+          {isFeatureEnabled('DASH_QUICK_ACTIONS') && (
+            <div className="flex items-center gap-2.5 pt-2 flex-wrap">
+              {canCreateRegisterNew && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon={<Plus className="w-3.5 h-3.5" />}
+                  onClick={() => navigate('/register/new')}
+                >
+                  New Family
+                </Button>
+              )}
+              {canViewRegister && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  icon={<BookOpen className="w-3.5 h-3.5" />}
+                  onClick={() => navigate('/register')}
+                >
+                  Parish Directory
+                </Button>
+              )}
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />}
+                onClick={fetchDashboardData}
+              >
+                Sync Live
+              </Button>
+            </div>
+          )}
         </div>
+
 
         {/* Decorative subtle ambient gradient */}
         <div className="absolute right-0 top-0 bottom-0 w-80 bg-gradient-to-l from-emerald-100/30 to-transparent pointer-events-none hidden md:block" />
       </div>
 
       {/* 2. Top Metric Cards (5 Vibrant Cards: Community & People Only, No Finance) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
-        {/* Metric 1: Registered Families */}
-        <div
-          onClick={() => navigate('/register?type=FAMILY')}
-          className="bg-parish-surface border border-parish-border p-4 sm:p-5 rounded-2xl shadow-xs space-y-1 hover:border-emerald-400/80 transition-all cursor-pointer group"
-          title="Click to view Families in Parish Register"
-        >
-          <div className="flex items-center justify-between text-parish-text-muted text-xs font-bold uppercase tracking-wider">
-            <span>Registered Families</span>
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center group-hover:scale-105 transition-transform">
-              <Church className="w-4 h-4" />
+      {isFeatureEnabled('DASH_KPI_CARDS') && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+          {/* Metric 1: Registered Families */}
+          <div
+            onClick={() => canViewRegister && navigate('/register?type=FAMILY')}
+            className={`bg-parish-surface border border-parish-border p-4 sm:p-5 rounded-2xl shadow-xs space-y-1 transition-all group ${
+              canViewRegister ? 'hover:border-emerald-400/80 cursor-pointer' : ''
+            }`}
+            title={canViewRegister ? 'Click to view Families in Parish Register' : undefined}
+          >
+            <div className="flex items-center justify-between text-parish-text-muted text-xs font-bold uppercase tracking-wider">
+              <span>Registered Families</span>
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Church className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl sm:text-3xl font-extrabold text-parish-text">
+              {isLoading ? '...' : stats?.activeFamilies ?? 0}
+            </div>
+            <div className="text-xs text-parish-text-muted flex items-center gap-1">
+              <span>Active Households</span>
+              <span className="text-emerald-700 font-bold ml-auto">Active</span>
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-parish-text">
-            {isLoading ? '...' : stats?.activeFamilies ?? 0}
-          </div>
-          <div className="text-xs text-parish-text-muted flex items-center gap-1">
-            <span>Active Households</span>
-            <span className="text-emerald-700 font-bold ml-auto">Active</span>
-          </div>
-        </div>
 
-        {/* Metric 2: Total Parishioners (All Souls) */}
-        <div
-          onClick={() => navigate('/register')}
-          className="bg-parish-surface border border-parish-border p-4 sm:p-5 rounded-2xl shadow-xs space-y-1 hover:border-blue-400/80 transition-all cursor-pointer group"
-          title="Click to view all Parish Members in Register"
-        >
-          <div className="flex items-center justify-between text-parish-text-muted text-xs font-bold uppercase tracking-wider">
-            <span>Parishioners</span>
-            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center group-hover:scale-105 transition-transform">
-              <Users className="w-4 h-4" />
+          {/* Metric 2: Total Parishioners (All Souls) */}
+          <div
+            onClick={() => canViewRegister && navigate('/register')}
+            className={`bg-parish-surface border border-parish-border p-4 sm:p-5 rounded-2xl shadow-xs space-y-1 transition-all group ${
+              canViewRegister ? 'hover:border-blue-400/80 cursor-pointer' : ''
+            }`}
+            title={canViewRegister ? 'Click to view all Parish Members in Register' : undefined}
+          >
+            <div className="flex items-center justify-between text-parish-text-muted text-xs font-bold uppercase tracking-wider">
+              <span>Parishioners</span>
+              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Users className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl sm:text-3xl font-extrabold text-blue-700">
+              {isLoading ? '...' : stats?.totalParishioners ?? 0}
+            </div>
+            <div className="text-xs text-parish-text-muted flex items-center gap-1">
+              <span>Across all households</span>
+              <span className="text-blue-700 font-bold ml-auto">100%</span>
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-blue-700">
-            {isLoading ? '...' : stats?.totalParishioners ?? 0}
-          </div>
-          <div className="text-xs text-parish-text-muted flex items-center gap-1">
-            <span>Across all households</span>
-            <span className="text-blue-700 font-bold ml-auto">100%</span>
-          </div>
-        </div>
 
-        {/* Metric 3: Adult Parishioners (18+) */}
-        <div
-          onClick={() => navigate('/register')}
-          className="bg-parish-surface border border-parish-border p-4 sm:p-5 rounded-2xl shadow-xs space-y-1 hover:border-indigo-400/80 transition-all cursor-pointer group"
-          title="Adult parishioners aged 18 and over"
-        >
-          <div className="flex items-center justify-between text-parish-text-muted text-xs font-bold uppercase tracking-wider">
-            <span>Adults (18+)</span>
-            <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center group-hover:scale-105 transition-transform">
-              <UserCheck className="w-4 h-4" />
+          {/* Metric 3: Adult Parishioners (18+) */}
+          <div
+            onClick={() => canViewRegister && navigate('/register')}
+            className={`bg-parish-surface border border-parish-border p-4 sm:p-5 rounded-2xl shadow-xs space-y-1 transition-all group ${
+              canViewRegister ? 'hover:border-indigo-400/80 cursor-pointer' : ''
+            }`}
+            title={canViewRegister ? 'Adult parishioners aged 18 and over' : undefined}
+          >
+            <div className="flex items-center justify-between text-parish-text-muted text-xs font-bold uppercase tracking-wider">
+              <span>Adults (18+)</span>
+              <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <UserCheck className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl sm:text-3xl font-extrabold text-parish-text">
+              {isLoading ? '...' : stats?.adultsCount ?? 0}
+            </div>
+            <div className="text-xs text-parish-text-muted flex items-center gap-1">
+              <span>Adult population</span>
+              <span className="text-indigo-700 font-bold ml-auto">{adultsPercent}%</span>
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-parish-text">
-            {isLoading ? '...' : stats?.adultsCount ?? 0}
-          </div>
-          <div className="text-xs text-parish-text-muted flex items-center gap-1">
-            <span>Adult population</span>
-            <span className="text-indigo-700 font-bold ml-auto">{adultsPercent}%</span>
-          </div>
-        </div>
 
-        {/* Metric 4: Children & Minors (<18) */}
-        <div
-          onClick={() => navigate('/register')}
-          className="bg-parish-surface border border-parish-border p-4 sm:p-5 rounded-2xl shadow-xs space-y-1 hover:border-amber-400/80 transition-all cursor-pointer group"
-          title="Children and minors under 18"
-        >
-          <div className="flex items-center justify-between text-parish-text-muted text-xs font-bold uppercase tracking-wider">
-            <span>Children & Minors</span>
-            <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center group-hover:scale-105 transition-transform">
-              <Baby className="w-4 h-4" />
+          {/* Metric 4: Children & Minors (<18) */}
+          <div
+            onClick={() => canViewRegister && navigate('/register')}
+            className={`bg-parish-surface border border-parish-border p-4 sm:p-5 rounded-2xl shadow-xs space-y-1 transition-all group ${
+              canViewRegister ? 'hover:border-amber-400/80 cursor-pointer' : ''
+            }`}
+            title={canViewRegister ? 'Children and minors under 18' : undefined}
+          >
+            <div className="flex items-center justify-between text-parish-text-muted text-xs font-bold uppercase tracking-wider">
+              <span>Children & Minors</span>
+              <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Baby className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl sm:text-3xl font-extrabold text-amber-700">
+              {isLoading ? '...' : stats?.kidsCount ?? 0}
+            </div>
+            <div className="text-xs text-parish-text-muted flex items-center gap-1">
+              <span>Under 18 / Youth</span>
+              <span className="text-amber-700 font-bold ml-auto">{kidsPercent}%</span>
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-amber-700">
-            {isLoading ? '...' : stats?.kidsCount ?? 0}
-          </div>
-          <div className="text-xs text-parish-text-muted flex items-center gap-1">
-            <span>Under 18 / Youth</span>
-            <span className="text-amber-700 font-bold ml-auto">{kidsPercent}%</span>
-          </div>
-        </div>
 
-        {/* Metric 5: Family Units / Wards */}
-        <div
-          onClick={() => navigate('/units')}
-          className="bg-parish-surface border border-parish-border p-4 sm:p-5 rounded-2xl shadow-xs space-y-1 hover:border-violet-400/80 transition-all cursor-pointer group"
-          title="Click to view Wards & Units"
-        >
-          <div className="flex items-center justify-between text-parish-text-muted text-xs font-bold uppercase tracking-wider">
-            <span>Family Units</span>
-            <div className="w-8 h-8 rounded-xl bg-violet-50 text-violet-700 flex items-center justify-center group-hover:scale-105 transition-transform">
-              <MapPin className="w-4 h-4" />
+          {/* Metric 5: Family Units / Wards */}
+          <div
+            onClick={() => canViewUnits && navigate('/units')}
+            className={`bg-parish-surface border border-parish-border p-4 sm:p-5 rounded-2xl shadow-xs space-y-1 transition-all group ${
+              canViewUnits ? 'hover:border-violet-400/80 cursor-pointer' : ''
+            }`}
+            title={canViewUnits ? 'Click to view Wards & Units' : undefined}
+          >
+            <div className="flex items-center justify-between text-parish-text-muted text-xs font-bold uppercase tracking-wider">
+              <span>Family Units</span>
+              <div className="w-8 h-8 rounded-xl bg-violet-50 text-violet-700 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <MapPin className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl sm:text-3xl font-extrabold text-parish-text">
+              {isLoading ? '...' : stats?.activeUnitsCount ?? 0}
+            </div>
+            <div className="text-xs text-parish-text-muted flex items-center gap-1">
+              <span>Wards</span>
+              <span className="text-violet-700 font-bold ml-auto">Active</span>
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-parish-text">
-            {isLoading ? '...' : stats?.activeUnitsCount ?? 0}
-          </div>
-          <div className="text-xs text-parish-text-muted flex items-center gap-1">
-            <span>Wards</span>
-            <span className="text-violet-700 font-bold ml-auto">Active</span>
-          </div>
         </div>
-      </div>
+      )}
 
-      {/* 3. SECTION 1: CIRCULAR DEMOGRAPHIC CHARTS (Row of 2 Donut Charts) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+      {/* 3. VISUALIZATION & DEMOGRAPHIC CARDS (Dynamic Consecutive Grid - Zero Blank Spaces) */}
+      {activeCardIds.length > 0 && (
+        <div className={`grid grid-cols-1 ${activeCardIds.length > 1 ? 'lg:grid-cols-2' : ''} gap-6`}>
+
         {/* Chart 1: Adults vs Children & Minors (Donut Chart) */}
-        <div className="bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4">
+        {isFeatureEnabled('DASH_DEMO_COMPOSITION') && (
+          <div className={`bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4 ${isSpanFull('demo_ratio') ? 'lg:col-span-2' : ''}`}>
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-parish-text flex items-center gap-2">
@@ -514,9 +578,11 @@ export const DashboardPage: React.FC = () => {
             )}
           </div>
         </div>
+        )}
 
         {/* Chart 2: Household Registration Demographics (Donut Chart) */}
-        <div className="bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4">
+        {isFeatureEnabled('DASH_DEMO_COMPOSITION') && (
+          <div className={`bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4 ${isSpanFull('demo_types') ? 'lg:col-span-2' : ''}`}>
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-parish-text flex items-center gap-2">
@@ -613,12 +679,12 @@ export const DashboardPage: React.FC = () => {
             )}
           </div>
         </div>
-      </div>
+        )}
 
-      {/* 4. SECTION 2: AGE DEMOGRAPHICS & HOUSEHOLD SIZES (2 Columns) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Chart 3: Pastoral & Catechism Age Brackets (Bar Chart) */}
-        <div className="bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4">
+        {isFeatureEnabled('DASH_AGE_BRACKETS') && (
+          <div className={`bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4 ${isSpanFull('age_brackets') ? 'lg:col-span-2' : ''}`}>
+
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-parish-text flex items-center gap-2">
@@ -689,9 +755,12 @@ export const DashboardPage: React.FC = () => {
             ))}
           </div>
         </div>
+      )}
 
-        {/* Chart 4: Household Size Distribution (Bar Chart) */}
-        <div className="bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4">
+      {/* Chart 4: Household Size Distribution (Bar Chart) */}
+      {isFeatureEnabled('DASH_FAMILY_SIZE') && (
+        <div className={`bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4 ${isSpanFull('family_size') ? 'lg:col-span-2' : ''}`}>
+
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-parish-text flex items-center gap-2">
@@ -720,7 +789,7 @@ export const DashboardPage: React.FC = () => {
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e2d9" />
                   <XAxis
                     dataKey="size"
-                    tickFormatter={(val: string) => val.replace(/Members?/i, 'Mem.')}
+                    tickFormatter={(val: string) => (val ? String(val).replace(/Members?/i, 'Mem.') : '')}
                     tick={{ fontSize: 10.5, fill: '#64748b' }}
                     interval={0}
                     height={30}
@@ -763,17 +832,16 @@ export const DashboardPage: React.FC = () => {
                   className="w-2 h-2 rounded-full shrink-0"
                   style={{ backgroundColor: FAMILY_SIZE_COLORS[idx % FAMILY_SIZE_COLORS.length] }}
                 />
-                <span>{s.size.replace(/Members?/i, 'Mem.')}: <strong>{s.count}</strong> ({s.percentage}%)</span>
+                <span>{(s.size || '').replace(/Members?/i, 'Mem.')}: <strong>{s.count}</strong> ({s.percentage}%)</span>
               </span>
             ))}
+            </div>
           </div>
-        </div>
-      </div>
+        )}
 
-      {/* 5. SECTION 3: PARISH GROWTH TREND & GEOGRAPHIC SUBURBS (2 Columns) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Chart 5: Year-Wise Registration Growth (Area Chart) */}
-        <div className="bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4">
+        {isFeatureEnabled('DASH_TREND_CHART') && (
+          <div className={`bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4 ${isSpanFull('trend_timeline') ? 'lg:col-span-2' : ''}`}>
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-parish-text flex items-center gap-2">
@@ -844,9 +912,11 @@ export const DashboardPage: React.FC = () => {
             📈 Displays year-on-year family integration history across the parish.
           </p>
         </div>
+        )}
 
         {/* Chart 6: Top Suburbs in Brisbane / Queensland (Horizontal Bar Chart) */}
-        <div className="bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4">
+        {isFeatureEnabled('DASH_SUBURB_CHART') && (
+          <div className={`bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4 ${isSpanFull('trend_suburbs') ? 'lg:col-span-2' : ''}`}>
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-parish-text flex items-center gap-2">
@@ -910,12 +980,11 @@ export const DashboardPage: React.FC = () => {
             )}
           </div>
         </div>
-      </div>
+        )}
 
-      {/* 6. SECTION 4: WARDS & INDIAN DIOCESAN ORIGINS (2 Columns) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Chart 7: Families by Ward (Bar Chart) */}
-        <div className="bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4">
+        {isFeatureEnabled('DASH_WARD_CHART') && (
+          <div className={`bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4 ${isSpanFull('ward_chart') ? 'lg:col-span-2' : ''}`}>
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-parish-text flex items-center gap-2">
@@ -977,9 +1046,11 @@ export const DashboardPage: React.FC = () => {
             )}
           </div>
         </div>
+        )}
 
         {/* Chart 8: Dioceses of Origin in Kerala / India (Searchable List) */}
-        <div className="bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft flex flex-col space-y-4">
+        {isFeatureEnabled('DASH_ORIGIN_DIOCESES') && (
+          <div className={`bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft flex flex-col space-y-4 ${isSpanFull('origin_dioceses') ? 'lg:col-span-2' : ''}`}>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
@@ -991,12 +1062,14 @@ export const DashboardPage: React.FC = () => {
                   Parishioners native roots across Kerala & India ({diocesesDistribution.length} dioceses).
                 </p>
               </div>
-              <button
-                onClick={() => navigate('/settings')}
-                className="text-xs font-semibold text-parish-primary hover:underline"
-              >
-                Settings
-              </button>
+              {isFeatureEnabled('PAGE_SETTINGS') && (
+                <button
+                  onClick={() => navigate('/settings')}
+                  className="text-xs font-semibold text-parish-primary hover:underline"
+                >
+                  Settings
+                </button>
+              )}
             </div>
 
             {/* Quick Search */}
@@ -1023,7 +1096,7 @@ export const DashboardPage: React.FC = () => {
             )}
           </div>
 
-          <div className={`space-y-1 ${showAllDioceses || dioceseSearch ? 'max-h-80 overflow-y-auto pr-1' : ''}`}>
+          <div className={`space-y-1 ${isSpanFull('origin_dioceses') ? 'md:grid md:grid-cols-2 md:gap-x-6 md:gap-y-1 md:space-y-0' : ''} ${showAllDioceses || dioceseSearch ? 'max-h-80 overflow-y-auto pr-1' : ''}`}>
             {isLoading ? (
               <div className="space-y-2">
                 {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -1098,133 +1171,149 @@ export const DashboardPage: React.FC = () => {
             </div>
           )}
         </div>
+        )}
       </div>
+      )}
 
       {/* 7. SECTION 5: RECENT AUDIT TRAIL & QUICK NAVIGATION TOOLS */}
-      <div className="bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-bold text-parish-text flex items-center gap-2">
-              <History className="w-4 h-4 text-parish-primary" />
-              Recent Record History & Notes
-            </h2>
-            <p className="text-xs text-parish-text-muted">
-              Recent administrative updates, pastoral notes, and record status changes.
-            </p>
+      {isFeatureEnabled('DASH_ACTIVITY_FEED') && hasPermission('DASHBOARD_ACTIVITY', 'canView') && (
+        <div className="bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-parish-text flex items-center gap-2">
+                <History className="w-4 h-4 text-parish-primary" />
+                Recent Record History & Notes
+              </h2>
+              <p className="text-xs text-parish-text-muted">
+                Recent administrative updates, pastoral notes, and record status changes.
+              </p>
+            </div>
+            {canViewRegister && (
+              <Button
+                variant="outline"
+                size="sm"
+                icon={<ArrowRight className="w-3.5 h-3.5" />}
+                onClick={() => navigate('/register')}
+              >
+                Directory
+              </Button>
+            )}
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            icon={<ArrowRight className="w-3.5 h-3.5" />}
-            onClick={() => navigate('/register')}
-          >
-            Directory
-          </Button>
-        </div>
 
-        <div className="divide-y divide-parish-border">
-          {isLoading ? (
-            <div className="space-y-3 py-2">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-14 bg-parish-surface-subtle animate-pulse rounded-xl" />
-              ))}
-            </div>
-          ) : recentActivity.length === 0 ? (
-            <div className="py-8 text-center text-xs text-parish-text-muted">
-              No record history or administrative notes recorded yet.
-            </div>
-          ) : (
-            recentActivity.map((activity) => (
-              <div key={activity.id} className="py-3 flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-bold text-parish-text">
-                      {activity.headName || activity.houseName}
-                    </span>
-                    <span className="text-[11px] text-parish-primary font-medium">
-                      {activity.houseName}
-                    </span>
-                    <span className="text-[11px] font-mono text-parish-text-muted">
-                      ({activity.familyCode})
-                    </span>
-                    <Badge variant="default" size="sm">
-                      {activity.unitName}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-parish-text-muted leading-relaxed">
-                    {activity.content}
-                  </p>
-                </div>
-
-                <div className="text-right shrink-0 text-[11px] text-parish-text-muted">
-                  <div>{activity.recordedBy}</div>
-                  <div className="flex items-center gap-1 justify-end font-medium">
-                    <Clock className="w-3 h-3 text-parish-text-muted/70" />
-                    {new Date(activity.noteDate).toLocaleString([], {
-                      day: '2-digit',
-                      month: '2-digit',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      hour12: true,
-                    })}
-                  </div>
-                </div>
+          <div className="divide-y divide-parish-border">
+            {isLoading ? (
+              <div className="space-y-3 py-2">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-14 bg-parish-surface-subtle animate-pulse rounded-xl" />
+                ))}
               </div>
-            ))
-          )}
+            ) : recentActivity.length === 0 ? (
+              <div className="py-8 text-center text-xs text-parish-text-muted">
+                No record history or administrative notes recorded yet.
+              </div>
+            ) : (
+              recentActivity.map((activity) => (
+                <div key={activity.id} className="py-3 flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-bold text-parish-text">
+                        {activity.headName || activity.houseName}
+                      </span>
+                      <span className="text-[11px] text-parish-primary font-medium">
+                        {activity.houseName}
+                      </span>
+                      <span className="text-[11px] font-mono text-parish-text-muted">
+                        ({activity.familyCode})
+                      </span>
+                      <Badge variant="default" size="sm">
+                        {activity.unitName}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-parish-text-muted leading-relaxed">
+                      {activity.content}
+                    </p>
+                  </div>
+
+                  <div className="text-right shrink-0 text-[11px] text-parish-text-muted">
+                    <div>{activity.recordedBy}</div>
+                    <div className="flex items-center gap-1 justify-end font-medium">
+                      <Clock className="w-3 h-3 text-parish-text-muted/70" />
+                      {new Date(activity.noteDate).toLocaleString([], {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: true,
+                      })}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 8. Quick Navigation Master Tools */}
-      <div className="bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-3">
-        <h3 className="text-sm font-bold text-parish-text">Quick Navigation & Master Tools</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <button
-            onClick={() => navigate('/register/new')}
-            className="p-3.5 rounded-xl border border-parish-border hover:border-parish-primary bg-parish-surface-subtle/50 hover:bg-white text-left transition-all flex items-center justify-between group min-h-[48px]"
-          >
-            <div className="flex items-center gap-2.5">
-              <FolderPlus className="w-4 h-4 text-parish-primary" />
-              <span className="text-xs font-bold text-parish-text">Register New Family</span>
-            </div>
-            <ArrowRight className="w-3.5 h-3.5 text-parish-text-muted group-hover:text-parish-primary group-hover:translate-x-0.5 transition-all" />
-          </button>
+      {(canCreateRegisterNew || canViewRegister || canViewUnits || canViewUsers) && (
+        <div className="bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-3">
+          <h3 className="text-sm font-bold text-parish-text">Quick Navigation & Master Tools</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {canCreateRegisterNew && (
+              <button
+                onClick={() => navigate('/register/new')}
+                className="p-3.5 rounded-xl border border-parish-border hover:border-parish-primary bg-parish-surface-subtle/50 hover:bg-white text-left transition-all flex items-center justify-between group min-h-[48px]"
+              >
+                <div className="flex items-center gap-2.5">
+                  <FolderPlus className="w-4 h-4 text-parish-primary" />
+                  <span className="text-xs font-bold text-parish-text">Register New Family</span>
+                </div>
+                <ArrowRight className="w-3.5 h-3.5 text-parish-text-muted group-hover:text-parish-primary group-hover:translate-x-0.5 transition-all" />
+              </button>
+            )}
 
-          <button
-            onClick={() => navigate('/register')}
-            className="p-3.5 rounded-xl border border-parish-border hover:border-parish-primary bg-parish-surface-subtle/50 hover:bg-white text-left transition-all flex items-center justify-between group min-h-[48px]"
-          >
-            <div className="flex items-center gap-2.5">
-              <BookOpen className="w-4 h-4 text-parish-primary" />
-              <span className="text-xs font-bold text-parish-text">Search Parish Register</span>
-            </div>
-            <ArrowRight className="w-3.5 h-3.5 text-parish-text-muted group-hover:text-parish-primary group-hover:translate-x-0.5 transition-all" />
-          </button>
+            {canViewRegister && (
+              <button
+                onClick={() => navigate('/register')}
+                className="p-3.5 rounded-xl border border-parish-border hover:border-parish-primary bg-parish-surface-subtle/50 hover:bg-white text-left transition-all flex items-center justify-between group min-h-[48px]"
+              >
+                <div className="flex items-center gap-2.5">
+                  <BookOpen className="w-4 h-4 text-parish-primary" />
+                  <span className="text-xs font-bold text-parish-text">Search Parish Register</span>
+                </div>
+                <ArrowRight className="w-3.5 h-3.5 text-parish-text-muted group-hover:text-parish-primary group-hover:translate-x-0.5 transition-all" />
+              </button>
+            )}
 
-          <button
-            onClick={() => navigate('/units')}
-            className="p-3.5 rounded-xl border border-parish-border hover:border-parish-primary bg-parish-surface-subtle/50 hover:bg-white text-left transition-all flex items-center justify-between group min-h-[48px]"
-          >
-            <div className="flex items-center gap-2.5">
-              <MapPin className="w-4 h-4 text-amber-700" />
-              <span className="text-xs font-bold text-parish-text">Manage Wards & Units</span>
-            </div>
-            <ArrowRight className="w-3.5 h-3.5 text-parish-text-muted group-hover:text-parish-primary group-hover:translate-x-0.5 transition-all" />
-          </button>
+            {canViewUnits && (
+              <button
+                onClick={() => navigate('/units')}
+                className="p-3.5 rounded-xl border border-parish-border hover:border-parish-primary bg-parish-surface-subtle/50 hover:bg-white text-left transition-all flex items-center justify-between group min-h-[48px]"
+              >
+                <div className="flex items-center gap-2.5">
+                  <MapPin className="w-4 h-4 text-amber-700" />
+                  <span className="text-xs font-bold text-parish-text">Manage Wards & Units</span>
+                </div>
+                <ArrowRight className="w-3.5 h-3.5 text-parish-text-muted group-hover:text-parish-primary group-hover:translate-x-0.5 transition-all" />
+              </button>
+            )}
 
-          <button
-            onClick={() => navigate('/users')}
-            className="p-3.5 rounded-xl border border-parish-border hover:border-parish-primary bg-parish-surface-subtle/50 hover:bg-white text-left transition-all flex items-center justify-between group min-h-[48px]"
-          >
-            <div className="flex items-center gap-2.5">
-              <UserPlus className="w-4 h-4 text-sky-700" />
-              <span className="text-xs font-bold text-parish-text">User Access & Permissions</span>
-            </div>
-            <ArrowRight className="w-3.5 h-3.5 text-parish-text-muted group-hover:text-parish-primary group-hover:translate-x-0.5 transition-all" />
-          </button>
+            {canViewUsers && (
+              <button
+                onClick={() => navigate('/users')}
+                className="p-3.5 rounded-xl border border-parish-border hover:border-parish-primary bg-parish-surface-subtle/50 hover:bg-white text-left transition-all flex items-center justify-between group min-h-[48px]"
+              >
+                <div className="flex items-center gap-2.5">
+                  <UserPlus className="w-4 h-4 text-sky-700" />
+                  <span className="text-xs font-bold text-parish-text">User Access & Permissions</span>
+                </div>
+                <ArrowRight className="w-3.5 h-3.5 text-parish-text-muted group-hover:text-parish-primary group-hover:translate-x-0.5 transition-all" />
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

@@ -15,6 +15,8 @@ import {
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../context/AuthContext';
 
+import { useFeatures } from '../../context/FeatureContext';
+
 export interface AppSidebarProps {
   activeTab: string;
   onSelectTab: (tab: string) => void;
@@ -29,6 +31,8 @@ interface NavItem {
   icon: React.ReactNode;
   count?: string | number;
   module?: string;
+  featureKey?: string;
+  action?: 'canView' | 'canCreate';
 }
 
 export const AppSidebar: React.FC<AppSidebarProps> = ({
@@ -38,19 +42,30 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
   onToggleCollapse,
   onQuickRegister,
 }) => {
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
+  const { isFeatureEnabled, isDeveloper, isSimulatingClient } = useFeatures();
+  const isDevUser = isDeveloper || user?.role === 'SUPER_ADMIN';
 
   const allNavItems: NavItem[] = [
     { id: 'dashboard', label: 'Home', icon: <Home className="w-4 h-4" /> },
-    { id: 'register', label: 'Parish Register', icon: <Users className="w-4 h-4" />, module: 'REGISTER' },
-    { id: 'register-family', label: 'Register New Family', icon: <UserPlus className="w-4 h-4" />, module: 'REGISTER_NEW' },
-    { id: 'import-registrations', label: 'Import Registrations', icon: <FileSpreadsheet className="w-4 h-4" />, module: 'IMPORT_REGISTRATIONS' },
-    { id: 'units', label: 'Wards & Units', icon: <MapPin className="w-4 h-4" />, module: 'WARDS' },
-    { id: 'users', label: 'Users & Roles', icon: <Shield className="w-4 h-4" />, module: 'USERS' },
-    { id: 'settings', label: 'Settings', icon: <Settings className="w-4 h-4" />, module: 'SETTINGS' },
+    { id: 'register', label: 'Parish Register', icon: <Users className="w-4 h-4" />, module: 'REGISTER', featureKey: 'PAGE_REGISTER' },
+    { id: 'register-family', label: 'Register New Family', icon: <UserPlus className="w-4 h-4" />, module: 'REGISTER_NEW', featureKey: 'PAGE_REGISTER_NEW', action: 'canCreate' },
+    { id: 'import-registrations', label: 'Import Registrations', icon: <FileSpreadsheet className="w-4 h-4" />, module: 'IMPORT_REGISTRATIONS', featureKey: 'PAGE_REGISTER_IMPORT', action: 'canCreate' },
+    { id: 'units', label: 'Wards & Units', icon: <MapPin className="w-4 h-4" />, module: 'WARDS', featureKey: 'PAGE_UNITS' },
+    { id: 'users', label: 'Users & Roles', icon: <Shield className="w-4 h-4" />, module: 'USERS', featureKey: 'PAGE_USERS' },
+    { id: 'settings', label: 'Settings', icon: <Settings className="w-4 h-4" />, module: 'SETTINGS', featureKey: 'PAGE_SETTINGS' },
   ];
 
-  const navItems = allNavItems.filter((item) => !item.module || hasPermission(item.module, 'canView'));
+  const navItems = allNavItems.filter((item) => {
+    // Platform Developer is never restricted unless explicitly simulating client view
+    if (isDevUser && !isSimulatingClient) return true;
+    // 1. Feature Toggle Check: If this page feature is disabled for the parish, hide it!
+    if (item.featureKey && !isFeatureEnabled(item.featureKey)) return false;
+    // 2. Role Permissions Matrix Check from database:
+    if (item.module && !hasPermission(item.module, item.action || 'canView')) return false;
+    return true;
+  });
+
 
   return (
     <aside
