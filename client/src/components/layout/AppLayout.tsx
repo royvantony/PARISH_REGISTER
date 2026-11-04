@@ -113,20 +113,20 @@ export const AppLayout: React.FC = () => {
 
 
   return (
-    <div className="min-h-screen bg-parish-bg text-parish-text flex flex-col font-sans selection:bg-parish-primary-light selection:text-parish-primary">
+    <div className="min-h-screen bg-parish-bg text-parish-text flex flex-col font-sans selection:bg-parish-primary-light selection:text-parish-primary overflow-x-hidden w-full max-w-full">
       {/* Simulation Active Top Banner - Persistent across all screens so developer can always return */}
       {isSimulatingClient && (
         <aside
           aria-label="Simulation Mode Banner"
-          className="bg-gradient-to-r from-amber-600 via-amber-700 to-amber-800 text-white px-4 py-2 text-xs font-semibold shadow-md flex items-center justify-between gap-3 z-50 sticky top-0 border-b border-amber-500/50 flex-wrap"
+          className="bg-gradient-to-r from-amber-600 via-amber-700 to-amber-800 text-white px-3 sm:px-4 py-2 text-xs font-semibold shadow-md flex items-center justify-between gap-2 sm:gap-3 z-50 sticky top-0 border-b border-amber-500/50 flex-wrap"
         >
-          <div className="flex items-center gap-2.5 min-w-0 flex-wrap">
+          <div className="flex items-center gap-2 min-w-0 flex-wrap">
             <span className="flex h-2.5 w-2.5 relative shrink-0">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-200"></span>
             </span>
             <span className="truncate">
-              <strong className="tracking-wide uppercase text-[11px] bg-amber-900/60 px-1.5 py-0.5 rounded border border-amber-400/40 mr-1.5">
+              <strong className="tracking-wide uppercase text-[10px] sm:text-[11px] bg-amber-900/60 px-1.5 py-0.5 rounded border border-amber-400/40 mr-1.5">
                 Simulating Client View
               </strong>
               Parish:{' '}
@@ -150,7 +150,7 @@ export const AppLayout: React.FC = () => {
               className="px-3 py-1 rounded-lg bg-white text-amber-950 hover:bg-amber-100 text-[11px] font-extrabold shadow-sm transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
             >
               <X className="w-3.5 h-3.5 text-amber-900" />
-              <span>Exit Simulation (Return to Normal)</span>
+              <span>Exit<span className="hidden sm:inline"> Simulation (Return to Normal)</span></span>
             </button>
           </div>
         </aside>
@@ -241,8 +241,22 @@ export const AppLayout: React.FC = () => {
               </nav>
             </div>
 
-            {/* Mobile Footer: Logout */}
-            <div className="pt-4 border-t border-parish-border">
+            {/* Mobile Footer: User Info & Logout */}
+            <div className="pt-4 border-t border-parish-border space-y-3">
+              <div className="flex items-center gap-3 px-1">
+                <div className="w-9 h-9 rounded-full bg-parish-primary-light text-parish-primary font-bold text-xs flex items-center justify-center border border-parish-primary/20 shrink-0">
+                  {(user?.fullName || 'Super Admin').substring(0, 2).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-bold text-parish-text truncate leading-tight">
+                    {user?.fullName || 'Super Admin'}
+                  </div>
+                  <div className="text-[10px] text-parish-text-muted font-medium truncate">
+                    {user?.role || 'PARISH_ADMIN'}
+                  </div>
+                </div>
+              </div>
+
               <button
                 onClick={() => {
                   setIsMobileMenuOpen(false);
@@ -251,7 +265,7 @@ export const AppLayout: React.FC = () => {
                 className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-red-200 bg-red-50 text-red-700 text-xs font-bold hover:bg-red-100 transition-colors cursor-pointer"
               >
                 <LogOut className="w-4 h-4" />
-                <span>Sign Out ({user?.fullName || 'Super Admin'})</span>
+                <span>Sign Out</span>
               </button>
             </div>
           </div>

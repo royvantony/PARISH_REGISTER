@@ -504,7 +504,7 @@ The entire frontend is engineered following strict reactive design guidelines ac
   - Residential address & Australian contact card (Street, Suburb, Phone, Email).
   - Ecclesiastical roots in India (Native diocese and home parish).
   - Family members breakdown with role badges (Head, Spouse, Child), birth dates, calculated ages, and canonical change trail.
-  - **Dedicated Direct Debit Area**: Integrated pledge view with amount, payment frequency, bank account last 4 digits, and purpose notes. Strictly visible to `SUPER_ADMIN` and `PARISH_ADMIN`; masked to `null` for `PARISH_USER`, `DIOCESAN_USER`, and `WARD_USER`.
+  - **Dedicated Direct Debit Area**: Integrated pledge view with multiple active schedules, contributor reference labels, amounts, payment frequencies, and combined monthly contribution average. Strictly visible to users with `DIRECT_DEBIT:canView` permissions; masked for unauthorized roles.
 
 ### 9.5 Role Permissions Matrix, Granular User Overrides & Ward Isolation (`/users`)
 - **Backend Architecture**:
@@ -547,6 +547,29 @@ To accelerate local testing across all hierarchical permissions without manually
 ### 9.9 Batch Import & Excel Export Engines
 - **Forminator / CSV Import (`/import`)**: Drag-and-drop batch ingestion for parish registration spreadsheets with header mapping, auto-cleaning of Australian mobile numbers, Indian diocese normalization, and automated family code allocation (`SABN100xxx`).
 - **Excel Export**: Full directory `.xlsx` generation using ExcelJS, delivering structured multi-column workbooks with Head of Family, House Name, Ward, Phone, Address, and Member Counts.
+
+### 9.10 Multi-Schedule Direct Debit System (One-to-Many Architecture)
+- **Database Architecture (`Family 1 --- * DirectDebit`)**:
+  - The direct debit relation was evolved from a `1:1` relationship into a `1:N` relationship. A single household can now maintain multiple independent recurring direct debit schedules (e.g., Husband, Wife, adult children who recently entered the workforce).
+  - Schema highlights:
+    - `reference`: Single-line text field (`VARCHAR(100)`, max-width 25-char feel) identifying the contributor or specific commitment (e.g. "Husband - James", "Wife - Mary", "Eldest Son").
+    - `amount`: `Decimal(10, 2)` representing recurring contribution in AUD.
+    - `frequency`: Recurring cadence (`Weekly`, `Fortnightly`, `Monthly`, `Quarterly`, `Annually`).
+    - `active`: Boolean flag allowing pause/reactivation of individual schedules without losing historical context.
+    - `createdAt` & `updatedAt`: Automatic tracking timestamps.
+    - Indexes: `@@index([familyId])` and `@@index([parishId, active])` for high-performance aggregation across all parish households.
+- **REST API Endpoints (`/api/families/:id/direct-debits`)**:
+  - `POST /api/families/:id/direct-debits`: Creates a new direct debit schedule for the household with automatic audit logging into `FamilyNote`.
+  - `PUT /api/families/:id/direct-debits/:ddId`: Updates an existing schedule (amount, frequency, status, reference, comments) with automatic change-diff audit logging.
+  - `DELETE /api/families/:id/direct-debits/:ddId`: Deletes a schedule with administrative reason logging.
+  - `PUT /api/families/:id/direct-debit`: Backwards-compatible legacy endpoint updating or creating the primary schedule.
+  - `POST /api/families/:id/inactivate`: Automatically cancels all active direct debit schedules when a household is marked inactive.
+- **UI & UX Implementation ([`EditFamily.tsx`](file:///c:/Dev/PARISH_REGISTER/client/src/pages/EditFamily.tsx) & [`DirectDebitModal.tsx`](file:///c:/Dev/PARISH_REGISTER/client/src/components/families/DirectDebitModal.tsx))**:
+  - Direct Debit Arrangements Table showing Reference / Contributor (`max-w-[25ch]`), Amount, Frequency, Normalized Monthly Average, Status (Active/Paused), Comments, and Action buttons (Edit/Delete).
+  - Header summary with active schedule counts and combined monthly contribution average for the family.
+  - Quick-preset amount buttons ($20, $30, $50, $100, $150, $200) and live monthly equivalent calculations.
+  - Deletion confirmation dialog ([`ConfirmDialog.tsx`](file:///c:/Dev/PARISH_REGISTER/client/src/components/ui/ConfirmDialog.tsx)) with audit trail disclosure.
+
 
 
 

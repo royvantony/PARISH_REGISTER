@@ -105,9 +105,13 @@ function formatPersonName(name: string | undefined): string | null {
 }
 
 // Standardize unit names
-function cleanUnitName(rawUnit: string | undefined): string {
-  if (!rawUnit || !rawUnit.trim()) return 'Nil';
+function cleanUnitName(rawUnit: string | undefined): string | null {
+  if (!rawUnit || !rawUnit.trim()) return null;
   const u = rawUnit.trim();
+  if (['none', 'n/a', 'not applicable', 'unknown', 'unassigned', '-'].includes(u.toLowerCase())) {
+    return null;
+  }
+  if (u.toLowerCase() === 'nil') return 'Nil';
   if (u.toLowerCase() === 'st josephs' || u.toLowerCase() === 'st-josephs') return 'St-Joseph';
   return u;
 }
@@ -170,27 +174,31 @@ async function run() {
     const letterUrl = row['Upload Letter from parish|upload-1']?.trim() || null;
     const comments = row['Comments (DD.MM.YY - put comments)']?.trim() || null;
 
-    // 2. Ensure Unit exists for this parish
-    const unitCategory =
-      rawUnit.includes('Student') || rawUnit.includes('Youth')
-        ? 'DEMOGRAPHIC'
-        : 'GEOGRAPHIC';
+    // 2. Ensure Unit exists for this parish (if assigned)
+    let unitId: number | null = null;
+    if (rawUnit) {
+      const unitCategory =
+        rawUnit.includes('Student') || rawUnit.includes('Youth')
+          ? 'DEMOGRAPHIC'
+          : 'GEOGRAPHIC';
 
-    const unit = await prisma.familyUnit.upsert({
-      where: {
-        parishId_unitName: {
+      const unit = await prisma.familyUnit.upsert({
+        where: {
+          parishId_unitName: {
+            parishId: parish.id,
+            unitName: rawUnit,
+          },
+        },
+        update: {},
+        create: {
           parishId: parish.id,
           unitName: rawUnit,
+          category: unitCategory,
+          isActive: true,
         },
-      },
-      update: {},
-      create: {
-        parishId: parish.id,
-        unitName: rawUnit,
-        category: unitCategory,
-        isActive: true,
-      },
-    });
+      });
+      unitId = unit.id;
+    }
 
     // 3. Classify registration type
     let regType = RegistrationType.FAMILY;
@@ -210,7 +218,7 @@ async function run() {
         registrationType: regType,
         houseName: houseName,
         headFullName: headName || houseName,
-        unitId: unit.id,
+        unitId: unitId,
         streetAddress: row['Address in Australia|address-1-street_address']?.trim() || null,
         city: row['City|address-1-city']?.trim() || null,
         state: row['State/Province|address-1-state']?.trim() || null,

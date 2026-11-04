@@ -158,10 +158,10 @@ export const InactivateFamilyModal: React.FC<InactivateFamilyModalProps> = ({
             <label htmlFor="cancelDirectDebit" className="text-xs text-sky-900 cursor-pointer space-y-0.5">
               <span className="font-semibold flex items-center gap-1">
                 <CreditCard className="w-3.5 h-3.5 text-sky-700" />
-                Cancel Active Direct Debit
+                Cancel Active Direct Debit Arrangements
               </span>
               <p className="text-[11px] text-sky-800">
-                Automatically deactivates the household's scheduled direct debit to prevent accidental future debits.
+                Automatically deactivates all active direct debit schedules for this household to prevent accidental future debits.
               </p>
             </label>
           </div>

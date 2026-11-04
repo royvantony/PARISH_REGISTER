@@ -79,6 +79,8 @@ function cleanUnitName(rawUnit: string | undefined | null): string {
   if (!rawUnit || !rawUnit.trim()) return '';
   const u = rawUnit.trim();
   const lower = u.toLowerCase();
+  if (['none', 'n/a', 'not applicable', 'unknown', 'unassigned', '-'].includes(lower)) return '';
+  if (lower === 'nil') return 'Nil';
   if (lower === 'st josephs' || lower === 'st-josephs' || lower === 'st joseph') return 'St-Joseph';
   if (lower === 'st thomas' || lower === 'st-thomas') return 'St-Thomas';
   if (lower === 'st alphonsa' || lower === 'st-alphonsa') return 'St-Alphonsa';

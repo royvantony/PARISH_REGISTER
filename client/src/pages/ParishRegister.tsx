@@ -114,8 +114,17 @@ interface FamilyDetail {
   status: 'ACTIVE' | 'INACTIVE' | 'MERGED' | 'PENDING';
   generalNotes: string | null;
   members: FamilyDetailMember[];
-  directDebit: {
+  directDebits?: Array<{
     id: number;
+    reference?: string | null;
+    amount: number | string;
+    frequency: string;
+    comments?: string | null;
+    active: boolean;
+  }>;
+  directDebit?: {
+    id: number;
+    reference?: string | null;
     amount: number | string;
     frequency: string;
     comments?: string | null;
@@ -547,12 +556,12 @@ export const ParishRegisterPage: React.FC = () => {
                   setPage(1);
                 }}
                 className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors min-h-[34px] flex items-center gap-1.5 cursor-pointer ${selectedStatus === st.key
-                    ? st.isPending
-                      ? 'bg-amber-600 text-white shadow-xs font-bold'
-                      : 'bg-parish-primary text-white shadow-xs font-bold'
-                    : st.isPending && pendingCount > 0
-                      ? 'bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200'
-                      : 'bg-parish-surface-subtle text-parish-text-muted hover:text-parish-text hover:bg-parish-surface-subtle/80 border border-parish-border/60'
+                  ? st.isPending
+                    ? 'bg-amber-600 text-white shadow-xs font-bold'
+                    : 'bg-parish-primary text-white shadow-xs font-bold'
+                  : st.isPending && pendingCount > 0
+                    ? 'bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200'
+                    : 'bg-parish-surface-subtle text-parish-text-muted hover:text-parish-text hover:bg-parish-surface-subtle/80 border border-parish-border/60'
                   }`}
               >
                 {st.isPending && <Clock className="w-3.5 h-3.5" />}
@@ -1381,74 +1390,96 @@ export const ParishRegisterPage: React.FC = () => {
             </div>
 
             {/* DEDICATED DIRECT DEBIT AREA - Only visible to users with view permission */}
-            {canViewDirectDebit && familyDetail.directDebitPermissions?.canView && (
-              <div className="p-4 rounded-xl border border-parish-border bg-parish-surface-subtle space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <CreditCard className="w-4 h-4 text-parish-primary" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-parish-text">
-                      Direct Debit
-                    </span>
+            {canViewDirectDebit && familyDetail.directDebitPermissions?.canView && (() => {
+              const debits = familyDetail.directDebits && familyDetail.directDebits.length > 0
+                ? familyDetail.directDebits
+                : (familyDetail.directDebit ? [familyDetail.directDebit] : []);
+              const activeDebits = debits.filter(d => d.active);
+              const totalMonthlyEst = activeDebits.reduce((acc, dd) => acc + calculateMonthlyEquivalent(Number(dd.amount) || 0, dd.frequency), 0);
+
+              return (
+                <div className="p-4 rounded-xl border border-parish-border bg-parish-surface-subtle space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="w-4 h-4 text-parish-primary" />
+                      <span className="text-xs font-bold uppercase tracking-wider text-parish-text">
+                        Direct Debit Arrangements
+                      </span>
+                    </div>
+
+                    {activeDebits.length > 0 ? (
+                      <Badge variant="success" size="sm">
+                        {activeDebits.length} Active {activeDebits.length > 1 ? `(≈ $${Math.round(totalMonthlyEst).toLocaleString()}/mo)` : `($${activeDebits[0].amount} AUD)`}
+                      </Badge>
+                    ) : debits.length > 0 ? (
+                      <Badge variant="subtle" size="sm">
+                        All Paused ({debits.length})
+                      </Badge>
+                    ) : (
+                      <Badge variant="subtle" size="sm">
+                        No Active Debit
+                      </Badge>
+                    )}
                   </div>
 
-                  {familyDetail.directDebit && familyDetail.directDebit.active ? (
-                    <Badge variant="success" size="sm">
-                      Active
-                    </Badge>
+                  {debits.length > 0 ? (
+                    <div className="space-y-2">
+                      <div className="divide-y divide-parish-border/60 rounded-lg border border-parish-border bg-white overflow-hidden">
+                        {debits.map((dd, idx) => {
+                          const amt = Number(dd.amount) || 0;
+                          const monthlyAvg = calculateMonthlyEquivalent(amt, dd.frequency);
+                          return (
+                            <div key={dd.id || idx} className="p-3 flex items-center justify-between gap-3 text-xs">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-parish-text truncate max-w-[25ch]" title={dd.reference || undefined}>
+                                    {dd.reference || `Direct Debit Schedule #${idx + 1}`}
+                                  </span>
+                                  {dd.active ? (
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                      Active
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-500 border border-slate-200">
+                                      Paused
+                                    </span>
+                                  )}
+                                </div>
+                                {dd.comments && (
+                                  <p className="text-[11px] text-parish-text-muted mt-0.5 truncate">{dd.comments}</p>
+                                )}
+                              </div>
+                              <div className="text-right shrink-0">
+                                <div className="font-bold text-parish-primary text-sm">
+                                  ${amt} <span className="text-[11px] font-medium text-parish-text-muted">/ {dd.frequency || 'Monthly'}</span>
+                                </div>
+                                {dd.frequency && dd.frequency.toLowerCase() !== 'monthly' && (
+                                  <div className="text-[10px] text-parish-text-muted">
+                                    ≈ ${Math.round(monthlyAvg).toLocaleString()}/mo
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {activeDebits.length > 1 && (
+                        <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-emerald-50/70 border border-emerald-200/60 text-xs font-semibold text-emerald-900">
+                          <span>Total Combined Monthly Contribution:</span>
+                          <span className="text-sm font-extrabold text-emerald-700">≈ ${Math.round(totalMonthlyEst).toLocaleString()} AUD / mo</span>
+                        </div>
+                      )}
+
+                    </div>
                   ) : (
-                    <Badge variant="subtle" size="sm">
-                      No Active Debit
-                    </Badge>
+                    <div className="text-xs text-parish-text-muted leading-relaxed">
+                      This household does not currently have active direct debit registered. Direct debit contributions can be set up via the parish administration office.
+                    </div>
                   )}
                 </div>
-
-                {familyDetail.directDebit && familyDetail.directDebit.active ? (
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3 pt-1">
-                      <div className="bg-white p-3 rounded-lg border border-parish-border">
-                        <div className="text-[10px] font-bold uppercase text-parish-text-muted">
-                          Amount
-                        </div>
-                        <div className="text-base font-extrabold text-parish-primary">
-                          ${familyDetail.directDebit.amount} AUD
-                        </div>
-                        {familyDetail.directDebit.frequency &&
-                          familyDetail.directDebit.frequency.toLowerCase() !== 'monthly' && (
-                            <div className="text-[11px] font-medium text-parish-text-muted mt-0.5">
-                              ≈ ${Math.round(
-                                calculateMonthlyEquivalent(
-                                  familyDetail.directDebit.amount,
-                                  familyDetail.directDebit.frequency
-                                )
-                              ).toLocaleString()}/mo (Avg)
-                            </div>
-                          )}
-                      </div>
-                      <div className="bg-white p-3 rounded-lg border border-parish-border">
-                        <div className="text-[10px] font-bold uppercase text-parish-text-muted">
-                          Frequency
-                        </div>
-                        <div className="text-sm font-bold text-parish-text">
-                          {familyDetail.directDebit.frequency || 'Monthly'}
-                          {familyDetail.directDebit.comments && (
-                            <span className="text-xs text-parish-text-muted block font-sans">
-                              {familyDetail.directDebit.comments}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-xs text-parish-text-muted">
-                      Direct debit processed automatically for the parish.
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-xs text-parish-text-muted leading-relaxed">
-                    This household does not currently have active direct debit registered. Direct debit contributions can be set up via the parish administration office.
-                  </div>
-                )}
-              </div>
-            )}
+              );
+            })()}
 
             {/* 1. Pastoral & Household Notes (Manual remarks by Priest/Staff) */}
             <div className="space-y-2">

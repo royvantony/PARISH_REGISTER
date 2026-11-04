@@ -9,6 +9,7 @@ import { Button } from '../components/ui/Button';
 import { ConfirmButton } from '../components/ui/ConfirmButton';
 import { ConfirmDeleteButton } from '../components/ui/ConfirmDeleteButton';
 import { Input } from '../components/ui/Input';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import {
   ArrowLeft,
   Users,
@@ -31,12 +32,15 @@ import {
   Printer,
   ChevronDown,
   ChevronUp,
+  Edit2,
+  Trash2,
+  Tag,
 } from 'lucide-react';
 import { InactivateFamilyModal } from '../components/families/InactivateFamilyModal';
 import { ApproveFamilyModal } from '../components/families/ApproveFamilyModal';
 import { ReactivateFamilyModal } from '../components/families/ReactivateFamilyModal';
 import { RejectFamilyModal } from '../components/families/RejectFamilyModal';
-import { DirectDebitModal } from '../components/families/DirectDebitModal';
+import { DirectDebitModal, type DirectDebitItem } from '../components/families/DirectDebitModal';
 import { HouseholdDossierModal } from '../components/families/HouseholdDossierModal';
 import type { DossierMember, DossierFamily } from '../components/families/HouseholdDossierModal';
 
@@ -129,12 +133,20 @@ export const EditFamilyPage: React.FC = () => {
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [isDirectDebitModalOpen, setIsDirectDebitModalOpen] = useState(false);
   const [hasDirectDebit, setHasDirectDebit] = useState(false);
-  const [directDebitData, setDirectDebitData] = useState<any>(null);
+  const [directDebits, setDirectDebits] = useState<DirectDebitItem[]>([]);
+  const [selectedDirectDebitForEdit, setSelectedDirectDebitForEdit] = useState<DirectDebitItem | null>(null);
+  const [deletingDirectDebit, setDeletingDirectDebit] = useState<DirectDebitItem | null>(null);
+  const [isDeletingDirectDebit, setIsDeletingDirectDebit] = useState(false);
   const [directDebitPerms, setDirectDebitPerms] = useState<{ canView: boolean; canEdit: boolean }>({ canView: false, canEdit: false });
   const [auditNotes, setAuditNotes] = useState<Array<{ id: number; noteDate: string; noteContent: string; recordedBy: string }>>([]);
   const [isAllAuditNotesShown, setIsAllAuditNotesShown] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const activeDirectDebitsCount = directDebits.filter((d) => d.active).length;
+  const totalMonthlyDirectDebit = directDebits
+    .filter((d) => d.active && d.amount)
+    .reduce((sum, d) => sum + calculateMonthlyEquivalent(d.amount!, d.frequency || 'Monthly'), 0);
 
   const canApproveAction = canApprove && hasPermission('REGISTER', 'canApprove');
   const canViewDirectDebit = isFeatureEnabled('REGISTER_DIRECT_DEBIT') && hasPermission('DIRECT_DEBIT', 'canView') && directDebitPerms.canView;
@@ -214,7 +226,7 @@ export const EditFamilyPage: React.FC = () => {
       originDiocese: originDiocese.trim() || null,
       members: dossierMembers,
       generalNotes: generalNotes.trim() || null,
-      directDebit: directDebitData,
+      directDebit: directDebits[0] || null,
     };
   }, [
     id,
@@ -245,7 +257,7 @@ export const EditFamilyPage: React.FC = () => {
     originParish,
     originDiocese,
     generalNotes,
-    directDebitData,
+    directDebits,
   ]);
 
   // Load family data
@@ -266,8 +278,9 @@ export const EditFamilyPage: React.FC = () => {
       setUnits(unitsRes.data);
       setDioceses(diocesesRes.data);
       setCanApprove(approveRes.data.canApprove);
-      setHasDirectDebit(Boolean(f.directDebit?.active));
-      setDirectDebitData(f.directDebit || null);
+      const loadedDDs = f.directDebits || (f.directDebit ? [f.directDebit] : []);
+      setDirectDebits(loadedDDs);
+      setHasDirectDebit(loadedDDs.some((d: any) => d.active));
       if (f.directDebitPermissions) {
         setDirectDebitPerms(f.directDebitPermissions);
       }
@@ -343,6 +356,22 @@ export const EditFamilyPage: React.FC = () => {
   useEffect(() => {
     loadFamilyData();
   }, [id]);
+
+  const handleDeleteDirectDebit = async (ddId: number) => {
+    if (!id) return;
+    try {
+      setIsDeletingDirectDebit(true);
+      await api.delete(`/families/${id}/direct-debits/${ddId}`);
+      setSuccessMessage('Direct Debit schedule removed successfully.');
+      setDeletingDirectDebit(null);
+      loadFamilyData();
+    } catch (err: any) {
+      console.error('Failed to remove direct debit:', err);
+      setErrorMessage(err.response?.data?.error || 'Failed to remove Direct Debit schedule.');
+    } finally {
+      setIsDeletingDirectDebit(false);
+    }
+  };
 
   // Add child row
   const handleAddChild = () => {
@@ -1252,56 +1281,171 @@ export const EditFamilyPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Direct Debit Summary Card (Option B Modal Trigger) */}
+        {/* Direct Debit Arrangements Table */}
         {canViewDirectDebit && (
-          <div className="bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-parish-primary-light text-parish-primary flex items-center justify-center shrink-0">
-                <CreditCard className="w-5 h-5 text-parish-primary" />
-              </div>
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-bold text-sm text-parish-text">
-                    Direct Debit Details
-                  </h3>
-                  {hasDirectDebit ? (
-                    <Badge variant="success" size="sm">Active</Badge>
-                  ) : directDebitData ? (
-                    <Badge variant="warning" size="sm">Paused / Inactive</Badge>
-                  ) : (
-                    <Badge variant="subtle" size="sm">No Direct Debit</Badge>
-                  )}
+          <div className="bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-parish-border">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-parish-primary-light text-parish-primary flex items-center justify-center shrink-0">
+                  <CreditCard className="w-5 h-5 text-parish-primary" />
                 </div>
-                <p className="text-xs text-parish-text-muted">
-                  {hasDirectDebit && directDebitData ? (
-                    <span>
-                      Contributing <strong>${directDebitData.amount} AUD</strong> ({directDebitData.frequency || 'Monthly'}
-                      {directDebitData.frequency && directDebitData.frequency.toLowerCase() !== 'monthly'
-                        ? `, ≈ $${Math.round(calculateMonthlyEquivalent(directDebitData.amount, directDebitData.frequency)).toLocaleString()}/mo avg`
-                        : ''})
-                      {directDebitData.comments ? ` • ${directDebitData.comments}` : ''}
-                    </span>
-                  ) : directDebitData ? (
-                    <span>Direct debit is currently paused / inactive ({directDebitData.amount ? `$${directDebitData.amount} AUD ${directDebitData.frequency || 'Monthly'}` : 'Inactive'}).</span>
-                  ) : (
-                    <span>No direct debit details recorded for this household.</span>
-                  )}
-                </p>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-bold text-sm text-parish-text">
+                      Direct Debit Arrangements
+                    </h3>
+                    {hasDirectDebit ? (
+                      <Badge variant="success" size="sm">
+                        {activeDirectDebitsCount} Active Schedule{activeDirectDebitsCount !== 1 ? 's' : ''}
+                      </Badge>
+                    ) : directDebits.length > 0 ? (
+                      <Badge variant="warning" size="sm">All Schedules Paused</Badge>
+                    ) : (
+                      <Badge variant="subtle" size="sm">No Direct Debit</Badge>
+                    )}
+                    {totalMonthlyDirectDebit > 0 && (
+                      <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30">
+                        Combined: ${Math.round(totalMonthlyDirectDebit).toLocaleString()} AUD / mo avg
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-parish-text-muted mt-0.5">
+                    Recurring parish direct debit contributions. Families can maintain separate schedules for husband, wife, and working family members.
+                  </p>
+                </div>
               </div>
+
+              {directDebitPerms.canEdit && (
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedDirectDebitForEdit(null);
+                    setIsDirectDebitModalOpen(true);
+                  }}
+                  icon={<Plus className="w-3.5 h-3.5" />}
+                  className="shrink-0 font-semibold"
+                >
+                  Add Direct Debit
+                </Button>
+              )}
             </div>
 
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setIsDirectDebitModalOpen(true)}
-              icon={<CreditCard className="w-3.5 h-3.5 text-parish-primary" />}
-              className="shrink-0 font-semibold text-parish-primary border-parish-border hover:bg-parish-primary-light"
-            >
-              {directDebitPerms.canEdit
-                ? (hasDirectDebit || directDebitData ? 'Manage Direct Debit' : 'Setup Direct Debit')
-                : 'View Direct Debit'}
-            </Button>
+            {directDebits.length > 0 ? (
+              <div className="overflow-x-auto rounded-xl border border-parish-border">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-parish-surface-subtle text-parish-text-muted font-bold text-[11px] uppercase tracking-wider border-b border-parish-border">
+                    <tr>
+                      <th className="py-2.5 px-3">Reference / Contributor</th>
+                      <th className="py-2.5 px-3">Amount</th>
+                      <th className="py-2.5 px-3">Frequency</th>
+                      <th className="py-2.5 px-3">Monthly Equivalent</th>
+                      <th className="py-2.5 px-3">Status</th>
+                      <th className="py-2.5 px-3">Remarks</th>
+                      {directDebitPerms.canEdit && (
+                        <th className="py-2.5 px-3 text-right">Actions</th>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-parish-border bg-parish-surface">
+                    {directDebits.map((dd) => {
+                      const monthlyAvg = dd.amount
+                        ? calculateMonthlyEquivalent(dd.amount, dd.frequency || 'Monthly')
+                        : 0;
+                      return (
+                        <tr key={dd.id} className="hover:bg-parish-surface-subtle/60 transition-colors">
+                          <td className="py-3 px-3">
+                            <div className="flex items-center gap-1.5 max-w-[25ch]">
+                              <Tag className="w-3.5 h-3.5 text-parish-primary shrink-0" />
+                              <span className="font-bold text-parish-text truncate" title={dd.reference || 'General Parish Contribution'}>
+                                {dd.reference || <span className="text-parish-text-muted font-normal italic">General Contribution</span>}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-3 font-extrabold text-parish-text">
+                            ${Number(dd.amount || 0).toFixed(2)} <span className="text-[10px] text-parish-text-muted font-normal">AUD</span>
+                          </td>
+                          <td className="py-3 px-3 font-semibold text-parish-text">
+                            {dd.frequency || 'Monthly'}
+                          </td>
+                          <td className="py-3 px-3 font-medium text-parish-text-muted">
+                            {dd.active ? (
+                              <span className="text-emerald-700 dark:text-emerald-400 font-bold">
+                                ≈ ${Math.round(monthlyAvg).toLocaleString()} AUD/mo
+                              </span>
+                            ) : (
+                              <span className="text-parish-text-muted italic">Inactive</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-3">
+                            {dd.active ? (
+                              <Badge variant="success" size="sm">Active</Badge>
+                            ) : (
+                              <Badge variant="subtle" size="sm">Paused / Inactive</Badge>
+                            )}
+                          </td>
+                          <td className="py-3 px-3 text-[11px] text-parish-text-muted max-w-[200px] truncate" title={dd.comments || ''}>
+                            {dd.comments || <span className="italic opacity-60">—</span>}
+                          </td>
+                          {directDebitPerms.canEdit && (
+                            <td className="py-3 px-3 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedDirectDebitForEdit(dd);
+                                    setIsDirectDebitModalOpen(true);
+                                  }}
+                                  className="p-1.5 rounded-lg text-parish-primary hover:bg-parish-primary-light transition-colors cursor-pointer"
+                                  title="Edit schedule"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setDeletingDirectDebit(dd)}
+                                  className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                                  title="Delete schedule"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="p-6 rounded-xl border border-dashed border-parish-border text-center space-y-2">
+                <p className="text-xs font-semibold text-parish-text">
+                  No direct debit details recorded for this household.
+                </p>
+                <p className="text-[11px] text-parish-text-muted max-w-md mx-auto">
+                  Add recurring contribution schedules for household members (husband, wife, or employed children) to track regular parish giving.
+                </p>
+                {directDebitPerms.canEdit && (
+                  <div className="pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedDirectDebitForEdit(null);
+                        setIsDirectDebitModalOpen(true);
+                      }}
+                      icon={<Plus className="w-3.5 h-3.5 text-parish-primary" />}
+                      className="font-semibold text-parish-primary border-parish-border hover:bg-parish-primary-light"
+                    >
+                      Setup Direct Debit
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -1510,22 +1654,37 @@ export const EditFamilyPage: React.FC = () => {
           }}
         />
       )}
-      {/* Direct Debit Modal (Option B: Dedicated window with auditing) */}
+      {/* Direct Debit Modal */}
       {id && canViewDirectDebit && (
         <DirectDebitModal
           isOpen={isDirectDebitModalOpen}
-          onClose={() => setIsDirectDebitModalOpen(false)}
+          onClose={() => {
+            setIsDirectDebitModalOpen(false);
+            setSelectedDirectDebitForEdit(null);
+          }}
           familyId={Number(id)}
           houseName={houseName}
           familyCode={familyCode}
-          currentDirectDebit={directDebitData}
+          directDebit={selectedDirectDebitForEdit}
           canEdit={isFeatureEnabled('REGISTER_DIRECT_DEBIT') && hasPermission('DIRECT_DEBIT', 'canEdit') && directDebitPerms.canEdit}
-          onSuccess={(updated) => {
-            setDirectDebitData(updated);
-            setHasDirectDebit(Boolean(updated?.active));
-            setSuccessMessage('Direct Debit details updated and logged in the Record History.');
+          onSuccess={() => {
+            setSuccessMessage(`Direct Debit schedule ${selectedDirectDebitForEdit ? 'updated' : 'added'} successfully.`);
             loadFamilyData();
           }}
+        />
+      )}
+
+      {/* Delete Direct Debit Confirmation Dialog */}
+      {deletingDirectDebit && (
+        <ConfirmDialog
+          isOpen={Boolean(deletingDirectDebit)}
+          title="Delete Direct Debit Schedule"
+          message={`Are you sure you want to remove the direct debit schedule ${deletingDirectDebit.reference ? `"${deletingDirectDebit.reference}"` : ''} ($${Number(deletingDirectDebit.amount || 0).toFixed(2)} AUD ${deletingDirectDebit.frequency || 'Monthly'})? This change will be permanently logged in the Record History.`}
+          confirmLabel="Delete Schedule"
+          variant="danger"
+          isLoading={isDeletingDirectDebit}
+          onConfirm={() => deletingDirectDebit.id && handleDeleteDirectDebit(deletingDirectDebit.id)}
+          onClose={() => setDeletingDirectDebit(null)}
         />
       )}
 

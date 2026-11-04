@@ -13,14 +13,19 @@ import {
   Home,
   Hash,
   Lock,
+  Tag,
 } from 'lucide-react';
 
-interface DirectDebitData {
+export interface DirectDebitItem {
   id?: number;
+  familyId?: number;
+  reference?: string | null;
   amount?: number | string | null;
   frequency?: string | null;
   comments?: string | null;
   active?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 interface DirectDebitModalProps {
@@ -29,9 +34,9 @@ interface DirectDebitModalProps {
   familyId: number;
   houseName: string;
   familyCode?: string | null;
-  currentDirectDebit?: DirectDebitData | null;
+  directDebit?: DirectDebitItem | null;
   canEdit: boolean;
-  onSuccess: (updatedRecord: any) => void;
+  onSuccess: (updatedRecord: DirectDebitItem) => void;
 }
 
 const FREQUENCY_OPTIONS = [
@@ -50,28 +55,38 @@ export const DirectDebitModal: React.FC<DirectDebitModalProps> = ({
   familyId,
   houseName,
   familyCode,
-  currentDirectDebit,
+  directDebit,
   canEdit,
   onSuccess,
 }) => {
-  const [active, setActive] = useState(false);
+  const isEditing = Boolean(directDebit && directDebit.id);
+  const [reference, setReference] = useState('');
+  const [active, setActive] = useState(true);
   const [amount, setAmount] = useState('');
   const [frequency, setFrequency] = useState('Monthly');
   const [comments, setComments] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Initialize or reset form strictly based on the current status when modal opens
+  // Initialize or reset form based on current item when modal opens
   useEffect(() => {
     if (isOpen) {
       setError(null);
-      const isCurrentlyActive = Boolean(currentDirectDebit && currentDirectDebit.active === true);
-      setActive(isCurrentlyActive);
-      setAmount(currentDirectDebit?.amount ? String(currentDirectDebit.amount) : '');
-      setFrequency(currentDirectDebit?.frequency || 'Monthly');
-      setComments(currentDirectDebit?.comments || '');
+      if (directDebit) {
+        setReference(directDebit.reference || '');
+        setActive(directDebit.active !== false);
+        setAmount(directDebit.amount !== null && directDebit.amount !== undefined ? String(directDebit.amount) : '');
+        setFrequency(directDebit.frequency || 'Monthly');
+        setComments(directDebit.comments || '');
+      } else {
+        setReference('');
+        setActive(true);
+        setAmount('');
+        setFrequency('Monthly');
+        setComments('');
+      }
     }
-  }, [isOpen, currentDirectDebit]);
+  }, [isOpen, directDebit]);
 
   const validateInputs = (): boolean => {
     if (!canEdit) return false;
@@ -94,18 +109,26 @@ export const DirectDebitModal: React.FC<DirectDebitModalProps> = ({
     try {
       setIsLoading(true);
 
-      const res = await api.put(`/families/${familyId}/direct-debit`, {
+      const payload = {
+        reference: reference.trim() || null,
         amount: amount ? parseFloat(amount) : null,
         frequency,
         active,
         comments: comments.trim() || null,
-      });
+      };
+
+      let res;
+      if (isEditing && directDebit?.id) {
+        res = await api.put(`/families/${familyId}/direct-debits/${directDebit.id}`, payload);
+      } else {
+        res = await api.post(`/families/${familyId}/direct-debits`, payload);
+      }
 
       onSuccess(res.data.directDebit);
       onClose();
     } catch (err: any) {
-      console.error('Failed to update direct debit:', err);
-      setError(err.response?.data?.error || 'Failed to update Direct Debit details. Please try again.');
+      console.error('Failed to save direct debit:', err);
+      setError(err.response?.data?.error || 'Failed to save Direct Debit details. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -115,7 +138,7 @@ export const DirectDebitModal: React.FC<DirectDebitModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Direct Debit Details"
+      title={isEditing ? 'Edit Direct Debit Schedule' : 'Add Direct Debit Schedule'}
       maxWidth="md"
       closeOnEsc={!isLoading}
     >
@@ -127,10 +150,10 @@ export const DirectDebitModal: React.FC<DirectDebitModalProps> = ({
           </div>
           <div className="text-xs space-y-1">
             <p className="font-bold text-parish-text text-sm">
-              Direct Debit Contribution
+              {isEditing ? 'Edit Direct Debit Schedule' : 'New Direct Debit Schedule'}
             </p>
             <p className="text-parish-text-muted leading-relaxed">
-              Track recurring direct debit contributions for the parish.
+              Track recurring direct debit contributions for this household. Families can have multiple direct debit schedules (e.g. husband, wife, adult children).
             </p>
           </div>
         </div>
@@ -151,7 +174,7 @@ export const DirectDebitModal: React.FC<DirectDebitModalProps> = ({
         )}
 
         {/* Household Summary Card */}
-        <div className="p-3.5 rounded-xl bg-parish-surface-subtle border border-parish-border space-y-1 text-xs">
+        <div className="p-3 rounded-xl bg-parish-surface-subtle border border-parish-border space-y-1 text-xs">
           <div className="flex items-center justify-between">
             <span className="text-[11px] text-parish-text-muted flex items-center gap-1">
               <Home className="w-3 h-3 text-parish-primary" /> House Name:
@@ -168,10 +191,37 @@ export const DirectDebitModal: React.FC<DirectDebitModalProps> = ({
           )}
         </div>
 
+        {/* Reference / Contributor single-line small text box */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label htmlFor="dd-reference-input" className="block text-xs font-semibold text-parish-text flex items-center gap-1.5">
+              <Tag className="w-3.5 h-3.5 text-parish-primary" />
+              <span>Reference / Contributor</span>
+              <span className="text-[10px] text-parish-text-muted font-normal">(Optional)</span>
+            </label>
+            <span className="text-[10px] text-parish-text-muted">Max width 25</span>
+          </div>
+          <div className="max-w-[25rem]">
+            <Input
+              id="dd-reference-input"
+              type="text"
+              maxLength={100}
+              placeholder="e.g. Husband - Thomas, Wife - Mary"
+              value={reference}
+              onChange={(e) => setReference(e.target.value)}
+              disabled={!canEdit || isLoading}
+              className="text-xs font-semibold"
+            />
+          </div>
+          <p className="text-[10px] text-parish-text-muted">
+            Identify who this direct debit is for (e.g., Husband, Wife, Son) or a bank transaction reference.
+          </p>
+        </div>
+
         {/* Active Toggle */}
         <div
           className={cn(
-            "p-3.5 rounded-xl border transition-all flex items-center justify-between cursor-pointer",
+            "p-3 rounded-xl border transition-all flex items-center justify-between cursor-pointer",
             active
               ? "border-parish-primary/40 bg-parish-primary-light/20"
               : "border-parish-border bg-parish-surface-subtle"
@@ -180,14 +230,12 @@ export const DirectDebitModal: React.FC<DirectDebitModalProps> = ({
         >
           <div className="space-y-0.5 select-none pr-3">
             <label htmlFor="dd-active-toggle" className="text-xs font-bold text-parish-text cursor-pointer">
-              Direct Debit Contribution Status
+              Schedule Status
             </label>
             <p className="text-[11px] text-parish-text-muted">
               {active
-                ? 'Direct debit contribution is active.'
-                : currentDirectDebit
-                  ? 'Direct debit is paused / inactive.'
-                  : 'Direct debit is not set up (turn on to activate).'}
+                ? 'Active (currently contributing to parish).'
+                : 'Paused / Inactive schedule.'}
             </p>
           </div>
 
@@ -207,9 +255,9 @@ export const DirectDebitModal: React.FC<DirectDebitModalProps> = ({
         {/* Direct Debit Amount */}
         <div className="space-y-1.5">
           <label className="block text-xs font-semibold text-parish-text">
-            Direct Debit Amount ($ AUD) {active && <span className="text-red-500">*</span>}
+            Contribution Amount ($ AUD) {active && <span className="text-red-500">*</span>}
           </label>
-          <div className="relative">
+          <div className="relative max-w-[25rem]">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-parish-text-muted">
               $
             </span>
@@ -260,18 +308,20 @@ export const DirectDebitModal: React.FC<DirectDebitModalProps> = ({
           <label className="block text-xs font-semibold text-parish-text">
             Contribution Frequency <span className="text-red-500">*</span>
           </label>
-          <select
-            value={frequency}
-            onChange={(e) => setFrequency(e.target.value)}
-            disabled={!canEdit || isLoading || !active}
-            className="w-full bg-parish-surface text-parish-text text-xs rounded-xl border border-parish-border p-2.5 transition-all focus:outline-none focus:ring-2 focus:ring-parish-primary/30 focus:border-parish-primary disabled:opacity-60"
-          >
-            {FREQUENCY_OPTIONS.map((f) => (
-              <option key={f} value={f}>
-                {f}
-              </option>
-            ))}
-          </select>
+          <div className="max-w-[25rem]">
+            <select
+              value={frequency}
+              onChange={(e) => setFrequency(e.target.value)}
+              disabled={!canEdit || isLoading || !active}
+              className="w-full bg-parish-surface text-parish-text text-xs rounded-xl border border-parish-border p-2.5 transition-all focus:outline-none focus:ring-2 focus:ring-parish-primary/30 focus:border-parish-primary disabled:opacity-60"
+            >
+              {FREQUENCY_OPTIONS.map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+            </select>
+          </div>
           {active && amount && !isNaN(parseFloat(amount)) && parseFloat(amount) > 0 && frequency.toLowerCase() !== 'monthly' && (
             <div className="text-[11px] text-parish-primary font-medium flex items-center gap-1.5 pt-0.5">
               <span>Normalized Monthly Average:</span>
@@ -280,17 +330,17 @@ export const DirectDebitModal: React.FC<DirectDebitModalProps> = ({
           )}
         </div>
 
-        {/* Notes & Bank Reference */}
+        {/* Additional Remarks */}
         <div className="space-y-1.5">
           <label className="block text-xs font-semibold text-parish-text">
-            Mandate / Donor Remarks <span className="text-parish-text-muted font-normal">(Optional)</span>
+            Additional Remarks <span className="text-parish-text-muted font-normal">(Optional)</span>
           </label>
           <textarea
             value={comments}
             onChange={(e) => setComments(e.target.value)}
             disabled={!canEdit || isLoading}
             rows={2}
-            placeholder="e.g. Account Holder: Thomas Abraham"
+            placeholder="e.g. Account name or specific bank arrangement notes..."
             className="w-full bg-parish-surface text-parish-text text-xs rounded-xl border border-parish-border p-2.5 transition-all focus:outline-none focus:ring-2 focus:ring-parish-primary/30 focus:border-parish-primary disabled:opacity-60"
           />
         </div>
@@ -299,7 +349,7 @@ export const DirectDebitModal: React.FC<DirectDebitModalProps> = ({
         <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200/80 text-[11px] text-amber-900 flex items-start gap-2.5">
           <ShieldCheck className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
           <p className="leading-relaxed">
-            <strong>Audit Guarantee:</strong> Any adjustment to the direct debit amount, frequency, or active status is automatically logged into the <strong>Record History & Audit Trail</strong> with your user name and exact timestamp.
+            <strong>Audit Guarantee:</strong> Any adjustment to direct debit schedules is automatically logged into the <strong>Record History & Audit Trail</strong> with your user name and exact timestamp.
           </p>
         </div>
 
@@ -326,7 +376,7 @@ export const DirectDebitModal: React.FC<DirectDebitModalProps> = ({
               icon={<Save className="w-4 h-4" />}
               confirmLabel="Confirm Save?"
             >
-              Save Direct Debit
+              {isEditing ? 'Save Changes' : 'Add Direct Debit'}
             </ConfirmButton>
           )}
         </div>

@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import { prisma } from '../lib/prisma.js';
 import { authenticateJWT } from '../middleware/auth.js';
-import { UserRole } from '@prisma/client';
+import { UserRole, FamilyStatus } from '@prisma/client';
 
 export const mastersRouter = Router();
 
@@ -14,10 +14,16 @@ mastersRouter.get('/units', async (req: Request, res: Response) => {
   try {
     const parishId = req.activeParishId;
     const units = await prisma.familyUnit.findMany({
-      where: { parishId },
+      where: {
+        parishId,
+      },
       include: {
         _count: {
-          select: { families: true },
+          select: {
+            families: {
+              where: { status: FamilyStatus.ACTIVE },
+            },
+          },
         },
       },
       orderBy: { unitName: 'asc' },
@@ -598,7 +604,10 @@ mastersRouter.get('/parishes', async (req: Request, res: Response) => {
       orderBy: { parishName: 'asc' },
       include: {
         _count: {
-          select: { families: true, units: true },
+          select: {
+            families: { where: { status: FamilyStatus.ACTIVE } },
+            units: { where: { isActive: true } },
+          },
         },
       },
     });
@@ -631,7 +640,11 @@ mastersRouter.get('/parishes/:id', async (req: Request, res: Response) => {
       where: { id },
       include: {
         _count: {
-          select: { families: true, units: true, users: true },
+          select: {
+            families: { where: { status: FamilyStatus.ACTIVE } },
+            units: { where: { isActive: true } },
+            users: true,
+          },
         },
       },
     });

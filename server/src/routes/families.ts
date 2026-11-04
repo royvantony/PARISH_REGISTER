@@ -71,16 +71,15 @@ export function buildFamilyQuery(
     const dd = (directDebit as string).trim().toUpperCase();
     if (dd === 'YES' || dd === 'TRUE' || dd === '1' || dd === 'PLEDGED') {
       andConditions.push({
-        directDebit: {
-          is: { active: true },
+        directDebits: {
+          some: { active: true },
         },
       });
     } else if (dd === 'NO' || dd === 'FALSE' || dd === '0') {
       andConditions.push({
-        OR: [
-          { directDebit: { is: null } },
-          { directDebit: { is: { active: false } } },
-        ],
+        directDebits: {
+          none: { active: true },
+        },
       });
     }
   }
@@ -234,7 +233,7 @@ familiesRouter.get('/', async (req: Request, res: Response) => {
               documents: true,
             },
           },
-          directDebit: {
+          directDebits: {
             select: { id: true, active: true },
           },
         },
@@ -267,7 +266,7 @@ familiesRouter.get('/', async (req: Request, res: Response) => {
         membersCount: f._count.members,
         documentsCount: f._count.documents,
         registrationDate: f.registrationDate,
-        hasDirectDebit: ddPerms.canView ? !!(f.directDebit && f.directDebit.active) : false,
+        hasDirectDebit: ddPerms.canView ? (f.directDebits || []).some((d) => d.active) : false,
       })),
       pagination: {
         page: pageNum,
@@ -337,8 +336,8 @@ familiesRouter.get('/export/data', async (req: Request, res: Response) => {
               isPrimaryContact: true,
             },
           },
-          directDebit: {
-            select: { id: true, amount: true, frequency: true, active: true },
+          directDebits: {
+            select: { id: true, reference: true, amount: true, frequency: true, active: true },
           },
         },
       }),
@@ -369,8 +368,8 @@ familiesRouter.get('/export/data', async (req: Request, res: Response) => {
         headOfFamily: f.members.find((m) => m.role === MemberRole.HEAD) || f.members[0] || null,
         membersCount: f.members.length,
         members: f.members,
-        hasDirectDebit: Boolean(f.directDebit?.active),
-        directDebit: f.directDebit,
+        hasDirectDebit: (f.directDebits || []).some((d) => d.active),
+        directDebits: f.directDebits,
       })),
     });
   } catch (err: any) {
@@ -417,8 +416,8 @@ familiesRouter.get('/export/excel', async (req: Request, res: Response) => {
               isPrimaryContact: true,
             },
           },
-          directDebit: {
-            select: { id: true, amount: true, frequency: true, active: true },
+          directDebits: {
+            select: { id: true, reference: true, amount: true, frequency: true, active: true },
           },
         },
       }),
@@ -528,10 +527,15 @@ familiesRouter.get('/export/excel', async (req: Request, res: Response) => {
         f.primaryPhone || '',
         f.primaryEmail || '',
         f.originDiocese || '',
-        f.originParish || '',
-        f.directDebit ? (f.directDebit.active ? 'Active' : 'Inactive') : 'None',
-        f.directDebit?.amount ? Number(f.directDebit.amount) : '',
-        f.directDebit?.frequency || '',
+        (f.directDebits && f.directDebits.some((d) => d.active))
+          ? 'Active'
+          : (f.directDebits && f.directDebits.length > 0 ? 'Inactive' : 'None'),
+        f.directDebits && f.directDebits.length > 0
+          ? f.directDebits.filter((d) => d.active).reduce((sum, d) => sum + (d.amount ? Number(d.amount) : 0), 0) || ''
+          : '',
+        f.directDebits && f.directDebits.length > 0
+          ? f.directDebits.map((d) => `${d.reference ? d.reference + ': ' : ''}$${d.amount} (${d.frequency || 'Monthly'})${!d.active ? ' [Inactive]' : ''}`).join(', ')
+          : '',
       ]);
       row.height = 20;
 
@@ -707,7 +711,9 @@ familiesRouter.get('/:id', async (req: Request, res: Response) => {
         notes: {
           orderBy: { noteDate: 'desc' },
         },
-        directDebit: true,
+        directDebits: {
+          orderBy: [{ active: 'desc' }, { createdAt: 'asc' }],
+        },
         mergedIntoFamily: {
           select: { id: true, familyCode: true, houseName: true },
         },
@@ -731,7 +737,7 @@ familiesRouter.get('/:id', async (req: Request, res: Response) => {
       : { canView: false, canEdit: false };
 
     if (!ddPerms.canView) {
-      (family as any).directDebit = null;
+      (family as any).directDebits = [];
     }
 
     // Audit Trail visibility & confidentiality:
@@ -1427,7 +1433,7 @@ familiesRouter.post('/:id/inactivate', async (req: Request, res: Response) => {
 
     const family = await prisma.family.findFirst({
       where: { id: familyId, parishId },
-      include: { directDebit: true },
+      include: { directDebits: true },
     });
 
     if (!family) {
@@ -1452,17 +1458,20 @@ familiesRouter.post('/:id/inactivate', async (req: Request, res: Response) => {
 
       // 2. Pause/Cancel Direct Debit if requested and active
       let ddNote = '';
-      if (cancelDirectDebit && family.directDebit && family.directDebit.active) {
-        await tx.directDebit.update({
-          where: { id: family.directDebit.id },
-          data: {
-            active: false,
-            comments: family.directDebit.comments
-              ? `${family.directDebit.comments} | Inactivated on household archival (${new Date().toLocaleDateString()})`
-              : `Direct debit cancelled on household archival (${new Date().toLocaleDateString()})`,
-          },
-        });
-        ddNote = ' Active Direct Debit was automatically cancelled.';
+      const activeDDs = (family.directDebits || []).filter((d) => d.active);
+      if (cancelDirectDebit && activeDDs.length > 0) {
+        for (const dd of activeDDs) {
+          await tx.directDebit.update({
+            where: { id: dd.id },
+            data: {
+              active: false,
+              comments: dd.comments
+                ? `${dd.comments} | Inactivated on household archival (${new Date().toLocaleDateString()})`
+                : `Direct debit cancelled on household archival (${new Date().toLocaleDateString()})`,
+            },
+          });
+        }
+        ddNote = ` ${activeDDs.length} active Direct Debit schedule(s) were automatically cancelled.`;
       }
 
       // 3. Log comprehensive audit note
@@ -1544,8 +1553,8 @@ familiesRouter.post('/:id/reactivate', async (req: Request, res: Response) => {
   }
 });
 
-// PUT /api/families/:id/direct-debit - Update or create Direct Debit with full auditing
-familiesRouter.put('/:id/direct-debit', async (req: Request, res: Response) => {
+// POST /api/families/:id/direct-debits - Create a new Direct Debit schedule with full auditing
+familiesRouter.post('/:id/direct-debits', async (req: Request, res: Response) => {
   try {
     const familyId = parseInt(req.params.id as string, 10);
     const parishId = req.activeParishId;
@@ -1560,64 +1569,124 @@ familiesRouter.put('/:id/direct-debit', async (req: Request, res: Response) => {
 
     const family = await prisma.family.findFirst({
       where: { id: familyId, parishId },
-      include: { directDebit: true },
     });
 
     if (!family) {
       return res.status(404).json({ error: 'Family record not found.' });
     }
 
-    const { amount, frequency = 'Monthly', active = true, comments } = req.body;
+    const { reference, amount, frequency = 'Monthly', active = true, comments } = req.body;
 
     const parsedAmount = amount !== null && amount !== undefined && amount !== '' ? parseFloat(amount) : null;
     if (active && (parsedAmount === null || isNaN(parsedAmount) || parsedAmount <= 0)) {
       return res.status(400).json({ error: 'Please enter a valid positive contribution amount.' });
     }
 
-    const existing = family.directDebit;
-    const changes: string[] = [];
+    const cleanRef = reference ? reference.trim() : null;
+    const cleanComments = comments ? comments.trim() : null;
+
+    const result = await prisma.$transaction(async (tx) => {
+      const dd = await tx.directDebit.create({
+        data: {
+          parishId: parishId || family.parishId,
+          familyId,
+          reference: cleanRef,
+          amount: parsedAmount !== null ? new Prisma.Decimal(parsedAmount) : null,
+          frequency: frequency || 'Monthly',
+          active: Boolean(active),
+          comments: cleanComments,
+        },
+      });
+
+      const auditMsg = `Direct Debit added by ${user.fullName} (${user.role}): $${parsedAmount ? parsedAmount.toFixed(2) : '0.00'} AUD (${frequency})${cleanRef ? ` [Reference: ${cleanRef}]` : ''}${!active ? ' (Status: Inactive)' : ''}${cleanComments ? ` • ${cleanComments}` : ''}.`;
+
+      await tx.familyNote.create({
+        data: {
+          familyId,
+          noteDate: new Date(),
+          noteContent: auditMsg,
+          recordedBy: user.fullName,
+        },
+      });
+
+      return dd;
+    });
+
+    return res.status(201).json({
+      message: 'Direct Debit schedule created successfully.',
+      directDebit: result,
+    });
+  } catch (err: any) {
+    console.error('Error creating direct debit schedule:', err);
+    return res.status(500).json({ error: 'Failed to create Direct Debit schedule.' });
+  }
+});
+
+// PUT /api/families/:id/direct-debits/:ddId - Update an existing Direct Debit schedule
+familiesRouter.put('/:id/direct-debits/:ddId', async (req: Request, res: Response) => {
+  try {
+    const familyId = parseInt(req.params.id as string, 10);
+    const ddId = parseInt(req.params.ddId as string, 10);
+    const parishId = req.activeParishId;
+    const user = req.user;
+
+    if (!user) return res.status(401).json({ error: 'Unauthorized.' });
+
+    const ddPerms = await getUserDirectDebitPermissions(user.userId, user.role, parishId);
+    if (!ddPerms.canEdit) {
+      return res.status(403).json({ error: 'Access denied: You do not have permission to manage Direct Debit.' });
+    }
+
+    const existing = await prisma.directDebit.findFirst({
+      where: { id: ddId, familyId },
+    });
 
     if (!existing) {
-      changes.push(`Direct debit established: $${parsedAmount ? parsedAmount.toFixed(2) : '0.00'} AUD (${frequency})`);
-      if (!active) changes.push('Status: Inactive');
-      if (comments) changes.push(`Notes: ${comments.trim()}`);
-    } else {
-      const oldAmount = existing.amount ? parseFloat(existing.amount.toString()) : 0;
-      const newAmount = parsedAmount ?? 0;
-      if (oldAmount !== newAmount) {
-        changes.push(`Amount changed from $${oldAmount.toFixed(2)} to $${newAmount.toFixed(2)} AUD`);
-      }
-      if (existing.frequency !== frequency) {
-        changes.push(`Frequency changed from ${existing.frequency || 'Unspecified'} to ${frequency}`);
-      }
-      if (existing.active !== Boolean(active)) {
-        changes.push(`Status changed from ${existing.active ? 'Active' : 'Inactive'} to ${active ? 'Active' : 'Inactive'}`);
-      }
-      if ((existing.comments || '').trim() !== (comments || '').trim()) {
-        changes.push('Direct debit notes updated');
-      }
+      return res.status(404).json({ error: 'Direct Debit record not found.' });
+    }
+
+    const { reference, amount, frequency = 'Monthly', active = true, comments } = req.body;
+
+    const parsedAmount = amount !== null && amount !== undefined && amount !== '' ? parseFloat(amount) : null;
+    if (active && (parsedAmount === null || isNaN(parsedAmount) || parsedAmount <= 0)) {
+      return res.status(400).json({ error: 'Please enter a valid positive contribution amount.' });
+    }
+
+    const cleanRef = reference !== undefined ? (reference ? reference.trim() : null) : existing.reference;
+    const cleanComments = comments !== undefined ? (comments ? comments.trim() : null) : existing.comments;
+
+    const changes: string[] = [];
+    if (existing.reference !== cleanRef) {
+      changes.push(`Reference changed from "${existing.reference || 'None'}" to "${cleanRef || 'None'}"`);
+    }
+    const oldAmount = existing.amount ? parseFloat(existing.amount.toString()) : 0;
+    const newAmount = parsedAmount ?? 0;
+    if (oldAmount !== newAmount) {
+      changes.push(`Amount changed from $${oldAmount.toFixed(2)} to $${newAmount.toFixed(2)} AUD`);
+    }
+    if (existing.frequency !== frequency) {
+      changes.push(`Frequency changed from ${existing.frequency || 'Unspecified'} to ${frequency}`);
+    }
+    if (existing.active !== Boolean(active)) {
+      changes.push(`Status changed from ${existing.active ? 'Active' : 'Inactive'} to ${active ? 'Active' : 'Inactive'}`);
+    }
+    if ((existing.comments || '').trim() !== (cleanComments || '').trim()) {
+      changes.push('Direct debit notes updated');
     }
 
     const auditMessage = changes.length > 0
-      ? `Direct Debit ${existing ? 'updated' : 'established'} by ${user.fullName} (${user.role}): ${changes.join('; ')}.`
-      : `Direct Debit verified by ${user.fullName} (${user.role}) with no changes.`;
+      ? `Direct Debit [${cleanRef || `#${ddId}`}] updated by ${user.fullName} (${user.role}): ${changes.join('; ')}.`
+      : `Direct Debit [${cleanRef || `#${ddId}`}] verified by ${user.fullName} (${user.role}) with no changes.`;
 
     const result = await prisma.$transaction(async (tx) => {
-      const dd = await tx.directDebit.upsert({
-        where: { familyId },
-        update: {
+      const dd = await tx.directDebit.update({
+        where: { id: ddId },
+        data: {
+          reference: cleanRef,
           amount: parsedAmount !== null ? new Prisma.Decimal(parsedAmount) : null,
           frequency: frequency || 'Monthly',
           active: Boolean(active),
-          comments: comments ? comments.trim() : null,
-        },
-        create: {
-          parishId,
-          familyId,
-          amount: parsedAmount !== null ? new Prisma.Decimal(parsedAmount) : null,
-          frequency: frequency || 'Monthly',
-          active: Boolean(active),
-          comments: comments ? comments.trim() : null,
+          comments: cleanComments,
         },
       });
 
@@ -1636,11 +1705,140 @@ familiesRouter.put('/:id/direct-debit', async (req: Request, res: Response) => {
     });
 
     return res.json({
+      message: 'Direct Debit schedule updated successfully.',
+      directDebit: result,
+    });
+  } catch (err: any) {
+    console.error('Error updating direct debit schedule:', err);
+    return res.status(500).json({ error: 'Failed to update Direct Debit schedule.' });
+  }
+});
+
+// DELETE /api/families/:id/direct-debits/:ddId - Delete a Direct Debit schedule
+familiesRouter.delete('/:id/direct-debits/:ddId', async (req: Request, res: Response) => {
+  try {
+    const familyId = parseInt(req.params.id as string, 10);
+    const ddId = parseInt(req.params.ddId as string, 10);
+    const parishId = req.activeParishId;
+    const user = req.user;
+
+    if (!user) return res.status(401).json({ error: 'Unauthorized.' });
+
+    const ddPerms = await getUserDirectDebitPermissions(user.userId, user.role, parishId);
+    if (!ddPerms.canEdit) {
+      return res.status(403).json({ error: 'Access denied: You do not have permission to manage Direct Debit.' });
+    }
+
+    const existing = await prisma.directDebit.findFirst({
+      where: { id: ddId, familyId },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Direct Debit record not found.' });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.directDebit.delete({
+        where: { id: ddId },
+      });
+
+      const auditMsg = `Direct Debit schedule [${existing.reference || `#${ddId}`}] ($${existing.amount ? parseFloat(existing.amount.toString()).toFixed(2) : '0.00'} ${existing.frequency || 'Monthly'}) was removed by ${user.fullName} (${user.role}).`;
+
+      await tx.familyNote.create({
+        data: {
+          familyId,
+          noteDate: new Date(),
+          noteContent: auditMsg,
+          recordedBy: user.fullName,
+        },
+      });
+    });
+
+    return res.json({ message: 'Direct Debit schedule removed successfully.' });
+  } catch (err: any) {
+    console.error('Error removing direct debit schedule:', err);
+    return res.status(500).json({ error: 'Failed to remove Direct Debit schedule.' });
+  }
+});
+
+// PUT /api/families/:id/direct-debit - Backwards compatibility endpoint
+familiesRouter.put('/:id/direct-debit', async (req: Request, res: Response) => {
+  try {
+    const familyId = parseInt(req.params.id as string, 10);
+    const parishId = req.activeParishId;
+    const user = req.user;
+
+    if (!user) return res.status(401).json({ error: 'Unauthorized.' });
+
+    const ddPerms = await getUserDirectDebitPermissions(user.userId, user.role, parishId);
+    if (!ddPerms.canEdit) {
+      return res.status(403).json({ error: 'Access denied: You do not have permission to manage Direct Debit.' });
+    }
+
+    const family = await prisma.family.findFirst({
+      where: { id: familyId, parishId },
+      include: { directDebits: { orderBy: { createdAt: 'asc' } } },
+    });
+
+    if (!family) {
+      return res.status(404).json({ error: 'Family record not found.' });
+    }
+
+    const { reference, amount, frequency = 'Monthly', active = true, comments } = req.body;
+    const parsedAmount = amount !== null && amount !== undefined && amount !== '' ? parseFloat(amount) : null;
+    if (active && (parsedAmount === null || isNaN(parsedAmount) || parsedAmount <= 0)) {
+      return res.status(400).json({ error: 'Please enter a valid positive contribution amount.' });
+    }
+
+    const cleanRef = reference ? reference.trim() : null;
+    const cleanComments = comments ? comments.trim() : null;
+    const existing = family.directDebits[0];
+
+    const result = await prisma.$transaction(async (tx) => {
+      let dd;
+      if (existing) {
+        dd = await tx.directDebit.update({
+          where: { id: existing.id },
+          data: {
+            reference: cleanRef !== null ? cleanRef : existing.reference,
+            amount: parsedAmount !== null ? new Prisma.Decimal(parsedAmount) : null,
+            frequency: frequency || 'Monthly',
+            active: Boolean(active),
+            comments: cleanComments,
+          },
+        });
+      } else {
+        dd = await tx.directDebit.create({
+          data: {
+            parishId: parishId || family.parishId,
+            familyId,
+            reference: cleanRef,
+            amount: parsedAmount !== null ? new Prisma.Decimal(parsedAmount) : null,
+            frequency: frequency || 'Monthly',
+            active: Boolean(active),
+            comments: cleanComments,
+          },
+        });
+      }
+
+      await tx.familyNote.create({
+        data: {
+          familyId,
+          noteDate: new Date(),
+          noteContent: `Direct Debit ${existing ? 'updated' : 'established'} by ${user.fullName} (${user.role}): $${parsedAmount ? parsedAmount.toFixed(2) : '0.00'} AUD (${frequency})${cleanRef ? ` [Reference: ${cleanRef}]` : ''}.`,
+          recordedBy: user.fullName,
+        },
+      });
+
+      return dd;
+    });
+
+    return res.json({
       message: 'Direct Debit updated successfully.',
       directDebit: result,
     });
   } catch (err: any) {
-    console.error('Error updating direct debit:', err);
+    console.error('Error in legacy direct-debit update:', err);
     return res.status(500).json({ error: 'Failed to update Direct Debit.' });
   }
 });

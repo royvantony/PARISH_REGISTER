@@ -401,7 +401,7 @@ model Family {
   // Child collections
   members            FamilyMember[]
   documents          FamilyDocument[]
-  directDebit        DirectDebit?
+  directDebits       DirectDebit[]
   notes              FamilyNote[]
   historyEntries     MemberHistory[]
 
@@ -461,13 +461,18 @@ model DirectDebit {
   id        Int      @id @default(autoincrement())
   parishId  Int
   parish    Parish   @relation(fields: [parishId], references: [id], onDelete: Cascade)
-  familyId  Int      @unique
+  familyId  Int
   family    Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  reference String?  @db.VarChar(100) // Distinct contributor/reference (e.g. "Husband - James", "Wife - Mary")
   amount    Decimal? @db.Decimal(10, 2)
-  frequency String?  // "Weekly", "Fortnightly", "Monthly"
+  frequency String?  // "Weekly", "Fortnightly", "Monthly", etc.
   comments  String?
   active    Boolean  @default(true)
+  createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([familyId])
+  @@index([parishId, active])
 }
 
 model FamilyNote {

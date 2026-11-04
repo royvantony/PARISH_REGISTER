@@ -62,56 +62,56 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
 
   return (
     <header className="sticky top-0 z-40 w-full glass-panel border-b border-parish-border transition-colors shadow-xs">
-      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      <div className="max-w-[1440px] w-full mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2 sm:gap-4">
         {/* Left: Brand & Parish Switcher */}
-        <div className="flex items-center gap-3 sm:gap-4 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1 sm:flex-initial">
           <button
             type="button"
             onClick={onGoHome}
             title="Go to Home"
-            className="flex items-center gap-3 text-left outline-none focus:outline-none focus:ring-0 focus-visible:outline-none rounded-xl transition-all cursor-pointer group select-none"
+            className="flex items-center gap-2 sm:gap-3 text-left outline-none focus:outline-none focus:ring-0 focus-visible:outline-none rounded-xl transition-all cursor-pointer group select-none shrink-0"
           >
-            <div className="h-10 px-2 py-0.5 rounded-xl bg-white border border-parish-border shadow-xs flex items-center justify-center shrink-0 group-hover:border-parish-primary/40 transition-colors">
+            <div className="h-9 px-1.5 sm:h-10 sm:px-2 py-0.5 rounded-xl bg-white border border-parish-border shadow-xs flex items-center justify-center shrink-0 group-hover:border-parish-primary/40 transition-colors">
               <img
                 src={CLIENT_BRANDING.logoUrl}
                 alt={CLIENT_BRANDING.logoAlt}
-                className="h-8 w-auto object-contain shrink-0"
+                className="h-7 sm:h-8 w-auto object-contain shrink-0"
               />
             </div>
             <div>
-              <span className="font-extrabold text-sm tracking-tight text-parish-text uppercase hidden sm:inline-block group-hover:text-parish-primary transition-colors">
+              <span className="font-extrabold text-sm tracking-tight text-parish-text uppercase hidden md:inline-block group-hover:text-parish-primary transition-colors">
                 PARISH REGISTER
               </span>
             </div>
           </button>
 
-          <div className="h-5 w-[1px] bg-parish-border hidden sm:block" />
+          <div className="h-5 w-[1px] bg-parish-border hidden sm:block shrink-0" />
 
           {/* Active Parish Display (Locked in all cases - parish is chosen at login) */}
           <div
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-parish-surface-subtle text-parish-text text-xs font-semibold border border-parish-border select-none"
-            title={`Active Parish: ${displayName} (${displayCode})`}
+            className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg bg-parish-surface-subtle text-parish-text text-xs font-semibold border border-parish-border select-none min-w-0 max-w-[160px] sm:max-w-[280px] md:max-w-[360px]"
+            title={`${displayName} (${displayCode})`}
           >
             <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse shrink-0" />
-            <span className="truncate max-w-[225px] sm:max-w-[310px] md:max-w-[360px]">{displayName}</span>
-            <Badge variant="subtle" size="sm" className="font-mono text-[10px] bg-white/70">
+            <span className="truncate min-w-0">{displayName}</span>
+            <Badge variant="subtle" size="sm" className="font-mono text-[10px] bg-white/70 shrink-0 hidden sm:inline-flex">
               {displayCode}
             </Badge>
           </div>
         </div>
 
         {/* Right: User Info, Theme Selector & Logout */}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           {/* Client Simulation Active Indicator */}
           {isGlobalUser && isSimulatingClient && (
             <button
               type="button"
               onClick={() => setIsSimulatingClient(false)}
               title="Currently simulating limited client/demo view. Click to exit and return to full developer view."
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition-all cursor-pointer animate-pulse"
+              className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition-all cursor-pointer animate-pulse shrink-0"
             >
               <Eye className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-              <span className="hidden sm:inline">Simulating Client</span>
+              <span className="hidden md:inline">Simulating Client</span>
               <span className="text-[10px] bg-amber-600 text-white px-1.5 py-0.2 rounded font-mono">EXIT</span>
             </button>
           )}
@@ -120,7 +120,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
           <ThemeSelector />
 
           {/* User profile */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <div className="w-8 h-8 rounded-full bg-parish-primary-light text-parish-primary font-bold text-xs flex items-center justify-center border border-parish-primary/20 shrink-0">
               {userName.substring(0, 2).toUpperCase()}
             </div>
@@ -130,11 +130,11 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
             </div>
           </div>
 
-          {/* Logout */}
+          {/* Logout (Visible on tablet & desktop; on mobile, logout is in the navigation drawer) */}
           <button
             onClick={onLogout}
             title="Sign Out"
-            className="text-parish-text-muted hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-colors cursor-pointer"
+            className="hidden sm:flex text-parish-text-muted hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-colors cursor-pointer shrink-0"
           >
             <LogOut className="w-4 h-4" />
           </button>
@@ -144,7 +144,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
             <button
               onClick={onToggleMobileMenu}
               aria-label={isMobileMenuOpen ? 'Close Menu' : 'Open Menu'}
-              className="md:hidden p-2 rounded-xl text-parish-text hover:bg-parish-surface-subtle border border-parish-border transition-colors flex items-center justify-center"
+              className="md:hidden p-2 rounded-xl text-parish-text hover:bg-parish-surface-subtle border border-parish-border transition-colors flex items-center justify-center shrink-0"
             >
               {isMobileMenuOpen ? (
                 <X className="w-5 h-5 text-parish-primary" />

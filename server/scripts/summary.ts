@@ -14,7 +14,13 @@ async function main() {
   });
 
   const units = await prisma.familyUnit.findMany({
-    include: { _count: { select: { families: true } } },
+    include: {
+      _count: {
+        select: {
+          families: { where: { status: 'ACTIVE' } },
+        },
+      },
+    },
     orderBy: { families: { _count: 'desc' } },
   });
 

@@ -210,28 +210,31 @@ dashboardRouter.get('/charts', async (req: Request, res: Response) => {
 
     // Run parallel queries for chart analytics
     const [unitStats, diocesesGroup, typeGroup, recentActivity, allMembers, allFamilies] = await Promise.all([
-      // 1. Ward / Unit Distribution
+      // 1. Ward / Unit Distribution (Active registered families only)
       prisma.familyUnit.findMany({
-        where: { parishId, isActive: true },
+        where: {
+          parishId,
+          isActive: true,
+        },
         select: {
           unitName: true,
           category: true,
           _count: {
-            select: { families: true },
-          },
-        },
-        orderBy: {
-          families: {
-            _count: 'desc',
+            select: {
+              families: {
+                where: { status: FamilyStatus.ACTIVE },
+              },
+            },
           },
         },
       }),
 
-      // 2. Roots in India: Top Dioceses of Origin
+      // 2. Roots in India: Top Dioceses of Origin (Active families only)
       prisma.family.groupBy({
         by: ['originDiocese'],
         where: {
           parishId,
+          status: FamilyStatus.ACTIVE,
           originDiocese: { not: null },
         },
         _count: true,
@@ -249,10 +252,10 @@ dashboardRouter.get('/charts', async (req: Request, res: Response) => {
         _count: true,
       }),
 
-      // 4. Recent Notes / Activity Feed
+      // 4. Recent Notes / Activity Feed (Active families only)
       prisma.familyNote.findMany({
         where: {
-          family: { parishId },
+          family: { parishId, status: FamilyStatus.ACTIVE },
         },
         take: 6,
         orderBy: {
@@ -299,12 +302,15 @@ dashboardRouter.get('/charts', async (req: Request, res: Response) => {
       }),
     ]);
 
-    // 1. Ward Distribution formatting
-    const wardDistribution = unitStats.map((u) => ({
-      name: u.unitName,
-      category: u.category,
-      count: u._count.families,
-    }));
+    // 1. Ward Distribution formatting (Active registered families only, sorted descending)
+    const wardDistribution = unitStats
+      .map((u) => ({
+        name: u.unitName,
+        category: u.category,
+        count: u._count.families,
+      }))
+      .filter((u) => u.count > 0)
+      .sort((a, b) => b.count - a.count);
 
     // 2. Dioceses of Origin in India formatting
     const diocesesDistribution = diocesesGroup

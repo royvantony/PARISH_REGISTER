@@ -59,7 +59,7 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = ({ className = '' }) 
 
       {/* Floating Menu */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-parish-surface border border-parish-border shadow-soft-hover p-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+        <div className="absolute right-0 mt-2 w-64 max-w-[calc(100vw-2rem)] rounded-2xl bg-parish-surface border border-parish-border shadow-soft-hover p-2 z-50 animate-in fade-in zoom-in-95 duration-150">
           <div className="px-2.5 py-1.5 pb-2 border-b border-parish-border/60 mb-1">
             <div className="text-[11px] font-bold uppercase tracking-wider text-parish-text-muted">
               Colour Theme
