@@ -95,7 +95,7 @@ model Parish {
   directDebits       DirectDebit[]
   nativeDioceses     NativeDiocese[]
   rolePermissions    RolePermission[]
-  systemFeatureToggles SystemFeatureToggle[]
+  featureVault       SystemFeatureVault?
   smtpSetting        SmtpSetting?
 
   createdAt          DateTime      @default(now())
@@ -130,7 +130,7 @@ model RolePermission {
   parishId   Int
   parish     Parish   @relation(fields: [parishId], references: [id], onDelete: Cascade)
   role       UserRole
-  module     String   // "REGISTER", "DIRECT_DEBIT", "WARDS", "USERS", "DASHBOARD_FINANCE", "DASHBOARD_ACTIVITY", "SETTINGS"
+  module     String   // "REGISTER", "REGISTER_NEW", "IMPORT_REGISTRATIONS", "DIRECT_DEBIT", "WARDS", "USERS", "DASHBOARD_ACTIVITY", "SETTINGS"
   canView    Boolean  @default(true)
   canCreate  Boolean  @default(false)
   canEdit    Boolean  @default(false)
@@ -149,7 +149,7 @@ model UserPermissionOverride {
   id         Int        @id @default(autoincrement())
   userId     Int
   user       ParishUser @relation(fields: [userId], references: [id], onDelete: Cascade)
-  module     String     // "REGISTER", "DIRECT_DEBIT", "WARDS", "USERS", "DASHBOARD_FINANCE", "DASHBOARD_ACTIVITY", "SETTINGS"
+  module     String     // "REGISTER", "REGISTER_NEW", "IMPORT_REGISTRATIONS", "DIRECT_DEBIT", "WARDS", "USERS", "DASHBOARD_ACTIVITY", "SETTINGS"
   canView    Boolean?
   canCreate  Boolean?
   canEdit    Boolean?
@@ -315,23 +315,20 @@ model FamilyNote {
 }
 
 // ----------------------------------------------------
-// 5. DEVELOPER SYSTEM FEATURE TOGGLES
+// 5. DEVELOPER SYSTEM FEATURE ENCRYPTED VAULT
 // ----------------------------------------------------
 
-model SystemFeatureToggle {
-  id          Int      @id @default(autoincrement())
-  parishId    Int      @default(1)
-  parish      Parish   @relation(fields: [parishId], references: [id], onDelete: Cascade)
-  key         String
-  name        String
-  category    String   // 'PAGE' | 'DASHBOARD' | 'SETTINGS' | 'USERS' | 'REGISTER' | 'GENERAL'
-  description String?
-  route       String?
-  isEnabled   Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+model SystemFeatureVault {
+  id            Int      @id @default(autoincrement())
+  parishId      Int      @unique
+  parish        Parish   @relation(fields: [parishId], references: [id], onDelete: Cascade)
+  encryptedData String   // AES-256-GCM encrypted features payload
+  iv            String   // 96-bit initialization vector in hex
+  tag           String   // GCM authentication tag in hex
+  version       Int      @default(1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  @@unique([parishId, key])
   @@index([parishId])
 }
 

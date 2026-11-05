@@ -24,7 +24,6 @@ import {
   RotateCcw,
   Users as UsersIcon,
   CreditCard,
-  TrendingUp,
   Clock,
   Settings as SettingsIcon,
   UserPlus,
@@ -687,8 +686,6 @@ Upon logging in, you will be prompted to set your own permanent password.`;
         return <MapPin className="w-4 h-4 text-amber-600" />;
       case 'USERS':
         return <ShieldCheck className="w-4 h-4 text-purple-600" />;
-      case 'DASHBOARD_FINANCE':
-        return <TrendingUp className="w-4 h-4 text-emerald-700" />;
       case 'DASHBOARD_ACTIVITY':
         return <Clock className="w-4 h-4 text-indigo-600" />;
       case 'SETTINGS':

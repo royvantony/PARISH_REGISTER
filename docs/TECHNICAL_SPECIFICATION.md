@@ -508,7 +508,7 @@ The entire frontend is engineered following strict reactive design guidelines ac
 
 ### 9.5 Role Permissions Matrix, Granular User Overrides & Ward Isolation (`/users`)
 - **Backend Architecture**:
-  - `RolePermission` table defines base capability matrix for each role across 8 modules (`REGISTER`, `REGISTER_NEW`, `DIRECT_DEBIT`, `WARDS`, `USERS`, `SETTINGS`, `DASHBOARD_FINANCE`, `DASHBOARD_ACTIVITY`) across 6 granular action flags: `canView`, `canCreate`, `canEdit`, `canArchive`, `canDelete`, `canExport`.
+  - `RolePermission` table defines base capability matrix for each role across 8 active system modules (`REGISTER`, `REGISTER_NEW`, `IMPORT_REGISTRATIONS`, `DIRECT_DEBIT`, `WARDS`, `USERS`, `SETTINGS`, `DASHBOARD_ACTIVITY`) across 7 granular action flags: `canView`, `canCreate`, `canEdit`, `canArchive`, `canDelete`, `canExport`, `canApprove`.
   - `UserPermissionOverride` table enables individual per-user overrides for any module action flag (`true`/`false`), overriding the role template while falling back to role defaults when null.
   - Endpoints: `GET /api/permissions/matrix`, `PUT /api/permissions/roles/:role`, `GET /api/permissions/users/:userId`, `PUT /api/permissions/users/:userId/overrides`, `DELETE /api/permissions/users/:userId/overrides`.
 - **Strict Ward Isolation Guarantee**:

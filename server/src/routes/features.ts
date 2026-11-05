@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { authenticateJWT, optionalAuth } from '../middleware/auth.js';
 import { UserRole } from '@prisma/client';
+import { encryptPayload, decryptPayload } from '../lib/crypto.js';
 
 export const featuresRouter = Router();
 
@@ -68,7 +69,7 @@ export const SYSTEM_FEATURES: FeatureDefinition[] = [
   // 2. Dashboard Sub-Items
   {
     key: 'DASH_KPI_CARDS',
-    name: 'Demographic KPI Summary Cards',
+    name: 'Demographic Summary Cards',
     category: 'DASHBOARD',
     description: 'Active families, student singles, and member metrics',
     defaultEnabled: true,
@@ -223,67 +224,142 @@ export const SYSTEM_FEATURES: FeatureDefinition[] = [
   },
 ];
 
+export interface SystemFeatureItem {
+  id: number;
+  key: string;
+  name: string;
+  category: string;
+  description: string | null;
+  route: string | null;
+  isEnabled: boolean;
+}
+
+// In-memory cache: parishId -> SystemFeatureItem[]
+const featureVaultCache = new Map<number, SystemFeatureItem[]>();
+
 /**
- * Ensure all standard features exist in database for a specific parish (or all parishes)
+ * Get decrypted features for a parish.
+ * 1. Checks in-memory cache (0.0001ms)
+ * 2. If missing, loads and decrypts from SystemFeatureVault table
+ * 3. If no vault exists yet, initializes with SYSTEM_FEATURES defaults, encrypts, and saves.
  */
-export async function ensureDefaultFeatures(parishId?: number) {
-  if (parishId) {
-    const existing = await prisma.systemFeatureToggle.findMany({
-      where: { parishId },
-      select: { key: true },
-    });
-    const existingKeys = new Set(existing.map((e) => e.key));
-    const missing = SYSTEM_FEATURES.filter((def) => !existingKeys.has(def.key));
-    if (missing.length > 0) {
-      for (const def of missing) {
-        await prisma.systemFeatureToggle.upsert({
-          where: {
-            parishId_key: {
-              parishId,
-              key: def.key,
-            },
-          },
-          update: {
-            name: def.name,
-            category: def.category,
-            description: def.description,
-            route: def.route || null,
-          },
-          create: {
-            parishId,
-            key: def.key,
-            name: def.name,
-            category: def.category,
-            description: def.description,
-            route: def.route || null,
-            isEnabled: def.defaultEnabled,
-          },
-        });
-      }
+export async function getParishFeatures(parishId: number): Promise<SystemFeatureItem[]> {
+  if (featureVaultCache.has(parishId)) {
+    return featureVaultCache.get(parishId)!;
+  }
+
+  const vault = await prisma.systemFeatureVault.findUnique({
+    where: { parishId },
+  });
+
+  let items: SystemFeatureItem[] = [];
+  if (vault) {
+    try {
+      items = decryptPayload<SystemFeatureItem[]>(vault.encryptedData, vault.iv, vault.tag);
+    } catch (err) {
+      console.error(`[FeatureVault] Decryption failed or tampered for Parish ${parishId}. Failing closed (hidden/off).`);
+      // Fail-closed: If the vault cannot be read, default ALL features to disabled/hidden (false)
+      items = SYSTEM_FEATURES.map((def, idx) => ({
+        id: idx + 1,
+        key: def.key,
+        name: def.name,
+        category: def.category,
+        description: def.description || null,
+        route: def.route || null,
+        isEnabled: false, // Strict default-hidden
+      }));
+      await saveParishFeatures(parishId, items);
+      return items;
     }
+  }
+
+  // Ensure all standard system features exist in items
+  const existingKeys = new Set(items.map((i) => i.key));
+  let hasMissing = false;
+
+  for (let idx = 0; idx < SYSTEM_FEATURES.length; idx++) {
+    const def = SYSTEM_FEATURES[idx];
+    if (!existingKeys.has(def.key)) {
+      items.push({
+        id: idx + 1,
+        key: def.key,
+        name: def.name,
+        category: def.category,
+        description: def.description || null,
+        route: def.route || null,
+        // If initializing a brand new parish, use def.defaultEnabled.
+        // If backfilling an existing vault where a key was missing, fail-closed to false (hidden).
+        isEnabled: vault ? false : def.defaultEnabled,
+      });
+      hasMissing = true;
+    }
+  }
+
+  // Sort by category & id
+  items.sort((a, b) => a.category.localeCompare(b.category) || a.id - b.id);
+
+  if (!vault || hasMissing) {
+    await saveParishFeatures(parishId, items);
   } else {
-    const parishes = await prisma.parish.findMany({ select: { id: true } });
-    for (const p of parishes) {
-      await ensureDefaultFeatures(p.id);
-    }
+    featureVaultCache.set(parishId, items);
+  }
+
+  return items;
+}
+
+/**
+ * Save and re-encrypt the feature vault for a parish.
+ * Updates in-memory cache and stores AES-256-GCM ciphertext in PostgreSQL.
+ */
+export async function saveParishFeatures(parishId: number, features: SystemFeatureItem[]) {
+  featureVaultCache.set(parishId, features);
+  const encrypted = encryptPayload(features);
+
+  await prisma.systemFeatureVault.upsert({
+    where: { parishId },
+    update: {
+      encryptedData: encrypted.encryptedData,
+      iv: encrypted.iv,
+      tag: encrypted.tag,
+    },
+    create: {
+      parishId,
+      encryptedData: encrypted.encryptedData,
+      iv: encrypted.iv,
+      tag: encrypted.tag,
+    },
+  });
+}
+
+/**
+ * Helper: check if a feature is enabled for a given parish.
+ * Reads directly from in-memory cache in 0.0001ms.
+ * Strict fail-closed: returns false if key is unknown or if an error occurs.
+ */
+export async function isFeatureEnabled(key: string, parishId?: number): Promise<boolean> {
+  try {
+    const targetParishId = parishId || 1;
+    const features = await getParishFeatures(targetParishId);
+    const match = features.find((f) => f.key === key);
+    return match ? Boolean(match.isEnabled) : false; // Strict default-deny / fail-closed
+  } catch (err) {
+    console.error(`[FeatureVault] Error checking feature "${key}" for Parish ${parishId}:`, err);
+    return false; // Fail-closed: unreadable -> hidden/disabled
   }
 }
 
 /**
- * Helper: check if a feature is enabled for a given parish
+ * Pre-warm/initialize feature cache for all active parishes
  */
-export async function isFeatureEnabled(key: string, parishId?: number): Promise<boolean> {
-  const targetParishId = parishId || 1;
-  const feat = await prisma.systemFeatureToggle.findUnique({
-    where: {
-      parishId_key: {
-        parishId: targetParishId,
-        key,
-      },
-    },
-  });
-  if (!feat) return true; // Default fallback to true if not found
-  return feat.isEnabled;
+export async function ensureDefaultFeatures(parishId?: number) {
+  if (parishId) {
+    await getParishFeatures(parishId);
+  } else {
+    const parishes = await prisma.parish.findMany({ select: { id: true } });
+    for (const p of parishes) {
+      await getParishFeatures(p.id);
+    }
+  }
 }
 
 // GET /api/features - Get feature toggles and flags map scoped to active parish
@@ -293,16 +369,11 @@ featuresRouter.get('/', optionalAuth, async (req: Request, res: Response) => {
     const queryParish = req.query.parishId;
     const targetParishId = Number(queryParish || headerParish || req.activeParishId || 1);
 
-    await ensureDefaultFeatures(targetParishId);
-
-    const allFeatures = await prisma.systemFeatureToggle.findMany({
-      where: { parishId: targetParishId },
-      orderBy: [{ category: 'asc' }, { id: 'asc' }],
-    });
+    const allFeatures = await getParishFeatures(targetParishId);
 
     const flagsMap: Record<string, boolean> = {};
     for (const f of allFeatures) {
-      flagsMap[f.key] = f.isEnabled;
+      flagsMap[f.key] = Boolean(f.isEnabled);
     }
 
     return res.json({
@@ -311,16 +382,16 @@ featuresRouter.get('/', optionalAuth, async (req: Request, res: Response) => {
       flags: flagsMap,
     });
   } catch (err: any) {
-    console.error('Error fetching feature toggles:', err);
-    // Fallback to default flags map so client never crashes
-    const defaultFlags: Record<string, boolean> = {};
+    console.error('Error fetching feature toggles (Failing closed):', err);
+    // Fail-Closed Security: If the vault or cache cannot be read, default ALL flags to false (hidden)
+    const failClosedFlags: Record<string, boolean> = {};
     for (const def of SYSTEM_FEATURES) {
-      defaultFlags[def.key] = def.defaultEnabled;
+      failClosedFlags[def.key] = false;
     }
     return res.json({
       parishId: 1,
-      features: SYSTEM_FEATURES.map((f, idx) => ({ id: idx + 1, ...f, isEnabled: f.defaultEnabled })),
-      flags: defaultFlags,
+      features: SYSTEM_FEATURES.map((f, idx) => ({ id: idx + 1, ...f, isEnabled: false })),
+      flags: failClosedFlags,
     });
   }
 });
@@ -345,26 +416,27 @@ featuresRouter.put('/:key', authenticateJWT, async (req: Request, res: Response)
     const queryParish = req.query.parishId;
     const targetParishId = Number(bodyParish || queryParish || headerParish || req.activeParishId || 1);
 
-    const def = SYSTEM_FEATURES.find((f) => f.key === key);
+    const allFeatures = await getParishFeatures(targetParishId);
+    const targetFeature = allFeatures.find((f) => f.key === key);
 
-    const updated = await prisma.systemFeatureToggle.upsert({
-      where: {
-        parishId_key: {
-          parishId: targetParishId,
-          key,
-        },
-      },
-      update: { isEnabled },
-      create: {
-        parishId: targetParishId,
+    if (targetFeature) {
+      targetFeature.isEnabled = isEnabled;
+    } else {
+      const def = SYSTEM_FEATURES.find((f) => f.key === key);
+      allFeatures.push({
+        id: allFeatures.length + 1,
         key,
         name: def?.name || key,
         category: def?.category || 'GENERAL',
         description: def?.description || null,
         route: def?.route || null,
         isEnabled,
-      },
-    });
+      });
+    }
+
+    await saveParishFeatures(targetParishId, allFeatures);
+
+    const updated = targetFeature || allFeatures[allFeatures.length - 1];
 
     return res.json({
       message: `Feature ${updated.name} for Parish #${targetParishId} is now ${updated.isEnabled ? 'ENABLED' : 'DISABLED'}.`,
@@ -394,34 +466,16 @@ featuresRouter.post('/batch', authenticateJWT, async (req: Request, res: Respons
     const queryParish = req.query.parishId;
     const targetParishId = Number(parishId || queryParish || headerParish || req.activeParishId || 1);
 
-    await prisma.$transaction(
-      updates.map((u) => {
-        const def = SYSTEM_FEATURES.find((f) => f.key === u.key);
-        return prisma.systemFeatureToggle.upsert({
-          where: {
-            parishId_key: {
-              parishId: targetParishId,
-              key: u.key,
-            },
-          },
-          update: { isEnabled: Boolean(u.isEnabled) },
-          create: {
-            parishId: targetParishId,
-            key: u.key,
-            name: def?.name || u.key,
-            category: def?.category || 'GENERAL',
-            description: def?.description || null,
-            route: def?.route || null,
-            isEnabled: Boolean(u.isEnabled),
-          },
-        });
-      })
-    );
+    const allFeatures = await getParishFeatures(targetParishId);
+    const updateMap = new Map(updates.map((u) => [u.key, Boolean(u.isEnabled)]));
 
-    const allFeatures = await prisma.systemFeatureToggle.findMany({
-      where: { parishId: targetParishId },
-      orderBy: [{ category: 'asc' }, { id: 'asc' }],
-    });
+    for (const f of allFeatures) {
+      if (updateMap.has(f.key)) {
+        f.isEnabled = updateMap.get(f.key)!;
+      }
+    }
+
+    await saveParishFeatures(targetParishId, allFeatures);
 
     const flagsMap: Record<string, boolean> = {};
     for (const f of allFeatures) {

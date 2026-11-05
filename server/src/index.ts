@@ -7,7 +7,7 @@ import { familiesRouter } from './routes/families.js';
 import { mastersRouter } from './routes/masters.js';
 import { permissionsRouter } from './routes/permissions.js';
 import { importRouter } from './routes/import.js';
-import { featuresRouter } from './routes/features.js';
+import { featuresRouter, ensureDefaultFeatures } from './routes/features.js';
 import { settingsRouter } from './routes/settings.js';
 import { prisma } from './lib/prisma.js';
 
@@ -95,4 +95,8 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 app.listen(Number(PORT), '0.0.0.0', () => {
   console.log(`\n🚀 Parish Register API running on http://0.0.0.0:${PORT}`);
   console.log(`📡 Health Check: http://localhost:${PORT}/api/health\n`);
+  // Warm up encrypted feature vault cache on startup for fast, instant lookups
+  ensureDefaultFeatures().catch((err) => {
+    console.warn('Feature cache warmup warning:', err);
+  });
 });

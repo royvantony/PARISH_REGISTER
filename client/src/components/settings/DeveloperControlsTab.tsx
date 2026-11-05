@@ -15,6 +15,7 @@ import {
   Palette,
   RotateCcw,
   Ban,
+  Check,
   Lock,
   Eye,
   EyeOff,
@@ -34,23 +35,35 @@ export const DeveloperControlsTab: React.FC = () => {
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [confirmBatchAction, setConfirmBatchAction] = useState<'ENABLE_ALL' | 'DISABLE_ALL' | null>(null);
   const [isBatchUpdating, setIsBatchUpdating] = useState(false);
+  const [updatingGroup, setUpdatingGroup] = useState<string | null>(null);
 
-  const handleToggle = async (key: string, currentVal: boolean, featName: string) => {
+  const handleToggleGroup = async (catId: string, enable: boolean) => {
+    const catFeatures = features.filter((f) => f.category === catId);
+    if (catFeatures.length === 0) return;
+
+    try {
+      setUpdatingGroup(catId);
+      const updates = catFeatures.map((f) => ({ key: f.key, isEnabled: enable }));
+      const res = await batchUpdateFeatures(updates, activeParish?.id);
+      if (!res.success) {
+        setFeedbackMsg({ type: 'error', text: res.error || 'Failed to update group.' });
+        setTimeout(() => setFeedbackMsg(null), 4000);
+      }
+    } finally {
+      setUpdatingGroup(null);
+    }
+  };
+
+  const handleToggle = async (key: string, currentVal: boolean) => {
     try {
       setUpdatingKey(key);
-      setFeedbackMsg(null);
       const res = await toggleFeature(key, !currentVal, activeParish?.id);
-      if (res.success) {
-        setFeedbackMsg({
-          type: 'success',
-          text: `"${featName}" is now ${!currentVal ? 'ENABLED' : 'HIDDEN/DISABLED'} for ${activeParish?.parishName || 'Parish'} (${activeParish?.parishCode || ''}).`,
-        });
-      } else {
+      if (!res.success) {
         setFeedbackMsg({ type: 'error', text: res.error || 'Failed to update feature.' });
+        setTimeout(() => setFeedbackMsg(null), 4000);
       }
     } finally {
       setUpdatingKey(null);
-      setTimeout(() => setFeedbackMsg(null), 4000);
     }
   };
 
@@ -188,21 +201,29 @@ export const DeveloperControlsTab: React.FC = () => {
         </div>
       </div>
 
-      {/* Live Feedback Toast */}
+      {/* Batch Actions & Feedback (Zero layout shift: floating notification at bottom) */}
       {feedbackMsg && (
         <div
-          className={`flex items-center gap-2 p-3 rounded-xl text-xs font-semibold animate-in fade-in ${
+          role="status"
+          className={`fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl text-xs font-bold shadow-xl border backdrop-blur-md animate-in slide-in-from-bottom-3 duration-200 ${
             feedbackMsg.type === 'success'
-              ? 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30'
-              : 'bg-rose-500/15 text-rose-800 dark:text-rose-300 border border-rose-500/30'
+              ? 'bg-emerald-950/90 text-emerald-200 border-emerald-600/50 shadow-emerald-950/30'
+              : 'bg-rose-950/90 text-rose-200 border-rose-600/50 shadow-rose-950/30'
           }`}
         >
           {feedbackMsg.type === 'success' ? (
-            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
           ) : (
-            <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
           )}
           <span>{feedbackMsg.text}</span>
+          <button
+            type="button"
+            onClick={() => setFeedbackMsg(null)}
+            className="ml-2 text-current opacity-70 hover:opacity-100 cursor-pointer text-base leading-none"
+          >
+            &times;
+          </button>
         </div>
       )}
 
@@ -212,24 +233,68 @@ export const DeveloperControlsTab: React.FC = () => {
           const catFeatures = features.filter((f) => f.category === cat.id);
           if (catFeatures.length === 0) return null;
 
+          const activeCount = catFeatures.filter((f) => getStoredFlag(f.key)).length;
+          const isAllActive = activeCount === catFeatures.length;
+          const isAllOff = activeCount === 0;
+          const isGroupBusy = updatingGroup === cat.id;
+
           return (
             <div
               key={cat.id}
               className="bg-parish-surface border border-parish-border rounded-2xl p-5 shadow-xs space-y-4"
             >
-              <div className="border-b border-parish-border pb-3">
-                <div className="flex items-center gap-2">
-                  {cat.icon}
-                  <h4 className="font-extrabold text-sm text-parish-text tracking-tight">
-                    {cat.title}
-                  </h4>
-                  <Badge variant="subtle" size="sm">
-                    {catFeatures.length} items
-                  </Badge>
+              <div className="border-b border-parish-border pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {cat.icon}
+                    <h4 className="font-extrabold text-sm text-parish-text tracking-tight">
+                      {cat.title}
+                    </h4>
+                    <Badge
+                      variant={isAllActive ? 'success' : isAllOff ? 'subtle' : 'warning'}
+                      size="sm"
+                      className="font-mono text-[10px]"
+                    >
+                      {activeCount} / {catFeatures.length} Active
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-parish-text-muted mt-0.5">
+                    {cat.description}
+                  </p>
                 </div>
-                <p className="text-xs text-parish-text-muted mt-0.5">
-                  {cat.description}
-                </p>
+
+                {/* Per-Group On / Off Action Buttons */}
+                <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
+                  <button
+                    type="button"
+                    disabled={isGroupBusy || isBatchUpdating}
+                    onClick={() => handleToggleGroup(cat.id, true)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer border ${
+                      isAllActive
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                        : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800'
+                    } disabled:opacity-50`}
+                    title={`Turn ON all features in ${cat.title}`}
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>All On</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isGroupBusy || isBatchUpdating}
+                    onClick={() => handleToggleGroup(cat.id, false)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer border ${
+                      isAllOff
+                        ? 'bg-slate-700 text-white border-slate-700 shadow-xs'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
+                    } disabled:opacity-50`}
+                    title={`Turn OFF all features in ${cat.title}`}
+                  >
+                    <Ban className="w-3.5 h-3.5" />
+                    <span>All Off</span>
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -269,7 +334,7 @@ export const DeveloperControlsTab: React.FC = () => {
                       <button
                         type="button"
                         disabled={isBusy}
-                        onClick={() => handleToggle(feat.key, enabledForUsers, feat.name)}
+                        onClick={() => handleToggle(feat.key, enabledForUsers)}
                         className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-parish-primary focus:ring-offset-2 ${
                           enabledForUsers ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-700'
                         } ${isBusy ? 'opacity-50 cursor-wait' : ''}`}

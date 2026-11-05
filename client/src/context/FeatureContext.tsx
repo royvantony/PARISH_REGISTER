@@ -80,7 +80,13 @@ export const FeatureProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       const savedId = localStorage.getItem('parish_active_id') || '1';
       const cached = localStorage.getItem(`parish_feature_flags_${savedId}`) || localStorage.getItem('parish_feature_flags');
-      return cached ? JSON.parse(cached) : {};
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && typeof parsed === 'object') {
+          return parsed;
+        }
+      }
+      return {};
     } catch {
       return {};
     }
@@ -105,7 +111,7 @@ export const FeatureProvider: React.FC<{ children: React.ReactNode }> = ({ child
         } catch (_) {}
       }
     } catch (err) {
-      console.warn('Could not load developer feature flags, using defaults');
+      console.warn('Could not load developer feature flags, failing closed (hidden by default):', err);
     } finally {
       setIsLoading(false);
     }
@@ -117,9 +123,18 @@ export const FeatureProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       const cached = localStorage.getItem(`parish_feature_flags_${currentId}`);
       if (cached) {
-        setFlags(JSON.parse(cached));
+        const parsed = JSON.parse(cached);
+        if (parsed && typeof parsed === 'object') {
+          setFlags(parsed);
+        } else {
+          setFlags({});
+        }
+      } else {
+        setFlags({});
       }
-    } catch (_) {}
+    } catch (_) {
+      setFlags({});
+    }
     fetchFeatures(currentId);
   }, [fetchFeatures, activeParish?.id, user?.id, token]);
 
@@ -130,6 +145,12 @@ export const FeatureProvider: React.FC<{ children: React.ReactNode }> = ({ child
    * As the Platform Developer (SUPER_ADMIN), you have 100% full unrestricted access to
    * all features across the platform at all times without being affected by client toggles
    * (unless explicitly testing via `isSimulatingClient`).
+   *
+   * STRICT FAIL-CLOSED / DEFAULT-HIDDEN ARCHITECTURE:
+   * By default, features are HIDDEN (false). A feature is only visible if positively verified
+   * as true in the loaded feature flags. If flags cannot be read, are corrupted, or the key is
+   * unknown, it strictly returns false. This guarantees no restricted feature ever flashes
+   * on screen before flags load or during network/cache failures.
    */
   const isFeatureEnabled = useCallback(
     (key: string): boolean => {
@@ -137,12 +158,18 @@ export const FeatureProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (isDeveloper && !isSimulatingClient) {
         return true;
       }
-      // 2. When simulating client (or for normal client users), strictly respect the parish feature toggles!
-      if (flags[key] !== undefined) {
-        return Boolean(flags[key]);
+      // 2. Strict Fail-Closed / Default-Hidden:
+      // If flags are loaded and key exists as a boolean, use it.
+      if (flags && typeof flags[key] === 'boolean') {
+        return flags[key];
       }
+      // 3. Fallback to loaded features list if key is present
       const match = features.find((f) => f.key === key);
-      return match ? match.isEnabled : true;
+      if (match && typeof match.isEnabled === 'boolean') {
+        return match.isEnabled;
+      }
+      // 4. Default Fail-Closed: If unreadable, missing, or in-flight -> HIDDEN (false)
+      return false;
     },
     [flags, features, isDeveloper, isSimulatingClient]
   );
@@ -150,14 +177,18 @@ export const FeatureProvider: React.FC<{ children: React.ReactNode }> = ({ child
   /**
    * Raw stored flag state representing what is actually configured for other users in the DB
    * for the active parish. Used in Developer Controls tab so switches reflect actual user-facing status.
+   * Strictly defaults to false (fail-closed) if unreadable.
    */
   const getStoredFlag = useCallback(
     (key: string): boolean => {
-      if (flags[key] !== undefined) {
-        return Boolean(flags[key]);
+      if (flags && typeof flags[key] === 'boolean') {
+        return flags[key];
       }
       const match = features.find((f) => f.key === key);
-      return match ? match.isEnabled : true;
+      if (match && typeof match.isEnabled === 'boolean') {
+        return match.isEnabled;
+      }
+      return false;
     },
     [flags, features]
   );
