@@ -1,15 +1,19 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   LogOut,
   Menu,
   X,
   Eye,
+  ChevronDown,
+  User as UserIcon,
+  KeyRound,
 } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { ThemeSelector } from './ThemeSelector';
 import { CLIENT_BRANDING } from '../../config/branding';
 import { useAuth } from '../../context/AuthContext';
 import { useFeatures } from '../../context/FeatureContext';
+import { UserProfileModal } from '../profile/UserProfileModal';
 
 export interface AppNavbarProps {
   onToggleMobileMenu?: () => void;
@@ -20,6 +24,7 @@ export interface AppNavbarProps {
   userRole?: string;
   onLogout?: () => void;
   onGoHome?: () => void;
+  onOpenProfile?: (initialTab?: 'details' | 'security') => void;
 }
 
 export const AppNavbar: React.FC<AppNavbarProps> = ({
@@ -31,6 +36,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
   userRole = 'PARISH_ADMIN',
   onLogout,
   onGoHome,
+  onOpenProfile,
 }) => {
   const { user, activeParish } = useAuth();
   const { isSimulatingClient, setIsSimulatingClient } = useFeatures();
@@ -56,6 +62,25 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
         return role || '';
     }
   };
+
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isDropdownOpen]);
 
   const displayName = activeParish?.parishName || activeParishName;
   const displayCode = activeParish?.parishCode || activeParishCode;
@@ -119,15 +144,87 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
           {/* Theme Selector */}
           <ThemeSelector />
 
-          {/* User profile */}
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="w-8 h-8 rounded-full bg-parish-primary-light text-parish-primary font-bold text-xs flex items-center justify-center border border-parish-primary/20 shrink-0">
-              {userName.substring(0, 2).toUpperCase()}
-            </div>
-            <div className="hidden md:block text-left">
-              <div className="text-xs font-bold text-parish-text leading-tight">{userName}</div>
-              <div className="text-[10px] text-parish-text-muted font-medium">{formatRole(userRole)}</div>
-            </div>
+          {/* User Profile Dropdown */}
+          <div className="relative shrink-0" ref={dropdownRef}>
+            <button
+              type="button"
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="flex items-center gap-2 p-1 sm:px-2 sm:py-1 rounded-xl hover:bg-parish-surface-subtle border border-transparent hover:border-parish-border transition-all cursor-pointer group"
+              title="Account settings & password"
+              aria-expanded={isDropdownOpen}
+            >
+              <div className="w-8 h-8 rounded-full bg-parish-primary-light text-parish-primary font-bold text-xs flex items-center justify-center border border-parish-primary/20 shrink-0 group-hover:scale-105 transition-transform">
+                {userName.substring(0, 2).toUpperCase()}
+              </div>
+              <div className="hidden md:block text-left">
+                <div className="text-xs font-bold text-parish-text leading-tight group-hover:text-parish-primary transition-colors">{userName}</div>
+                <div className="text-[10px] text-parish-text-muted font-medium">{formatRole(userRole)}</div>
+              </div>
+              <ChevronDown className={`w-3.5 h-3.5 text-parish-text-muted transition-transform duration-200 hidden sm:block ${isDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Dropdown Menu */}
+            {isDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-parish-surface border border-parish-border shadow-xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="px-4 py-2.5 border-b border-parish-border">
+                  <div className="text-xs font-bold text-parish-text truncate">{userName}</div>
+                  <div className="text-[11px] text-parish-text-muted truncate">{user?.email}</div>
+                  <div className="mt-1.5">
+                    <Badge variant="subtle" size="sm" className="text-[10px] font-medium">
+                      {formatRole(userRole)}
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="py-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      if (onOpenProfile) {
+                        onOpenProfile('details');
+                      } else {
+                        setIsProfileModalOpen(true);
+                      }
+                    }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-parish-text hover:bg-parish-surface-subtle transition-colors cursor-pointer"
+                  >
+                    <UserIcon className="w-4 h-4 text-parish-primary" />
+                    <span>My Profile & Details</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      if (onOpenProfile) {
+                        onOpenProfile('security');
+                      } else {
+                        setIsProfileModalOpen(true);
+                      }
+                    }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-parish-text hover:bg-parish-surface-subtle transition-colors cursor-pointer"
+                  >
+                    <KeyRound className="w-4 h-4 text-emerald-600" />
+                    <span>Reset / Change Password</span>
+                  </button>
+                </div>
+
+                <div className="pt-1 border-t border-parish-border">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      onLogout?.();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Logout (Visible on tablet & desktop; on mobile, logout is in the navigation drawer) */}
@@ -155,6 +252,14 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
           )}
         </div>
       </div>
+
+      {/* User Profile & Security Modal (Fallback if onOpenProfile is not passed from layout) */}
+      {!onOpenProfile && (
+        <UserProfileModal
+          isOpen={isProfileModalOpen}
+          onClose={() => setIsProfileModalOpen(false)}
+        />
+      )}
     </header>
   );
 };

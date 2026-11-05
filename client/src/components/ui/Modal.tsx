@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from '../../lib/utils';
 import { X } from 'lucide-react';
 
@@ -56,18 +57,18 @@ export const Modal: React.FC<ModalProps> = ({
     '6xl': 'max-w-6xl',
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
-      {/* Backdrop - Clicking outside does NOT close modal to protect user input */}
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+      {/* Backdrop - Clicking outside closes modal when closeOnBackdropClick is true */}
       <div
-        className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity animate-in fade-in duration-200"
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity animate-in fade-in duration-200"
         onClick={closeOnBackdropClick ? onClose : undefined}
       />
 
       {/* Modal Dialog Card */}
       <div
         className={cn(
-          'relative w-full bg-parish-surface rounded-2xl border border-parish-border shadow-soft-hover z-10 overflow-hidden',
+          'relative w-full bg-parish-surface rounded-2xl border border-parish-border shadow-2xl z-10 overflow-hidden my-auto',
           'animate-in zoom-in-95 duration-200',
           maxWidths[maxWidth]
         )}
@@ -82,7 +83,7 @@ export const Modal: React.FC<ModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="text-parish-text-muted hover:text-parish-text p-1.5 rounded-lg hover:bg-parish-surface-subtle transition-colors shrink-0"
+              className="text-parish-text-muted hover:text-parish-text p-1.5 rounded-lg hover:bg-parish-surface-subtle transition-colors shrink-0 cursor-pointer"
               aria-label="Close"
               title="Close"
             >
@@ -93,7 +94,7 @@ export const Modal: React.FC<ModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="absolute top-4 right-4 z-20 text-parish-text-muted hover:text-parish-text p-1.5 rounded-lg hover:bg-parish-surface-subtle transition-colors"
+            className="absolute top-4 right-4 z-20 text-parish-text-muted hover:text-parish-text p-1.5 rounded-lg hover:bg-parish-surface-subtle transition-colors cursor-pointer"
             aria-label="Close"
             title="Close"
           >
@@ -104,6 +105,7 @@ export const Modal: React.FC<ModalProps> = ({
         {/* Content */}
         <div className="px-3 sm:px-6 py-4 sm:py-5 max-h-[85vh] overflow-y-auto">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

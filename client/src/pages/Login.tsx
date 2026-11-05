@@ -15,6 +15,7 @@ import {
   Clock,
   Church,
 } from 'lucide-react';
+import { ForgotPasswordModal } from '../components/auth/ForgotPasswordModal';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -26,6 +27,8 @@ export const LoginPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [inactivityNotice, setInactivityNotice] = useState<string | null>(null);
+  const [successNotice, setSuccessNotice] = useState<string | null>(null);
+  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
 
   useEffect(() => {
     const notice = sessionStorage.getItem('inactivity_logout_notice');
@@ -164,6 +167,14 @@ export const LoginPage: React.FC = () => {
               </div>
             )}
 
+            {/* Success Notice Alert */}
+            {successNotice && (
+              <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2.5 animate-in fade-in duration-200">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                <span>{successNotice}</span>
+              </div>
+            )}
+
             {/* Error Message Alert */}
             {errorMessage && (
               <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2.5 animate-in fade-in duration-200">
@@ -180,19 +191,42 @@ export const LoginPage: React.FC = () => {
                 required
                 placeholder="e.g. fr.abraham or priest@stalphonsabrisbane.org.au"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setSuccessNotice(null);
+                }}
                 icon={<User className="w-4 h-4" />}
               />
 
-              <Input
-                label="Password"
-                type="password"
-                required
-                placeholder="••••••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                icon={<Lock className="w-4 h-4" />}
-              />
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-parish-text">
+                    Password <span className="text-red-500">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setErrorMessage('');
+                      setSuccessNotice(null);
+                      setIsForgotPasswordOpen(true);
+                    }}
+                    className="text-xs font-semibold text-parish-primary hover:underline cursor-pointer"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+                <Input
+                  type="password"
+                  required
+                  placeholder="••••••••••••"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setSuccessNotice(null);
+                  }}
+                  icon={<Lock className="w-4 h-4" />}
+                />
+              </div>
 
               <div className="pt-2">
                 <Button
@@ -218,7 +252,7 @@ export const LoginPage: React.FC = () => {
               <div className="grid grid-cols-1 gap-2">
                 <button
                   type="button"
-                  onClick={() => handleQuickFill('priest@stalphonsabrisbane.org.au', 'parishAdmin2026!')}
+                  onClick={() => handleQuickFill('royvadakumpadan@gmail.com', 'parishAdmin2026!')}
                   className="w-full text-left p-2.5 rounded-xl border border-parish-border hover:border-parish-primary hover:bg-parish-surface-subtle transition-all flex items-center justify-between text-xs group cursor-pointer"
                 >
                   <div>
@@ -226,7 +260,7 @@ export const LoginPage: React.FC = () => {
                       <span>⛪ Parish Priest</span>
                       <span className="text-[10px] text-parish-text-muted font-normal">(PARISH_PRIEST)</span>
                     </div>
-                    <div className="text-[11px] text-parish-text-muted">priest@stalphonsabrisbane.org.au</div>
+                    <div className="text-[11px] text-parish-text-muted">royvadakumpadan@gmail.com</div>
                   </div>
                   <Badge variant="default" size="sm" className="group-hover:bg-parish-primary group-hover:text-white transition-colors">
                     Fill
@@ -235,7 +269,7 @@ export const LoginPage: React.FC = () => {
 
                 <button
                   type="button"
-                  onClick={() => handleQuickFill('trustee@parish.org', 'parishAdmin2026!')}
+                  onClick={() => handleQuickFill('royvadakumpadan+trustee@gmail.com', 'parishAdmin2026!')}
                   className="w-full text-left p-2.5 rounded-xl border border-parish-border hover:border-parish-primary hover:bg-parish-surface-subtle transition-all flex items-center justify-between text-xs group cursor-pointer"
                 >
                   <div>
@@ -243,7 +277,7 @@ export const LoginPage: React.FC = () => {
                       <span>🛡️ Parish Admin</span>
                       <span className="text-[10px] text-parish-text-muted font-normal">(Trustee)</span>
                     </div>
-                    <div className="text-[11px] text-parish-text-muted">trustee@parish.org</div>
+                    <div className="text-[11px] text-parish-text-muted">royvadakumpadan+trustee@gmail.com</div>
                   </div>
                   <Badge variant="subtle" size="sm" className="group-hover:bg-parish-primary group-hover:text-white transition-colors">
                     Fill
@@ -252,7 +286,7 @@ export const LoginPage: React.FC = () => {
 
                 <button
                   type="button"
-                  onClick={() => handleQuickFill('secretary@stalphonsabrisbane.org.au', 'parishAdmin2026!')}
+                  onClick={() => handleQuickFill('royvadakumpadan+secretary@gmail.com', 'parishAdmin2026!')}
                   className="w-full text-left p-2.5 rounded-xl border border-parish-border hover:border-parish-primary hover:bg-parish-surface-subtle transition-all flex items-center justify-between text-xs group cursor-pointer"
                 >
                   <div>
@@ -260,7 +294,7 @@ export const LoginPage: React.FC = () => {
                       <span>📋 Parish User</span>
                       <span className="text-[10px] text-parish-text-muted font-normal">(Secretary)</span>
                     </div>
-                    <div className="text-[11px] text-parish-text-muted">secretary@stalphonsabrisbane.org.au</div>
+                    <div className="text-[11px] text-parish-text-muted">royvadakumpadan+secretary@gmail.com</div>
                   </div>
                   <Badge variant="subtle" size="sm" className="group-hover:bg-parish-primary group-hover:text-white transition-colors">
                     Fill
@@ -296,6 +330,18 @@ export const LoginPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Forgot Password 6-Digit OTP Modal */}
+      <ForgotPasswordModal
+        isOpen={isForgotPasswordOpen}
+        onClose={() => setIsForgotPasswordOpen(false)}
+        initialEmail={email}
+        onPasswordResetSuccess={(resetEmail) => {
+          setEmail(resetEmail);
+          setPassword('');
+          setSuccessNotice('Your password has been reset successfully! Please log in with your new password.');
+        }}
+      />
     </div>
   );
 };

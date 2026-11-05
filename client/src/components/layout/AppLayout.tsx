@@ -14,11 +14,13 @@ import {
   Settings,
   X,
   LogOut,
+  KeyRound,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { ChangePasswordModal } from '../auth/ChangePasswordModal';
 import { SessionTimeoutWarningModal } from '../auth/SessionTimeoutWarningModal';
 import { LogoutConfirmModal } from '../auth/LogoutConfirmModal';
+import { UserProfileModal } from '../profile/UserProfileModal';
 import { CLIENT_BRANDING } from '../../config/branding';
 
 export const AppLayout: React.FC = () => {
@@ -33,6 +35,13 @@ export const AppLayout: React.FC = () => {
   } = useAuth();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [profileModalTab, setProfileModalTab] = useState<'details' | 'security'>('details');
+
+  const handleOpenProfile = (tab: 'details' | 'security' = 'details') => {
+    setProfileModalTab(tab);
+    setIsProfileModalOpen(true);
+  };
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -165,6 +174,7 @@ export const AppLayout: React.FC = () => {
         userRole={user?.role || 'PARISH_ADMIN'}
         onLogout={requestLogout}
         onGoHome={() => handleSelectTab('dashboard')}
+        onOpenProfile={handleOpenProfile}
       />
 
       {/* 2. Responsive Mobile Navigation Drawer (< 768px screens) */}
@@ -258,6 +268,18 @@ export const AppLayout: React.FC = () => {
               </div>
 
               <button
+                type="button"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  handleOpenProfile('details');
+                }}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-parish-border bg-parish-surface text-parish-text text-xs font-bold hover:bg-parish-surface-subtle transition-colors cursor-pointer"
+              >
+                <KeyRound className="w-4 h-4 text-parish-primary" />
+                <span>My Profile & Security</span>
+              </button>
+
+              <button
                 onClick={() => {
                   setIsMobileMenuOpen(false);
                   requestLogout();
@@ -301,6 +323,13 @@ export const AppLayout: React.FC = () => {
         userName={user?.fullName}
         userRole={user?.role}
         parishName={activeParish?.parishName}
+      />
+
+      {/* 7. Self-Service Profile & Security Modal */}
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        initialTab={profileModalTab}
       />
     </div>
   );

@@ -96,6 +96,7 @@ model Parish {
   nativeDioceses     NativeDiocese[]
   rolePermissions    RolePermission[]
   systemFeatureToggles SystemFeatureToggle[]
+  smtpSetting        SmtpSetting?
 
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
@@ -333,4 +334,43 @@ model SystemFeatureToggle {
   @@unique([parishId, key])
   @@index([parishId])
 }
+
+// ----------------------------------------------------
+// 6. SMTP & EMAIL CONFIGURATION
+// ----------------------------------------------------
+
+model SmtpSetting {
+  id          Int      @id @default(autoincrement())
+  parishId    Int      @unique
+  parish      Parish   @relation(fields: [parishId], references: [id], onDelete: Cascade)
+  host        String   @default("smtp.gmail.com")
+  port        Int      @default(587)
+  secure      Boolean  @default(false)
+  user        String?
+  pass        String?
+  fromEmail   String?
+  fromName    String?  @default("Parish Register")
+  isEnabled   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([parishId])
+}
+
+// ----------------------------------------------------
+// 7. PASSWORD RESET TOKENS
+// ----------------------------------------------------
+
+model PasswordResetToken {
+  id         Int      @id @default(autoincrement())
+  email      String
+  tokenHash  String
+  expiresAt  DateTime
+  usedAt     DateTime?
+  attempts   Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([email])
+}
+
 

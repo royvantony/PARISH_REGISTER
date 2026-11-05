@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma.js';
 import { authenticateJWT, AuthenticatedUser } from '../middleware/auth.js';
 import { UserRole } from '@prisma/client';
+import { sendParishEmail } from '../lib/email.js';
 
 export const authRouter = Router();
 
@@ -233,9 +234,34 @@ authRouter.get('/me', authenticateJWT, async (req: Request, res: Response) => {
 // POST /api/auth/change-password - Set new password on first login or profile update
 authRouter.post('/change-password', authenticateJWT, async (req: Request, res: Response) => {
   try {
-    const { newPassword } = req.body;
+    const { currentPassword, newPassword } = req.body;
+
     if (!newPassword || typeof newPassword !== 'string' || newPassword.trim().length < 6) {
       return res.status(400).json({ error: 'New password must be at least 6 characters long.' });
+    }
+
+    const user = await prisma.parishUser.findUnique({
+      where: { id: req.user!.userId },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    // If user is voluntarily changing password (not forced on first login) or currentPassword is sent, verify it
+    if (!user.mustChangePassword || currentPassword) {
+      if (!currentPassword) {
+        return res.status(400).json({ error: 'Current password is required to change your password.' });
+      }
+
+      const isCurrentMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+      if (!isCurrentMatch) {
+        return res.status(400).json({ error: 'Current password is incorrect.' });
+      }
+
+      if (currentPassword === newPassword.trim()) {
+        return res.status(400).json({ error: 'New password cannot be the same as your current password.' });
+      }
     }
 
     const passwordHash = await bcrypt.hash(newPassword.trim(), 10);
@@ -261,5 +287,218 @@ authRouter.post('/change-password', authenticateJWT, async (req: Request, res: R
   } catch (err: any) {
     console.error('Change password error:', err);
     return res.status(500).json({ error: 'Failed to update password.' });
+  }
+});
+
+// POST /api/auth/forgot-password - Dispatch 6-digit OTP to user's registered email
+authRouter.post('/forgot-password', async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    const identifier = ((email || '') as string).trim().toLowerCase();
+
+    if (!identifier) {
+      return res.status(400).json({ error: 'Please enter your registered email address or username.' });
+    }
+
+    const user = await prisma.parishUser.findFirst({
+      where: {
+        OR: [{ email: identifier }, { username: identifier }],
+        isActive: true,
+      },
+      include: {
+        parish: true,
+      },
+    });
+
+    // To prevent user enumeration attacks, if user is not found, return generic success
+    if (!user) {
+      return res.json({
+        message: 'If an account matches that email address, a 6-digit verification code has been dispatched.',
+      });
+    }
+
+    // Rate limiting: check if a token was already created within the last 60 seconds
+    const recentToken = await prisma.passwordResetToken.findFirst({
+      where: {
+        email: user.email,
+        createdAt: { gt: new Date(Date.now() - 60 * 1000) },
+      },
+    });
+
+    if (recentToken) {
+      return res.status(429).json({
+        error: 'A verification code was recently sent. Please check your inbox or wait a moment before requesting another.',
+      });
+    }
+
+    // Invalidate any existing unused tokens for this email
+    await prisma.passwordResetToken.updateMany({
+      where: {
+        email: user.email,
+        usedAt: null,
+      },
+      data: {
+        usedAt: new Date(),
+      },
+    });
+
+    // Generate 6-digit numeric OTP
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const tokenHash = await bcrypt.hash(otpCode, 10);
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+    await prisma.passwordResetToken.create({
+      data: {
+        email: user.email,
+        tokenHash,
+        expiresAt,
+      },
+    });
+
+    // Dispatch email
+    const parishId = user.parishId || 1;
+    const parishName = user.parish?.parishName || 'Parish Register';
+
+    const emailHtml = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h2 style="color: #831843; margin: 0 0 6px 0; font-size: 20px; font-weight: 800;">${parishName}</h2>
+          <span style="background-color: #fdf2f8; color: #9d174d; font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 9999px; border: 1px solid #fbcfe8;">
+            Password Reset Request
+          </span>
+        </div>
+
+        <p style="color: #334155; font-size: 14px; line-height: 1.6; margin-bottom: 12px;">
+          Hello <strong>${user.fullName}</strong>,
+        </p>
+        <p style="color: #334155; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">
+          We received a request to reset the password for your Parish Register account. Enter the 6-digit verification code below on the reset screen:
+        </p>
+
+        <div style="background-color: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 20px; text-align: center; margin: 24px 0;">
+          <div style="font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 1px; margin-bottom: 8px;">
+            Your One-Time Reset Code
+          </div>
+          <div style="font-family: 'Courier New', Courier, monospace; font-size: 34px; font-weight: 800; letter-spacing: 8px; color: #831843;">
+            ${otpCode}
+          </div>
+          <div style="font-size: 12px; color: #94a3b8; margin-top: 8px;">
+            Valid for 15 minutes
+          </div>
+        </div>
+
+        <p style="color: #64748b; font-size: 12px; line-height: 1.6; margin-top: 20px;">
+          If you did not request a password reset, you can safely ignore this email. Your password will not change until this code is entered.
+        </p>
+
+        <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 24px 0;" />
+        <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">
+          Parish Register • St. Thomas the Apostle Syro-Malabar Diocese
+        </p>
+      </div>
+    `;
+
+    // Attempt to send email
+    const emailResult = await sendParishEmail(parishId, {
+      to: user.email,
+      subject: `[Parish Register] Your Password Reset Code: ${otpCode}`,
+      html: emailHtml,
+      text: `Hello ${user.fullName},\n\nYour 6-digit password reset code is: ${otpCode}\n\nThis code is valid for 15 minutes. If you did not request this, please ignore this email.\n\nBlessings,\nParish Administration`,
+    });
+
+    if (!emailResult.success && !emailResult.skipped) {
+      console.error('Failed to send reset email:', emailResult.error);
+    }
+
+    return res.json({
+      message: 'If an account matches that email address, a 6-digit verification code has been dispatched.',
+      email: user.email,
+    });
+  } catch (err: any) {
+    console.error('Forgot password error:', err);
+    return res.status(500).json({ error: 'Failed to process password reset request.' });
+  }
+});
+
+// POST /api/auth/reset-password - Verify OTP code and apply new password
+authRouter.post('/reset-password', async (req: Request, res: Response) => {
+  try {
+    const { email, code, newPassword } = req.body;
+    const targetEmail = ((email || '') as string).trim().toLowerCase();
+    const targetCode = ((code || '') as string).trim();
+
+    if (!targetEmail || !targetCode || !newPassword) {
+      return res.status(400).json({ error: 'Email, 6-digit code, and new password are required.' });
+    }
+
+    if (targetCode.length !== 6 || !/^\d{6}$/.test(targetCode)) {
+      return res.status(400).json({ error: 'Please enter a valid 6-digit verification code.' });
+    }
+
+    if (typeof newPassword !== 'string' || newPassword.trim().length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters long.' });
+    }
+
+    // Find active token record
+    const tokenRecord = await prisma.passwordResetToken.findFirst({
+      where: {
+        email: targetEmail,
+        usedAt: null,
+        expiresAt: { gt: new Date() },
+        attempts: { lt: 5 },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!tokenRecord) {
+      return res.status(400).json({
+        error: 'Invalid or expired verification code. Please request a new code.',
+      });
+    }
+
+    // Verify OTP code
+    const isCodeMatch = await bcrypt.compare(targetCode, tokenRecord.tokenHash);
+    if (!isCodeMatch) {
+      // Increment attempt counter
+      await prisma.passwordResetToken.update({
+        where: { id: tokenRecord.id },
+        data: { attempts: { increment: 1 } },
+      });
+
+      const remaining = 5 - (tokenRecord.attempts + 1);
+      return res.status(400).json({
+        error: `Incorrect verification code. ${remaining > 0 ? `${remaining} attempts remaining.` : 'Code has been invalidated.'}`,
+      });
+    }
+
+    // Mark token as used
+    await prisma.passwordResetToken.update({
+      where: { id: tokenRecord.id },
+      data: { usedAt: new Date() },
+    });
+
+    // Hash and update password on user
+    const passwordHash = await bcrypt.hash(newPassword.trim(), 10);
+    const updatedUser = await prisma.parishUser.update({
+      where: { email: targetEmail },
+      data: {
+        passwordHash,
+        mustChangePassword: false,
+      },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        role: true,
+      },
+    });
+
+    return res.json({
+      message: 'Your password has been reset successfully. You can now log in with your new password.',
+      user: updatedUser,
+    });
+  } catch (err: any) {
+    console.error('Reset password error:', err);
+    return res.status(500).json({ error: 'Failed to reset password.' });
   }
 });

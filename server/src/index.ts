@@ -8,6 +8,7 @@ import { mastersRouter } from './routes/masters.js';
 import { permissionsRouter } from './routes/permissions.js';
 import { importRouter } from './routes/import.js';
 import { featuresRouter } from './routes/features.js';
+import { settingsRouter } from './routes/settings.js';
 import { prisma } from './lib/prisma.js';
 
 // St. Alphonsa Syro-Malabar Parish Register Server
@@ -50,6 +51,7 @@ app.use('/api/masters', mastersRouter);
 app.use('/api/permissions', permissionsRouter);
 app.use('/api/import', importRouter);
 app.use('/api/features', featuresRouter);
+app.use('/api/settings', settingsRouter);
 
 
 // Health check endpoint with database ping

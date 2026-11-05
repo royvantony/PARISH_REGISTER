@@ -40,6 +40,7 @@ import { useTheme, type ThemeId } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useFeatures } from '../context/FeatureContext';
 import { DeveloperControlsTab } from '../components/settings/DeveloperControlsTab';
+import { EmailSmtpTab } from '../components/settings/EmailSmtpTab';
 import { ShieldAlert } from 'lucide-react';
 
 interface SystemHealthResponse {
@@ -132,7 +133,7 @@ export const SettingsPage: React.FC = () => {
   } = useAuth();
   const { isFeatureEnabled, isDeveloper, getStoredFlag, isSimulatingClient } = useFeatures();
   const isDev = (isDeveloper || user?.role === 'SUPER_ADMIN') && !isSimulatingClient;
-  const [activeSubTab, setActiveSubTab] = useState<'governing' | 'dioceses' | 'general' | 'developer'>('governing');
+  const [activeSubTab, setActiveSubTab] = useState<'governing' | 'dioceses' | 'email' | 'general' | 'developer'>('governing');
 
   // Sync tab from URL query params (e.g. /settings?tab=developer)
   useEffect(() => {
@@ -140,6 +141,8 @@ export const SettingsPage: React.FC = () => {
     const tabParam = params.get('tab');
     if (tabParam === 'developer' && (isDeveloper || user?.role === 'SUPER_ADMIN')) {
       setActiveSubTab('developer');
+    } else if (tabParam === 'email') {
+      setActiveSubTab('email');
     } else if (tabParam === 'dioceses' && (isDev || isFeatureEnabled('SETTING_NATIVE_DIOCESES'))) {
       setActiveSubTab('dioceses');
     } else if (tabParam === 'general' && (isDev || isFeatureEnabled('SETTING_SYSTEM_HEALTH'))) {
@@ -641,6 +644,16 @@ export const SettingsPage: React.FC = () => {
             )}
           </button>
         )}
+        <button
+          onClick={() => setActiveSubTab('email')}
+          className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${activeSubTab === 'email'
+            ? 'border-parish-primary text-parish-primary'
+            : 'border-transparent text-parish-text-muted hover:text-parish-text'
+            }`}
+        >
+          <Mail className="w-3.5 h-3.5" />
+          <span>Email & SMTP Gateway</span>
+        </button>
         {(isDev || isFeatureEnabled('SETTING_SYSTEM_HEALTH')) && (
           <button
             onClick={() => setActiveSubTab('general')}
@@ -2057,6 +2070,10 @@ export const SettingsPage: React.FC = () => {
                 </div>
               </div>
             </div>
+          )}
+
+          {activeSubTab === 'email' && (
+            <EmailSmtpTab />
           )}
 
           {activeSubTab === 'developer' && (isDeveloper || user?.role === 'SUPER_ADMIN') && (
