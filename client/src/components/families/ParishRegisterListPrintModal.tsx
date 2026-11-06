@@ -81,7 +81,7 @@ export const ParishRegisterListPrintModal: React.FC<ParishRegisterListPrintModal
   initialTheme = 'COLOUR',
   initialDetailLevel = 'COMPACT',
 }) => {
-  const { activeParish, user } = useAuth();
+  const { activeParish, user, parishLogo } = useAuth();
   const [printTheme, setPrintTheme] = useState<'COLOUR' | 'FLAT'>(initialTheme);
   const [exportDetailLevel, setExportDetailLevel] = useState<'COMPACT' | 'WHOLE_FAMILY'>(initialDetailLevel);
   const [orientation, setOrientation] = useState<'PORTRAIT' | 'LANDSCAPE'>('PORTRAIT');
@@ -696,7 +696,7 @@ export const ParishRegisterListPrintModal: React.FC<ParishRegisterListPrintModal
           <!-- 1. Header Banner (Page 1) -->
           <div class="header-banner">
             <div class="header-left">
-              <img src="${CLIENT_BRANDING.logoUrl}" alt="${CLIENT_BRANDING.logoAlt}" style="height: 38px; width: auto; object-fit: contain;" onerror="this.style.display='none'; document.getElementById('fallback-crest').style.display='flex';" />
+              <img src="${parishLogo || CLIENT_BRANDING.logoUrl}" alt="${parishName}" style="height: 38px; width: auto; object-fit: contain;" onerror="this.onerror=null; this.src='/branding/logo.png';" />
               <div id="fallback-crest" class="crest-box" style="display: none;">&#9877;</div>
               <div class="header-title">
                 <h1>${parishName}</h1>
@@ -976,13 +976,18 @@ export const ParishRegisterListPrintModal: React.FC<ParishRegisterListPrintModal
                 >
                   <div className="flex items-center gap-3">
                     <img
-                      src={CLIENT_BRANDING.logoUrl}
-                      alt={CLIENT_BRANDING.logoAlt}
+                      src={parishLogo || CLIENT_BRANDING.logoUrl}
+                      alt={activeParish?.parishName || CLIENT_BRANDING.logoAlt}
                       className="h-10 w-auto object-contain shrink-0"
                       onError={(e) => {
-                        (e.target as HTMLElement).style.display = 'none';
-                        const fallback = (e.target as HTMLElement).nextElementSibling as HTMLElement;
-                        if (fallback) fallback.style.display = 'flex';
+                        const target = e.target as HTMLImageElement;
+                        if (!target.src.endsWith('/branding/logo.png')) {
+                          target.src = '/branding/logo.png';
+                        } else {
+                          target.style.display = 'none';
+                          const fallback = target.nextElementSibling as HTMLElement;
+                          if (fallback) fallback.style.display = 'flex';
+                        }
                       }}
                     />
                     <div

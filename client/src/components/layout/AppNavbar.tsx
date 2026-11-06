@@ -38,7 +38,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
   onGoHome,
   onOpenProfile,
 }) => {
-  const { user, activeParish } = useAuth();
+  const { user, activeParish, parishLogo } = useAuth();
   const { isSimulatingClient, setIsSimulatingClient } = useFeatures();
   const isGlobalUser = user?.role === 'SUPER_ADMIN' || user?.role === 'DIOCESAN_ADMIN';
 
@@ -98,8 +98,11 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
           >
             <div className="h-9 px-1.5 sm:h-10 sm:px-2 py-0.5 rounded-xl bg-white border border-parish-border shadow-xs flex items-center justify-center shrink-0 group-hover:border-parish-primary/40 transition-colors">
               <img
-                src={CLIENT_BRANDING.logoUrl}
-                alt={CLIENT_BRANDING.logoAlt}
+                src={parishLogo}
+                alt={activeParish?.parishName || CLIENT_BRANDING.logoAlt}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = '/branding/logo.png';
+                }}
                 className="h-7 sm:h-8 w-auto object-contain shrink-0"
               />
             </div>

@@ -693,6 +693,7 @@ mastersRouter.put('/parishes/:id', async (req: Request, res: Response) => {
       priestName,
       priestEmail,
       priestPhone,
+      logoUrl,
     } = req.body;
 
     if (!parishName || !parishName.trim()) {
@@ -724,6 +725,7 @@ mastersRouter.put('/parishes/:id', async (req: Request, res: Response) => {
         priestName: priestName?.trim() || null,
         priestEmail: priestEmail?.trim() || null,
         priestPhone: priestPhone?.trim() || null,
+        logoUrl: logoUrl !== undefined ? (logoUrl?.trim() || null) : existing.logoUrl,
         ...(typeof isActive === 'boolean' && isGlobalAdmin ? { isActive } : {}),
       },
     });

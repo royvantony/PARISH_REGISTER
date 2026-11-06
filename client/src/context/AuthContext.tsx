@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { api } from '../lib/api';
 
 export type UserRole =
@@ -35,6 +35,7 @@ export interface Parish {
   priestName?: string | null;
   priestEmail?: string | null;
   priestPhone?: string | null;
+  logoUrl?: string | null;
 }
 
 export interface DioceseInfo {
@@ -105,6 +106,7 @@ export interface AuthContextType {
   updatePassword: (newPassword: string, currentPassword?: string) => Promise<{ success: boolean; error?: string }>;
   refreshDiocese: () => Promise<void>;
   refreshParishes: () => Promise<void>;
+  parishLogo: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -478,6 +480,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  /**
+   * Dynamic Parish Logo Resolution with Robust Fallback Chain:
+   * 1. Explicit parish logo from database (`activeParish.logoUrl`)
+   * 2. Convention-based file path (`/branding/parishes/{PARISH_CODE}.png`)
+   * 3. Governing Diocese Chancery Seal (`diocese.logoUrl`)
+   * 4. Default generic official crest (`/branding/logo.png`)
+   */
+  const parishLogo = useMemo(() => {
+    if (activeParish?.logoUrl && activeParish.logoUrl.trim()) {
+      return activeParish.logoUrl.trim();
+    }
+    if (activeParish?.parishCode) {
+      return `/branding/parishes/${activeParish.parishCode.toUpperCase()}.png`;
+    }
+    if (diocese?.logoUrl && diocese.logoUrl.trim()) {
+      return diocese.logoUrl.trim();
+    }
+    return '/branding/logo.png';
+  }, [activeParish?.logoUrl, activeParish?.parishCode, diocese?.logoUrl]);
+
   return (
     <AuthContext.Provider
       value={{
@@ -486,6 +508,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         diocese,
         activeParish,
         availableParishes,
+        parishLogo,
         permissions,
         isLoading,
         isAuthenticated: !!token && !!user,

@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { authenticateJWT } from '../middleware/auth.js';
 import { UserRole } from '@prisma/client';
+import { getParishFeatures } from './features.js';
 
 export const permissionsRouter = Router();
 
@@ -18,6 +19,22 @@ export const SYSTEM_MODULES = [
   { key: 'DASHBOARD_ACTIVITY', name: 'Dashboard Pastoral Notes', category: 'Dashboard' },
   { key: 'SETTINGS', name: 'System Settings & Masters', category: 'Administration' },
 ];
+
+/**
+ * Maps each functional permission module to its controlling Developer Feature Key.
+ * If a feature is disabled in Developer Controls for a parish, that module is
+ * automatically filtered out and disallowed from role & user permission matrixes.
+ */
+export const MODULE_TO_FEATURE_KEY: Record<string, string> = {
+  REGISTER: 'PAGE_REGISTER',
+  REGISTER_NEW: 'PAGE_REGISTER_NEW',
+  IMPORT_REGISTRATIONS: 'PAGE_REGISTER_IMPORT',
+  DIRECT_DEBIT: 'REGISTER_DIRECT_DEBIT',
+  WARDS: 'PAGE_UNITS',
+  USERS: 'PAGE_USERS',
+  DASHBOARD_ACTIVITY: 'DASH_ACTIVITY_FEED',
+  SETTINGS: 'PAGE_SETTINGS',
+};
 
 export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, {
   canView: boolean;
@@ -130,20 +147,34 @@ export async function ensureDefaultPermissions(parishId: number = 1) {
 // GET /api/permissions/matrix - Get role permission matrix for active parish
 permissionsRouter.get('/matrix', async (req: Request, res: Response) => {
   try {
-    const parishId = req.activeParishId;
+    const parishId = req.activeParishId || 1;
 
     // Only ensure defaults for Parish 1 (Brisbane) so unprovisioned parishes stay empty until setup
     if (parishId === 1) {
       await ensureDefaultPermissions(parishId);
     }
 
+    // Retrieve active parish feature toggles from encrypted vault / in-memory cache
+    const parishFeatures = await getParishFeatures(parishId);
+    const featureMap = new Map(parishFeatures.map((f) => [f.key, f.isEnabled]));
+
+    // Strictly filter system modules based on developer controls configured for this parish
+    const allowedModules = SYSTEM_MODULES.filter((mod) => {
+      const featKey = MODULE_TO_FEATURE_KEY[mod.key];
+      if (!featKey) return true;
+      return featureMap.get(featKey) ?? false;
+    });
+
     const permissions = await prisma.rolePermission.findMany({
-      where: { parishId },
+      where: {
+        parishId,
+        module: { in: allowedModules.map((m) => m.key) },
+      },
       orderBy: [{ role: 'asc' }, { module: 'asc' }],
     });
 
     return res.json({
-      modules: SYSTEM_MODULES,
+      modules: allowedModules,
       matrix: permissions,
       isInitialized: permissions.length > 0,
     });
@@ -248,12 +279,32 @@ permissionsRouter.get('/my-permissions', async (req: Request, res: Response) => 
     }
 
     const userParishId = user.parishId || req.activeParishId || 1;
+    const parishFeatures = await getParishFeatures(userParishId);
+    const featureMap = new Map(parishFeatures.map((f) => [f.key, f.isEnabled]));
+
     const rolePermissions = await prisma.rolePermission.findMany({
       where: { parishId: userParishId, role: user.role },
     });
 
     const permissionsMap: Record<string, any> = {};
     for (const mod of SYSTEM_MODULES) {
+      const featKey = MODULE_TO_FEATURE_KEY[mod.key];
+      const isFeatureAllowed = featKey ? (featureMap.get(featKey) ?? false) : true;
+
+      // If this functional module is disabled in Developer Controls for this parish, all rights are revoked
+      if (!isFeatureAllowed) {
+        permissionsMap[mod.key] = {
+          canView: false,
+          canCreate: false,
+          canEdit: false,
+          canArchive: false,
+          canDelete: false,
+          canExport: false,
+          canApprove: false,
+        };
+        continue;
+      }
+
       const defaultRolePerm = DEFAULT_ROLE_PERMISSIONS[user.role]?.[mod.key] || {
         canView: false,
         canCreate: false,
@@ -308,12 +359,26 @@ permissionsRouter.get('/users/:userId', async (req: Request, res: Response) => {
     }
 
     const userParishId = user.parishId || req.activeParishId || 1;
+    const parishFeatures = await getParishFeatures(userParishId);
+    const featureMap = new Map(parishFeatures.map((f) => [f.key, f.isEnabled]));
+
+    // Strictly filter system modules based on developer controls configured for this parish
+    const allowedModules = SYSTEM_MODULES.filter((mod) => {
+      const featKey = MODULE_TO_FEATURE_KEY[mod.key];
+      if (!featKey) return true;
+      return featureMap.get(featKey) ?? false;
+    });
+
     const rolePermissions = await prisma.rolePermission.findMany({
-      where: { parishId: userParishId, role: user.role },
+      where: {
+        parishId: userParishId,
+        role: user.role,
+        module: { in: allowedModules.map((m) => m.key) },
+      },
     });
 
     // Compute effective permissions (Override takes priority if explicitly set)
-    const effective = SYSTEM_MODULES.map((mod) => {
+    const effective = allowedModules.map((mod) => {
       const base = rolePermissions.find((r) => r.module === mod.key) || {
         canView: false,
         canCreate: false,

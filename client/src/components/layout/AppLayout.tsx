@@ -27,6 +27,7 @@ export const AppLayout: React.FC = () => {
   const {
     user,
     activeParish,
+    parishLogo,
     logout,
     requestLogout,
     isLogoutConfirmOpen,
@@ -194,8 +195,11 @@ export const AppLayout: React.FC = () => {
                 <div className="flex items-center gap-2.5">
                   <div className="h-8 px-1.5 py-0.5 rounded-lg bg-white border border-parish-border shadow-xs flex items-center justify-center shrink-0">
                     <img
-                      src={CLIENT_BRANDING.logoUrl}
-                      alt={CLIENT_BRANDING.logoAlt}
+                      src={parishLogo}
+                      alt={activeParish?.parishName || CLIENT_BRANDING.logoAlt}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/branding/logo.png';
+                      }}
                       className="h-6 w-auto object-contain shrink-0"
                     />
                   </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../lib/api';
 import { useAuth, type UserRole } from '../context/AuthContext';
 import { useFeatures } from '../context/FeatureContext';
@@ -59,6 +59,17 @@ interface SystemModule {
   category: string;
 }
 
+const MODULE_TO_FEATURE_KEY: Record<string, string> = {
+  REGISTER: 'PAGE_REGISTER',
+  REGISTER_NEW: 'PAGE_REGISTER_NEW',
+  IMPORT_REGISTRATIONS: 'PAGE_REGISTER_IMPORT',
+  DIRECT_DEBIT: 'REGISTER_DIRECT_DEBIT',
+  WARDS: 'PAGE_UNITS',
+  USERS: 'PAGE_USERS',
+  DASHBOARD_ACTIVITY: 'DASH_ACTIVITY_FEED',
+  SETTINGS: 'PAGE_SETTINGS',
+};
+
 interface RolePermRecord {
   id?: number;
   role: string;
@@ -97,7 +108,7 @@ interface UserEffectivePerm {
 
 export const UsersPage: React.FC = () => {
   const { user: currentUser, activeParish, hasPermission } = useAuth();
-  const { isFeatureEnabled } = useFeatures();
+  const { isFeatureEnabled, getStoredFlag } = useFeatures();
 
   const canCreateUser = hasPermission('USERS', 'canCreate');
   const canEditUsers = hasPermission('USERS', 'canEdit');
@@ -112,6 +123,16 @@ export const UsersPage: React.FC = () => {
       setActiveTab('users');
     }
   }, [activeTab, isFeatureEnabled]);
+
+  // Evaluates whether a functional module is permitted for the active parish by Developer Controls
+  const isModuleAllowedByDeveloper = useCallback(
+    (moduleKey: string): boolean => {
+      const featKey = MODULE_TO_FEATURE_KEY[moduleKey];
+      if (!featKey) return true;
+      return getStoredFlag(featKey);
+    },
+    [getStoredFlag]
+  );
 
   // Users List State
   const [users, setUsers] = useState<ParishUserItem[]>([]);
@@ -139,6 +160,17 @@ export const UsersPage: React.FC = () => {
   const [isOverrideLoading, setIsOverrideLoading] = useState(false);
   const [isSavingOverride, setIsSavingOverride] = useState(false);
   const [overrideSuccessMsg, setOverrideSuccessMsg] = useState<string | null>(null);
+
+  // Active modules filtered strictly by Developer Controls for this parish
+  const allowedModules = useMemo(
+    () => modules.filter((mod) => isModuleAllowedByDeveloper(mod.key)),
+    [modules, isModuleAllowedByDeveloper]
+  );
+
+  const allowedOverrides = useMemo(
+    () => overrideUserData?.effective.filter((item) => isModuleAllowedByDeveloper(item.module)) || [],
+    [overrideUserData, isModuleAllowedByDeveloper]
+  );
 
   // Invite Modal
   const [isInviteOpen, setIsInviteOpen] = useState(false);
@@ -231,7 +263,7 @@ export const UsersPage: React.FC = () => {
     if (activeTab === 'matrix') {
       fetchMatrix();
     }
-  }, [activeTab]);
+  }, [activeTab, activeParish?.id]);
 
   // Fetch User Effective Permissions & Overrides
   const fetchUserPermissions = async (userId: number) => {
@@ -273,7 +305,7 @@ export const UsersPage: React.FC = () => {
     if (activeTab === 'overrides' && selectedOverrideUserId) {
       fetchUserPermissions(selectedOverrideUserId);
     }
-  }, [activeTab, selectedOverrideUserId]);
+  }, [activeTab, selectedOverrideUserId, activeParish?.id]);
 
   const handleOpenInvite = () => {
     setInviteFullName('');
@@ -1265,7 +1297,14 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-parish-border">
-                    {modules.map((mod) => {
+                    {allowedModules.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="py-8 text-center text-parish-text-muted">
+                          No functional modules are currently enabled by Developer Controls for this parish.
+                        </td>
+                      </tr>
+                    ) : (
+                      allowedModules.map((mod) => {
                       const rec = roleMatrix[selectedRole]?.[mod.key] || {
                         role: selectedRole,
                         module: mod.key,
@@ -1397,7 +1436,7 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                           </td>
                         </tr>
                       );
-                    })}
+                    }))}
                   </tbody>
                 </table>
               </div>
@@ -1435,7 +1474,7 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                     variant="outline"
                     size="sm"
                     onClick={handleClearUserOverrides}
-                    disabled={!overrideUserData?.effective.some((e) => e.isOverridden)}
+                    disabled={!allowedOverrides.some((e) => e.isOverridden)}
                     icon={<RotateCcw className="w-3.5 h-3.5" />}
                   >
                     Reset to Role Defaults
@@ -1516,7 +1555,14 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-parish-border">
-                    {overrideUserData.effective.map((item) => {
+                    {allowedOverrides.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="py-8 text-center text-parish-text-muted">
+                          No functional modules are currently enabled by Developer Controls for this parish.
+                        </td>
+                      </tr>
+                    ) : (
+                      allowedOverrides.map((item) => {
                       const current = userOverrides[item.module] || {};
                       const isOverridden =
                         current.canView !== item.base.canView ||
@@ -1656,7 +1702,7 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                           </td>
                         </tr>
                       );
-                    })}
+                    }))}
                   </tbody>
                 </table>
               </div>

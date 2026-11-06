@@ -88,6 +88,9 @@ model Parish {
   priestEmail        String?
   priestPhone        String?
 
+  // Parish Branding & Crest
+  logoUrl            String?
+
   // Scoped Relations
   units              FamilyUnit[]
   families           Family[]

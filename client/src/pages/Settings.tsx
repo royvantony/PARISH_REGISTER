@@ -35,6 +35,7 @@ import {
   Eye,
   UserCheck,
   Lock,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { useTheme, type ThemeId } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -121,6 +122,7 @@ interface ParishSettingsForm {
   priestName: string;
   priestEmail: string;
   priestPhone: string;
+  logoUrl: string;
 }
 
 export const SettingsPage: React.FC = () => {
@@ -205,6 +207,7 @@ export const SettingsPage: React.FC = () => {
     priestName: activeParish?.priestName || '',
     priestEmail: activeParish?.priestEmail || '',
     priestPhone: activeParish?.priestPhone || '',
+    logoUrl: activeParish?.logoUrl || '',
   });
   const [initialParishData, setInitialParishData] = useState<ParishSettingsForm | null>(null);
   const [isParishLoading, setIsParishLoading] = useState(false);
@@ -372,6 +375,7 @@ export const SettingsPage: React.FC = () => {
           priestName: res.data.priestName || '',
           priestEmail: res.data.priestEmail || '',
           priestPhone: res.data.priestPhone || '',
+          logoUrl: res.data.logoUrl || '',
         };
         setParishFormData(p);
         setInitialParishData(p);
@@ -419,6 +423,7 @@ export const SettingsPage: React.FC = () => {
           priestName: res.data.priestName || '',
           priestEmail: res.data.priestEmail || '',
           priestPhone: res.data.priestPhone || '',
+          logoUrl: res.data.logoUrl || '',
         };
         setParishFormData(p);
         setInitialParishData(p);
@@ -837,9 +842,21 @@ export const SettingsPage: React.FC = () => {
 
                 {/* Session Parish Indicator (No Switcher - Locked to Login Choice) */}
                 <div className="mb-3 px-3 py-2 bg-parish-surface-subtle border border-parish-border rounded-xl text-xs flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-parish-text-muted">
-                    <Lock className="w-3.5 h-3.5" />
-                    <span className="text-[11px] font-semibold uppercase tracking-wider">Active Parish:</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-md border border-parish-border bg-white flex items-center justify-center p-0.5 shrink-0 overflow-hidden">
+                      <img
+                        src={parishFormData.logoUrl?.trim() || `/branding/parishes/${(parishFormData.parishCode || 'SABN').toUpperCase()}.png`}
+                        alt="Parish Seal"
+                        className="w-full h-full object-contain"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = '/branding/logo.png';
+                        }}
+                      />
+                    </div>
+                    <div className="flex items-center gap-1.5 text-parish-text-muted">
+                      <Lock className="w-3 h-3" />
+                      <span className="text-[11px] font-semibold uppercase tracking-wider">Active Parish:</span>
+                    </div>
                   </div>
                   <span className="font-bold text-parish-primary truncate max-w-[200px]" title={parishFormData.parishName}>
                     {parishFormData.parishName} ({parishFormData.parishCode})
@@ -1413,6 +1430,44 @@ export const SettingsPage: React.FC = () => {
                         placeholder="e.g. office@alphonsabrisbane.org.au"
                         className="text-xs"
                       />
+                    </div>
+                  </div>
+
+                  {/* Parish Official Seal & Crest */}
+                  <div className="space-y-3 pt-3 border-t border-parish-border/60">
+                    <div className="flex items-center gap-2 text-xs font-bold text-parish-text uppercase tracking-wider text-parish-primary">
+                      <ImageIcon className="w-3.5 h-3.5" />
+                      <span>Parish Official Seal &amp; Crest</span>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-start gap-4 p-3.5 bg-parish-surface-subtle rounded-xl border border-parish-border">
+                      <div className="w-16 h-16 rounded-xl border border-parish-border bg-white flex items-center justify-center p-1.5 shrink-0 shadow-sm overflow-hidden">
+                        <img
+                          src={
+                            parishFormData.logoUrl?.trim() ||
+                            `/branding/parishes/${(parishFormData.parishCode || 'SABN').toUpperCase()}.png`
+                          }
+                          alt="Parish Seal Preview"
+                          className="w-full h-full object-contain"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = '/branding/logo.png';
+                          }}
+                        />
+                      </div>
+                      <div className="flex-1 w-full space-y-1.5">
+                        <Input
+                          label="Custom Logo URL or Path"
+                          icon={<Globe className="w-3.5 h-3.5" />}
+                          value={parishFormData.logoUrl}
+                          onChange={(e) => setParishFormData({ ...parishFormData, logoUrl: e.target.value })}
+                          disabled={!canEditParish || isParishSaving}
+                          placeholder={`/branding/parishes/${(parishFormData.parishCode || 'SABN').toUpperCase()}.png or https://...`}
+                          className="text-xs"
+                        />
+                        <p className="text-[11px] text-parish-text-muted leading-relaxed">
+                          Leave blank to use the standard convention <code className="font-mono text-parish-primary bg-parish-surface px-1 py-0.5 rounded border border-parish-border">/branding/parishes/{parishFormData.parishCode?.toUpperCase() || 'CODE'}.png</code>. If no parish logo file is uploaded, the system automatically falls back to the Diocesan chancery seal.
+                        </p>
+                      </div>
                     </div>
                   </div>
 

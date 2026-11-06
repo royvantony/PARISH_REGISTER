@@ -78,6 +78,7 @@ authRouter.post('/login', async (req: Request, res: Response) => {
           priestName: true,
           priestEmail: true,
           priestPhone: true,
+          logoUrl: true,
         },
         orderBy: { id: 'asc' },
       });
@@ -98,6 +99,7 @@ authRouter.post('/login', async (req: Request, res: Response) => {
           priestName: user.parish.priestName,
           priestEmail: user.parish.priestEmail,
           priestPhone: user.parish.priestPhone,
+          logoUrl: user.parish.logoUrl,
         },
       ];
     }
@@ -144,6 +146,7 @@ authRouter.get('/parishes', async (_req: Request, res: Response) => {
         priestName: true,
         priestEmail: true,
         priestPhone: true,
+        logoUrl: true,
       },
       orderBy: { id: 'asc' },
     });
@@ -196,7 +199,7 @@ authRouter.get('/me', authenticateJWT, async (req: Request, res: Response) => {
         isActive: true,
         mustChangePassword: true,
         parish: {
-          select: { id: true, parishCode: true, parishName: true, city: true, state: true },
+          select: { id: true, parishCode: true, parishName: true, city: true, state: true, logoUrl: true },
         },
       },
     });
@@ -214,7 +217,7 @@ authRouter.get('/me', authenticateJWT, async (req: Request, res: Response) => {
     if (isGlobalRole) {
       availableParishes = await prisma.parish.findMany({
         where: { isActive: true },
-        select: { id: true, parishCode: true, parishName: true, city: true, state: true },
+        select: { id: true, parishCode: true, parishName: true, city: true, state: true, logoUrl: true },
         orderBy: { id: 'asc' },
       });
     } else if (user.parish) {
