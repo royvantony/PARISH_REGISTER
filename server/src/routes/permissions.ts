@@ -495,40 +495,90 @@ permissionsRouter.delete('/users/:userId/overrides', async (req: Request, res: R
   }
 });
 
-// Helper: Check if a user has approval authority for registrations
-export async function canUserApproveRegistration(userId: number, role: UserRole, parishId?: number): Promise<boolean> {
-  // 1. Super Admin and Diocesan Admin always have full authority
-  if (role === UserRole.SUPER_ADMIN || role === UserRole.DIOCESAN_ADMIN) {
+// Generic helper: Check if a user has permission for a specific module & action based ONLY on matrix & overrides
+export async function checkUserPermission(
+  userId: number,
+  role: UserRole,
+  parishId: number,
+  module: string,
+  action: 'canView' | 'canCreate' | 'canEdit' | 'canArchive' | 'canDelete' | 'canExport' | 'canApprove' = 'canView'
+): Promise<boolean> {
+  // Super Admin developer wildcard bypass
+  if (role === UserRole.SUPER_ADMIN) {
     return true;
   }
 
   const targetParishId = parishId || 1;
 
-  // 2. First verify user has canView for REGISTER
-  const viewOverride = await prisma.userPermissionOverride.findUnique({
-    where: { userId_module: { userId, module: 'REGISTER' } },
+  const override = await prisma.userPermissionOverride.findUnique({
+    where: { userId_module: { userId, module } },
   });
-  const viewRolePerm = await prisma.rolePermission.findUnique({
-    where: { parishId_role_module: { parishId: targetParishId, role, module: 'REGISTER' } },
+
+  const rolePerm = await prisma.rolePermission.findUnique({
+    where: { parishId_role_module: { parishId: targetParishId, role, module } },
   });
-  const canView = viewOverride?.canView !== null && viewOverride?.canView !== undefined
-    ? viewOverride.canView
-    : (viewRolePerm?.canView ?? DEFAULT_ROLE_PERMISSIONS[role]?.REGISTER?.canView ?? false);
+
+  const canView = override?.canView !== null && override?.canView !== undefined
+    ? override.canView
+    : (rolePerm?.canView ?? DEFAULT_ROLE_PERMISSIONS[role]?.[module]?.canView ?? false);
+
+  if (!canView) return false;
+  if (action === 'canView') return true;
+
+  if (override && (override as any)[action] !== null && (override as any)[action] !== undefined) {
+    return Boolean((override as any)[action]);
+  }
+
+  if (rolePerm && (rolePerm as any)[action] !== null && (rolePerm as any)[action] !== undefined) {
+    return Boolean((rolePerm as any)[action]);
+  }
+
+  return Boolean(DEFAULT_ROLE_PERMISSIONS[role]?.[module]?.[action] ?? false);
+}
+
+// Helper: Check if a user has approval authority for registrations based strictly on matrix & user overrides
+export async function canUserApproveRegistration(
+  userId: number,
+  role: UserRole,
+  parishId?: number,
+  module: 'REGISTER_NEW' | 'REGISTER' | 'IMPORT_REGISTRATIONS' = 'REGISTER_NEW'
+): Promise<boolean> {
+  // Super Admin developer wildcard bypass
+  if (role === UserRole.SUPER_ADMIN) {
+    return true;
+  }
+
+  const targetParishId = parishId || 1;
+
+  // 1. Check for explicit user permission override
+  const override = await prisma.userPermissionOverride.findUnique({
+    where: { userId_module: { userId, module } },
+  });
+
+  // 2. Check role permission from database
+  const rolePerm = await prisma.rolePermission.findUnique({
+    where: { parishId_role_module: { parishId: targetParishId, role, module } },
+  });
+
+  // 3. Verify user has canView for this module first
+  const canView = override?.canView !== null && override?.canView !== undefined
+    ? override.canView
+    : (rolePerm?.canView ?? DEFAULT_ROLE_PERMISSIONS[role]?.[module]?.canView ?? false);
 
   if (!canView) return false;
 
-  // 3. Check for explicit user permission override
-  if (viewOverride && (viewOverride as any).canApprove !== null && (viewOverride as any).canApprove !== undefined) {
-    return Boolean((viewOverride as any).canApprove);
+  // 4. Check for explicit user permission override
+  if (override && (override as any).canApprove !== null && (override as any).canApprove !== undefined) {
+    return Boolean((override as any).canApprove);
   }
 
-  // 4. Check role permission from database
-  if (viewRolePerm && (viewRolePerm as any).canApprove !== undefined && (viewRolePerm as any).canApprove !== null) {
-    return Boolean((viewRolePerm as any).canApprove);
+  // 5. Check role permission from database matrix
+  if (rolePerm && (rolePerm as any).canApprove !== undefined && (rolePerm as any).canApprove !== null) {
+    return Boolean((rolePerm as any).canApprove);
   }
 
-  // 5. Default fallback: Parish Priest and Trustees
-  return role === UserRole.PARISH_PRIEST || role === UserRole.PARISH_ADMIN;
+  // 6. Inherit strictly from default matrix without any hardcoded role overrides
+  return Boolean(DEFAULT_ROLE_PERMISSIONS[role]?.[module]?.canApprove ?? false);
 }
 
 // GET /api/permissions/can-approve - Check if current user has approval authority
@@ -536,7 +586,8 @@ permissionsRouter.get('/can-approve', async (req: Request, res: Response) => {
   try {
     const user = req.user;
     if (!user) return res.json({ canApprove: false });
-    const canApprove = await canUserApproveRegistration(user.userId, user.role, req.activeParishId);
+    const targetModule = (req.query.module as any) || 'REGISTER_NEW';
+    const canApprove = await canUserApproveRegistration(user.userId, user.role, req.activeParishId, targetModule);
     return res.json({ canApprove });
   } catch (err: any) {
     console.error('Error checking can-approve:', err);
@@ -655,7 +706,7 @@ export async function canUserImportRegistrations(
     canCreate = rolePerm?.canCreate ?? DEFAULT_ROLE_PERMISSIONS[role]?.IMPORT_REGISTRATIONS?.canCreate ?? false;
   }
   if (canApprove === null) {
-    canApprove = rolePerm?.canApprove ?? DEFAULT_ROLE_PERMISSIONS[role]?.IMPORT_REGISTRATIONS?.canApprove ?? (role === UserRole.PARISH_PRIEST || role === UserRole.PARISH_ADMIN);
+    canApprove = rolePerm?.canApprove ?? DEFAULT_ROLE_PERMISSIONS[role]?.IMPORT_REGISTRATIONS?.canApprove ?? false;
   }
 
   return {
@@ -687,7 +738,7 @@ export async function canUserExportModule(
   parishId: number,
   module: string = 'REGISTER'
 ): Promise<boolean> {
-  if (role === UserRole.SUPER_ADMIN || role === UserRole.DIOCESAN_ADMIN || role === UserRole.PARISH_PRIEST) {
+  if (role === UserRole.SUPER_ADMIN) {
     return true;
   }
 

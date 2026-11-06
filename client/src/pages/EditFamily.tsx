@@ -75,7 +75,7 @@ export const EditFamilyPage: React.FC = () => {
   const canPrintDossier = isFeatureEnabled('REGISTER_PRINT_DOSSIER') && hasPermission('REGISTER', 'canExport');
 
   const canViewAuditTrail = Boolean(
-    user?.role === 'SUPER_ADMIN' || hasPermission('REGISTER', 'canApprove')
+    user?.role === 'SUPER_ADMIN' || hasPermission('REGISTER_NEW', 'canApprove')
   );
 
   // Reference Data
@@ -148,7 +148,7 @@ export const EditFamilyPage: React.FC = () => {
     .filter((d) => d.active && d.amount)
     .reduce((sum, d) => sum + calculateMonthlyEquivalent(d.amount!, d.frequency || 'Monthly'), 0);
 
-  const canApproveAction = canApprove && hasPermission('REGISTER', 'canApprove');
+  const canApproveAction = canApprove && hasPermission('REGISTER_NEW', 'canApprove');
   const canViewDirectDebit = isFeatureEnabled('REGISTER_DIRECT_DEBIT') && hasPermission('DIRECT_DEBIT', 'canView') && directDebitPerms.canView;
 
   // Print Dossier State
@@ -271,7 +271,7 @@ export const EditFamilyPage: React.FC = () => {
         api.get<any>(`/families/${id}`),
         api.get<UnitOption[]>('/masters/units'),
         api.get<DioceseOption[]>('/masters/dioceses').catch(() => ({ data: [] })),
-        api.get<{ canApprove: boolean }>('/permissions/can-approve').catch(() => ({ data: { canApprove: false } })),
+        api.get<{ canApprove: boolean }>('/permissions/can-approve?module=REGISTER_NEW').catch(() => ({ data: { canApprove: false } })),
       ]);
 
       const f = familyRes.data;

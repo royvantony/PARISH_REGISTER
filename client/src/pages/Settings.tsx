@@ -132,6 +132,7 @@ export const SettingsPage: React.FC = () => {
     refreshDiocese,
     refreshParishes,
     activeParish,
+    hasPermission,
   } = useAuth();
   const { isFeatureEnabled, isDeveloper, getStoredFlag, isSimulatingClient } = useFeatures();
   const isDev = (isDeveloper || user?.role === 'SUPER_ADMIN') && !isSimulatingClient;
@@ -155,16 +156,10 @@ export const SettingsPage: React.FC = () => {
   const [dioceses, setDioceses] = useState<DioceseItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Role privileges
-  const isDiocesanAdmin =
+  // Permissions Matrix Access (Strictly matrix-based)
+  const canEditDiocese =
     user?.role === 'SUPER_ADMIN' ||
-    user?.role === 'DIOCESAN_ADMIN';
-
-  const isParishAdmin =
-    user?.role === 'PARISH_PRIEST' ||
-    user?.role === 'PARISH_ADMIN';
-
-  const canEditDiocese = isDiocesanAdmin;
+    hasPermission('SETTINGS', 'canEdit');
 
   // Modals visibility state
   const [isDioceseModalOpen, setIsDioceseModalOpen] = useState(false);
@@ -216,8 +211,8 @@ export const SettingsPage: React.FC = () => {
   const [parishSuccess, setParishSuccess] = useState<string | null>(null);
 
   const canEditParish =
-    isDiocesanAdmin ||
-    (isParishAdmin && (!user?.parishId || user.parishId === parishFormData.id));
+    user?.role === 'SUPER_ADMIN' ||
+    hasPermission('SETTINGS', 'canEdit');
 
   // Search & Filter state for Dioceses
   const [searchQuery, setSearchQuery] = useState('');

@@ -45,7 +45,7 @@ model Diocese {
   id              Int      @id @default(autoincrement())
   dioceseName     String   @default("Diocese of St. Thomas the Apostle, Melbourne")
   rite            String   @default("Syro-Malabar")
-  bishopName      String?  @default("Bishop Bosco Puthur")
+  bishopName      String?  @default("Bishop John Panamthottathil")
   chanceryAddress String?  @default("62 Moore Rd, Mill Park VIC 3082, Australia")
   city            String?  @default("Melbourne")
   state           String?  @default("VIC")
@@ -56,6 +56,8 @@ model Diocese {
   logoUrl         String?  @default("/branding/logo.png")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  parishes        Parish[]
 }
 
 model NativeDiocese {
@@ -72,6 +74,8 @@ model NativeDiocese {
 
 model Parish {
   id                 Int           @id @default(autoincrement())
+  dioceseId          Int?
+  diocese            Diocese?      @relation(fields: [dioceseId], references: [id])
   parishCode         String        @unique // e.g. "SABN", "SMEL"
   parishName         String        // "St. Alphonsa Syro-Malabar Parish"
   city               String        // "Brisbane North"
@@ -322,11 +326,11 @@ model FamilyNote {
 // ----------------------------------------------------
 
 model SystemFeatureVault {
-  id            Int      @id @default(autoincrement())
-  parishId      Int      @unique
-  parish        Parish   @relation(fields: [parishId], references: [id], onDelete: Cascade)
-  encryptedData String   // AES-256-GCM encrypted features payload
-  iv            String   // 96-bit initialization vector in hex
+  id              Int      @id @default(autoincrement())
+  parishId        Int      @unique
+  parish          Parish   @relation(fields: [parishId], references: [id], onDelete: Cascade)
+  controlManifest String   // AES-256-GCM encrypted features payload
+  iv              String   // 96-bit initialization vector in hex
   tag           String   // GCM authentication tag in hex
   version       Int      @default(1)
   createdAt     DateTime @default(now())

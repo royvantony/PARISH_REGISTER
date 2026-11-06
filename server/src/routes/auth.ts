@@ -126,6 +126,121 @@ authRouter.post('/login', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/auth/dev-login - Developer / Demo Passwordless Fast Access
+authRouter.post('/dev-login', async (req: Request, res: Response) => {
+  try {
+    const isDevAllowed = process.env.NODE_ENV !== 'production' || process.env.ALLOW_DEV_LOGIN === 'true';
+    if (!isDevAllowed) {
+      return res.status(403).json({ error: 'Developer login bypass is disabled on this server.' });
+    }
+
+    const { email } = req.body;
+    const identifier = ((email || '') as string).trim().toLowerCase();
+
+    if (!identifier) {
+      return res.status(400).json({ error: 'Account identifier is required for developer login.' });
+    }
+
+    const user = await prisma.parishUser.findFirst({
+      where: {
+        OR: [
+          { email: identifier },
+          { username: identifier },
+        ],
+      },
+      include: {
+        parish: true,
+      },
+    });
+
+    if (!user || !user.isActive) {
+      return res.status(404).json({ error: 'Active user account not found.' });
+    }
+
+    const payload: AuthenticatedUser = {
+      userId: user.id,
+      email: user.email,
+      username: user.username,
+      fullName: user.fullName,
+      role: user.role,
+      parishId: user.parishId,
+      assignedUnitId: user.assignedUnitId,
+    };
+
+    const token = jwt.sign(payload, getJwtSecret(), { expiresIn: '7d' });
+
+    let availableParishes: any[] = [];
+    const isGlobalRole =
+      user.role === UserRole.SUPER_ADMIN ||
+      user.role === UserRole.DIOCESAN_ADMIN ||
+      user.role === UserRole.DIOCESAN_USER;
+
+    if (isGlobalRole) {
+      availableParishes = await prisma.parish.findMany({
+        where: { isActive: true },
+        select: {
+          id: true,
+          parishCode: true,
+          parishName: true,
+          city: true,
+          state: true,
+          postalCode: true,
+          contactEmail: true,
+          contactPhone: true,
+          idPrefix: true,
+          nextFamilyNumber: true,
+          isActive: true,
+          priestName: true,
+          priestEmail: true,
+          priestPhone: true,
+          logoUrl: true,
+        },
+        orderBy: { id: 'asc' },
+      });
+    } else if (user.parish) {
+      availableParishes = [
+        {
+          id: user.parish.id,
+          parishCode: user.parish.parishCode,
+          parishName: user.parish.parishName,
+          city: user.parish.city,
+          state: user.parish.state,
+          postalCode: user.parish.postalCode,
+          contactEmail: user.parish.contactEmail,
+          contactPhone: user.parish.contactPhone,
+          idPrefix: user.parish.idPrefix,
+          nextFamilyNumber: user.parish.nextFamilyNumber,
+          isActive: user.parish.isActive,
+          priestName: user.parish.priestName,
+          priestEmail: user.parish.priestEmail,
+          priestPhone: user.parish.priestPhone,
+          logoUrl: user.parish.logoUrl,
+        },
+      ];
+    }
+
+    return res.json({
+      message: 'Developer login successful',
+      token,
+      user: {
+        id: user.id,
+        fullName: user.fullName,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        parishId: user.parishId,
+        assignedUnitId: user.assignedUnitId,
+        mustChangePassword: user.mustChangePassword,
+      },
+      availableParishes,
+      defaultParishId: user.parishId || (availableParishes[0]?.id ?? 1),
+    });
+  } catch (err: any) {
+    console.error('Dev login error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /api/auth/parishes - Publicly accessible list of active parishes
 authRouter.get('/parishes', async (_req: Request, res: Response) => {
   try {

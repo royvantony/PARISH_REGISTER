@@ -15,7 +15,7 @@ async function main() {
         VALUES (
           'Diocese of St. Thomas the Apostle, Melbourne',
           'Syro-Malabar',
-          'Bishop Bosco Puthur',
+          'Bishop John Panamthottathil',
           '62 Moore Rd, Mill Park VIC 3082, Australia',
           'Melbourne',
           'VIC',

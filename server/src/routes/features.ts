@@ -255,7 +255,7 @@ export async function getParishFeatures(parishId: number): Promise<SystemFeature
   let items: SystemFeatureItem[] = [];
   if (vault) {
     try {
-      items = decryptPayload<SystemFeatureItem[]>(vault.encryptedData, vault.iv, vault.tag);
+      items = decryptPayload<SystemFeatureItem[]>(vault.controlManifest, vault.iv, vault.tag);
     } catch (err) {
       console.error(`[FeatureVault] Decryption failed or tampered for Parish ${parishId}. Failing closed (hidden/off).`);
       // Fail-closed: If the vault cannot be read, default ALL features to disabled/hidden (false)
@@ -318,13 +318,13 @@ export async function saveParishFeatures(parishId: number, features: SystemFeatu
   await prisma.systemFeatureVault.upsert({
     where: { parishId },
     update: {
-      encryptedData: encrypted.encryptedData,
+      controlManifest: encrypted.encryptedData,
       iv: encrypted.iv,
       tag: encrypted.tag,
     },
     create: {
       parishId,
-      encryptedData: encrypted.encryptedData,
+      controlManifest: encrypted.encryptedData,
       iv: encrypted.iv,
       tag: encrypted.tag,
     },
@@ -491,5 +491,122 @@ featuresRouter.post('/batch', authenticateJWT, async (req: Request, res: Respons
   } catch (err: any) {
     console.error('Error batch updating features:', err);
     return res.status(500).json({ error: 'Failed to batch update features.' });
+  }
+});
+
+// ----------------------------------------------------
+// DEVELOPER CRYPTOGRAPHIC WORKBENCH (SUPER_ADMIN ONLY)
+// ----------------------------------------------------
+
+/**
+ * GET /api/features/crypto/raw/:parishId
+ * Fetch raw ciphertext record directly from PostgreSQL SystemFeatureVault.
+ */
+featuresRouter.get('/crypto/raw/:parishId', authenticateJWT, async (req: Request, res: Response) => {
+  try {
+    const user = req.user;
+    if (!user || user.role !== UserRole.SUPER_ADMIN) {
+      return res.status(403).json({ error: 'Developer privilege required.' });
+    }
+
+    const parishId = Number(req.params.parishId || 1);
+    const vault = await prisma.systemFeatureVault.findUnique({
+      where: { parishId },
+    });
+
+    if (!vault) {
+      return res.status(404).json({ error: `No feature vault found for Parish #${parishId}.` });
+    }
+
+    return res.json({
+      parishId: vault.parishId,
+      controlManifest: vault.controlManifest,
+      iv: vault.iv,
+      tag: vault.tag,
+      version: vault.version,
+      updatedAt: vault.updatedAt,
+    });
+  } catch (err: any) {
+    console.error('Error fetching raw vault:', err);
+    return res.status(500).json({ error: 'Failed to fetch raw vault record.' });
+  }
+});
+
+/**
+ * POST /api/features/crypto/decrypt
+ * Decrypts any arbitrary AES-256-GCM ciphertext, IV, and tag using the server's master key.
+ */
+featuresRouter.post('/crypto/decrypt', authenticateJWT, async (req: Request, res: Response) => {
+  try {
+    const user = req.user;
+    if (!user || user.role !== UserRole.SUPER_ADMIN) {
+      return res.status(403).json({ error: 'Developer privilege required.' });
+    }
+
+    const { ciphertext, iv, tag } = req.body;
+    if (!ciphertext || !iv || !tag) {
+      return res.status(400).json({ error: 'Missing required parameters: ciphertext, iv, and tag are required.' });
+    }
+
+    const cleanCiphertext = String(ciphertext).trim();
+    const cleanIv = String(iv).trim();
+    const cleanTag = String(tag).trim();
+
+    try {
+      const decrypted = decryptPayload<any>(cleanCiphertext, cleanIv, cleanTag);
+      return res.json({
+        success: true,
+        data: decrypted,
+        formattedJson: typeof decrypted === 'object' ? JSON.stringify(decrypted, null, 2) : String(decrypted),
+      });
+    } catch (decryptErr: any) {
+      return res.status(400).json({
+        success: false,
+        error: `Decryption failed: ${decryptErr.message || 'Authentication tag mismatch or corrupt ciphertext.'}`,
+      });
+    }
+  } catch (err: any) {
+    console.error('Error in crypto decrypt:', err);
+    return res.status(500).json({ error: 'Internal error executing decryption.' });
+  }
+});
+
+/**
+ * POST /api/features/crypto/encrypt
+ * Encrypts arbitrary plaintext / JSON string into AES-256-GCM ciphertext, IV, and auth tag.
+ */
+featuresRouter.post('/crypto/encrypt', authenticateJWT, async (req: Request, res: Response) => {
+  try {
+    const user = req.user;
+    if (!user || user.role !== UserRole.SUPER_ADMIN) {
+      return res.status(403).json({ error: 'Developer privilege required.' });
+    }
+
+    const { plaintext } = req.body;
+    if (plaintext === undefined || plaintext === null) {
+      return res.status(400).json({ error: 'plaintext is required.' });
+    }
+
+    let payloadToEncrypt: any = plaintext;
+    if (typeof plaintext === 'string') {
+      try {
+        payloadToEncrypt = JSON.parse(plaintext);
+      } catch {
+        // Not JSON, encrypt as string
+        payloadToEncrypt = plaintext;
+      }
+    }
+
+    const encrypted = encryptPayload(payloadToEncrypt);
+
+    return res.json({
+      success: true,
+      controlManifest: encrypted.encryptedData,
+      iv: encrypted.iv,
+      tag: encrypted.tag,
+    });
+  } catch (err: any) {
+    console.error('Error in crypto encrypt:', err);
+    return res.status(500).json({ error: 'Internal error executing encryption.' });
   }
 });

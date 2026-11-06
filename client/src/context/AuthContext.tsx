@@ -101,6 +101,10 @@ export interface AuthContextType {
     password: string,
     overrideParishId?: number
   ) => Promise<{ success: boolean; needsParishSelection?: boolean; error?: string }>;
+  devLogin: (
+    email: string,
+    overrideParishId?: number
+  ) => Promise<{ success: boolean; needsParishSelection?: boolean; error?: string }>;
   logout: () => void;
   setActiveParishById: (parishId: number) => void;
   updatePassword: (newPassword: string, currentPassword?: string) => Promise<{ success: boolean; error?: string }>;
@@ -122,19 +126,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
   const [token, setToken] = useState<string | null>(localStorage.getItem('parish_token'));
   const [permissions, setPermissions] = useState<Record<string, ModulePermission>>({});
-  const DEFAULT_PARISH_LIST: Parish[] = [
-    { id: 1, parishCode: 'SABN', parishName: 'St. Alphonsa Syro-Malabar Parish Brisbane', city: 'Brisbane North' },
-    { id: 4, parishCode: 'SMEL', parishName: 'St. Thomas Cathedral Melbourne', city: 'Melbourne' },
-    { id: 5, parishCode: 'SSYD', parishName: 'St. Marys Parish Sydney', city: 'Sydney' },
-    { id: 6, parishCode: 'SPER', parishName: 'St. Joseph Parish Perth', city: 'Perth' },
-    { id: 7, parishCode: 'SADL', parishName: 'St. Euphrasia Parish Adelaide', city: 'Adelaide' },
-  ];
-  const [availableParishes, setAvailableParishes] = useState<Parish[]>(DEFAULT_PARISH_LIST);
+  const [availableParishes, setAvailableParishes] = useState<Parish[]>(() => {
+    try {
+      const cached = localStorage.getItem('parish_available_list');
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
   const [diocese, setDiocese] = useState<DioceseInfo | null>(null);
   const [activeParish, setActiveParish] = useState<Parish | null>(() => {
-    const savedParishId = localStorage.getItem('parish_active_id');
-    const matched = DEFAULT_PARISH_LIST.find((p) => p.id === Number(savedParishId));
-    return matched || DEFAULT_PARISH_LIST[0];
+    try {
+      const savedParish = localStorage.getItem('parish_active_object');
+      if (savedParish) {
+        return JSON.parse(savedParish);
+      }
+    } catch {}
+    return null;
   });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -148,27 +156,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ]);
         if (Array.isArray(parishesRes.data) && parishesRes.data.length > 0) {
           setAvailableParishes(parishesRes.data);
+          try {
+            localStorage.setItem('parish_available_list', JSON.stringify(parishesRes.data));
+          } catch {}
         }
         if (dioceseRes.data) {
           setDiocese(dioceseRes.data);
         }
       } catch (e) {
-        // Fall back to seeded initial state
+        // Fall back to cached or empty state
       }
     };
     fetchPublicData();
   }, []);
 
-  // Initialize active parish from local storage or default to Brisbane
+  // Initialize active parish from local storage or default to first available parish
   useEffect(() => {
     const savedParishId = localStorage.getItem('parish_active_id');
     const matched = availableParishes.find((p) => p.id === Number(savedParishId));
     if (matched) {
       setActiveParish((prev) => (prev?.id === matched.id && prev?.parishName === matched.parishName ? prev : matched));
+      try {
+        localStorage.setItem('parish_active_object', JSON.stringify(matched));
+      } catch {}
     } else if (availableParishes.length > 0) {
       const fallback = availableParishes[0];
       setActiveParish((prev) => (prev?.id === fallback.id && prev?.parishName === fallback.parishName ? prev : fallback));
       localStorage.setItem('parish_active_id', String(fallback.id));
+      try {
+        localStorage.setItem('parish_active_object', JSON.stringify(fallback));
+      } catch {}
     }
   }, [availableParishes]);
 
@@ -303,6 +320,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: true, needsParishSelection: false };
     } catch (err: any) {
       const errorMsg = err.response?.data?.error || 'Invalid email or password. Please try again.';
+      return { success: false, error: errorMsg };
+    }
+  };
+
+  const devLogin = async (
+    email: string,
+    overrideParishId?: number
+  ): Promise<{ success: boolean; needsParishSelection?: boolean; error?: string }> => {
+    try {
+      const res = await api.post('/auth/dev-login', { email });
+      const {
+        token: receivedToken,
+        user: receivedUser,
+        availableParishes: returnedParishes,
+        defaultParishId,
+      } = res.data;
+
+      // Persist auth tokens & last activity for standard session lifecycle
+      localStorage.setItem('parish_token', receivedToken);
+      localStorage.setItem('parish_user', JSON.stringify(receivedUser));
+      localStorage.setItem('parish_last_activity', String(Date.now()));
+      setToken(receivedToken);
+      setUser(receivedUser);
+
+      if (returnedParishes && returnedParishes.length > 0) {
+        setAvailableParishes(returnedParishes);
+      }
+
+      const isGlobal =
+        receivedUser.role === 'SUPER_ADMIN' ||
+        receivedUser.role === 'DIOCESAN_ADMIN' ||
+        receivedUser.role === 'DIOCESAN_USER' ||
+        receivedUser.parishId === null;
+
+      // If global role and no override supplied, prompt user to choose parish in intermediate window
+      if (isGlobal && !overrideParishId) {
+        fetchPermissions();
+        return { success: true, needsParishSelection: true };
+      }
+
+      // Parish user or explicit override
+      if (returnedParishes && returnedParishes.length > 0) {
+        const targetId = overrideParishId || defaultParishId || returnedParishes[0].id;
+        const targetParish = returnedParishes.find((p: Parish) => p.id === targetId) || returnedParishes[0];
+        setActiveParish(targetParish);
+        localStorage.setItem('parish_active_id', String(targetParish.id));
+      } else {
+        const fallbackId = overrideParishId || receivedUser.parishId || 1;
+        localStorage.setItem('parish_active_id', String(fallbackId));
+      }
+
+      // Fetch user permissions
+      fetchPermissions();
+
+      return { success: true, needsParishSelection: false };
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.error || 'Developer bypass login failed.';
       return { success: false, error: errorMsg };
     }
   };
@@ -521,6 +595,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         hasPermission,
         staySignedIn,
         login,
+        devLogin,
         logout,
         setActiveParishById,
         updatePassword,

@@ -2,23 +2,21 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { authenticateJWT } from '../middleware/auth.js';
 import { verifyAndTestSmtp, SmtpConfigInput } from '../lib/email.js';
-import { UserRole } from '@prisma/client';
+import { checkUserPermission } from './permissions.js';
 
 export const settingsRouter = Router();
-
-const canManageSmtp = (role: UserRole) => {
-  return (
-    role === UserRole.SUPER_ADMIN ||
-    role === UserRole.DIOCESAN_ADMIN ||
-    role === UserRole.PARISH_PRIEST ||
-    role === UserRole.PARISH_ADMIN
-  );
-};
 
 // GET /api/settings/smtp - Fetch SMTP settings for active parish
 settingsRouter.get('/smtp', authenticateJWT, async (req: Request, res: Response) => {
   try {
     const parishId = req.activeParishId || req.user?.parishId || 1;
+
+    if (req.user) {
+      const canView = await checkUserPermission(req.user.userId, req.user.role, parishId, 'SETTINGS', 'canView');
+      if (!canView) {
+        return res.status(403).json({ error: 'You do not have permission to view settings.' });
+      }
+    }
 
     const setting = await prisma.smtpSetting.findUnique({
       where: { parishId },
@@ -59,11 +57,14 @@ settingsRouter.get('/smtp', authenticateJWT, async (req: Request, res: Response)
 // POST /api/settings/smtp - Update SMTP settings for active parish
 settingsRouter.post('/smtp', authenticateJWT, async (req: Request, res: Response) => {
   try {
-    if (!req.user || !canManageSmtp(req.user.role)) {
+    const parishId = req.activeParishId || req.user?.parishId || 1;
+    if (!req.user) {
+      return res.status(401).json({ error: 'Unauthorized.' });
+    }
+    const canEdit = await checkUserPermission(req.user.userId, req.user.role, parishId, 'SETTINGS', 'canEdit');
+    if (!canEdit) {
       return res.status(403).json({ error: 'You do not have permission to configure mail settings.' });
     }
-
-    const parishId = req.activeParishId || req.user.parishId || 1;
     const { host, port, secure, user, pass, fromEmail, fromName, isEnabled } = req.body;
 
     // Check existing setting to preserve password if not updated
@@ -137,14 +138,20 @@ settingsRouter.post('/smtp', authenticateJWT, async (req: Request, res: Response
 // POST /api/settings/smtp/test - Test connection & send test email
 settingsRouter.post('/smtp/test', authenticateJWT, async (req: Request, res: Response) => {
   try {
-    if (!req.user || !canManageSmtp(req.user.role)) {
+    const parishId = req.activeParishId || req.user?.parishId || 1;
+    if (!req.user) {
+      return res.status(401).json({ error: 'Unauthorized.' });
+    }
+    const canEdit = await checkUserPermission(req.user.userId, req.user.role, parishId, 'SETTINGS', 'canEdit');
+    if (!canEdit) {
       return res.status(403).json({ error: 'You do not have permission to test mail settings.' });
     }
-
-    const parishId = req.activeParishId || req.user.parishId || 1;
     const { host, port, secure, user, pass, fromEmail, fromName, recipientEmail } = req.body;
 
-    const targetRecipient = (recipientEmail || req.user.email || 'royvadakumpadan@gmail.com').trim();
+    const targetRecipient = (recipientEmail || req.user.email || '').trim();
+    if (!targetRecipient) {
+      return res.status(400).json({ error: 'A recipient email address is required to send a test verification email.' });
+    }
 
     // Determine config to test: either from request body or saved DB record
     const existing = await prisma.smtpSetting.findUnique({

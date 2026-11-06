@@ -21,7 +21,6 @@ import { ChangePasswordModal } from '../auth/ChangePasswordModal';
 import { SessionTimeoutWarningModal } from '../auth/SessionTimeoutWarningModal';
 import { LogoutConfirmModal } from '../auth/LogoutConfirmModal';
 import { UserProfileModal } from '../profile/UserProfileModal';
-import { CLIENT_BRANDING } from '../../config/branding';
 
 export const AppLayout: React.FC = () => {
   const {
@@ -196,7 +195,7 @@ export const AppLayout: React.FC = () => {
                   <div className="h-8 px-1.5 py-0.5 rounded-lg bg-white border border-parish-border shadow-xs flex items-center justify-center shrink-0">
                     <img
                       src={parishLogo}
-                      alt={activeParish?.parishName || CLIENT_BRANDING.logoAlt}
+                      alt={activeParish?.parishName || 'Parish Official Seal'}
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = '/branding/logo.png';
                       }}

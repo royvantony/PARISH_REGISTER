@@ -161,7 +161,7 @@ export const ParishRegisterPage: React.FC = () => {
   const canViewDirectDebit = isFeatureEnabled('REGISTER_DIRECT_DEBIT') && hasPermission('DIRECT_DEBIT', 'canView');
 
   const canViewAuditTrail = Boolean(
-    user?.role === 'SUPER_ADMIN' || hasPermission('REGISTER', 'canApprove')
+    user?.role === 'SUPER_ADMIN' || hasPermission('REGISTER_NEW', 'canApprove')
   );
 
   // Export & Print Modal States

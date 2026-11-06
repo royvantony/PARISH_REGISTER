@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { CryptoWorkbenchCard } from './CryptoWorkbenchCard';
 import {
   CheckCircle2,
   AlertCircle,
@@ -226,6 +227,9 @@ export const DeveloperControlsTab: React.FC = () => {
           </button>
         </div>
       )}
+
+      {/* Database Cryptographic Workbench */}
+      <CryptoWorkbenchCard />
 
       {/* Feature Sections */}
       <div className="space-y-6">

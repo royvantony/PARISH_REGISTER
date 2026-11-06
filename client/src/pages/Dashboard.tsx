@@ -309,7 +309,8 @@ export const DashboardPage: React.FC = () => {
             Welcome back, {user?.fullName || 'Parish Administrator'}!
           </h1>
           <p className="text-xs sm:text-sm text-parish-text-muted leading-relaxed">
-            Parish Register demographic and pastoral intelligence for {activeParish?.city || 'Brisbane'}. All metrics, age cohorts, and family distributions update live from verified parish records.
+
+            Welcome to your parish dashboard. View verified family directories, sacramental records, and community statistics for {activeParish?.city || 'Brisbane'} in real time.
           </p>
 
           {/* Quick Action Buttons (Touch Friendly) */}
@@ -358,9 +359,8 @@ export const DashboardPage: React.FC = () => {
           {/* Metric 1: Registered Families */}
           <div
             onClick={() => canViewRegister && navigate('/register?type=FAMILY')}
-            className={`bg-parish-surface border border-parish-border p-4 sm:p-5 rounded-2xl shadow-xs space-y-1 transition-all group ${
-              canViewRegister ? 'hover:border-emerald-400/80 cursor-pointer' : ''
-            }`}
+            className={`bg-parish-surface border border-parish-border p-4 sm:p-5 rounded-2xl shadow-xs space-y-1 transition-all group ${canViewRegister ? 'hover:border-emerald-400/80 cursor-pointer' : ''
+              }`}
             title={canViewRegister ? 'Click to view Families in Parish Register' : undefined}
           >
             <div className="flex items-center justify-between text-parish-text-muted text-xs font-bold uppercase tracking-wider">
@@ -381,9 +381,8 @@ export const DashboardPage: React.FC = () => {
           {/* Metric 2: Total Parishioners (All Souls) */}
           <div
             onClick={() => canViewRegister && navigate('/register')}
-            className={`bg-parish-surface border border-parish-border p-4 sm:p-5 rounded-2xl shadow-xs space-y-1 transition-all group ${
-              canViewRegister ? 'hover:border-blue-400/80 cursor-pointer' : ''
-            }`}
+            className={`bg-parish-surface border border-parish-border p-4 sm:p-5 rounded-2xl shadow-xs space-y-1 transition-all group ${canViewRegister ? 'hover:border-blue-400/80 cursor-pointer' : ''
+              }`}
             title={canViewRegister ? 'Click to view all Parish Members in Register' : undefined}
           >
             <div className="flex items-center justify-between text-parish-text-muted text-xs font-bold uppercase tracking-wider">
@@ -404,9 +403,8 @@ export const DashboardPage: React.FC = () => {
           {/* Metric 3: Adult Parishioners (18+) */}
           <div
             onClick={() => canViewRegister && navigate('/register')}
-            className={`bg-parish-surface border border-parish-border p-4 sm:p-5 rounded-2xl shadow-xs space-y-1 transition-all group ${
-              canViewRegister ? 'hover:border-indigo-400/80 cursor-pointer' : ''
-            }`}
+            className={`bg-parish-surface border border-parish-border p-4 sm:p-5 rounded-2xl shadow-xs space-y-1 transition-all group ${canViewRegister ? 'hover:border-indigo-400/80 cursor-pointer' : ''
+              }`}
             title={canViewRegister ? 'Adult parishioners aged 18 and over' : undefined}
           >
             <div className="flex items-center justify-between text-parish-text-muted text-xs font-bold uppercase tracking-wider">
@@ -427,9 +425,8 @@ export const DashboardPage: React.FC = () => {
           {/* Metric 4: Children & Minors (<18) */}
           <div
             onClick={() => canViewRegister && navigate('/register')}
-            className={`bg-parish-surface border border-parish-border p-4 sm:p-5 rounded-2xl shadow-xs space-y-1 transition-all group ${
-              canViewRegister ? 'hover:border-amber-400/80 cursor-pointer' : ''
-            }`}
+            className={`bg-parish-surface border border-parish-border p-4 sm:p-5 rounded-2xl shadow-xs space-y-1 transition-all group ${canViewRegister ? 'hover:border-amber-400/80 cursor-pointer' : ''
+              }`}
             title={canViewRegister ? 'Children and minors under 18' : undefined}
           >
             <div className="flex items-center justify-between text-parish-text-muted text-xs font-bold uppercase tracking-wider">
@@ -450,9 +447,8 @@ export const DashboardPage: React.FC = () => {
           {/* Metric 5: Family Units / Wards */}
           <div
             onClick={() => canViewUnits && navigate('/units')}
-            className={`bg-parish-surface border border-parish-border p-4 sm:p-5 rounded-2xl shadow-xs space-y-1 transition-all group ${
-              canViewUnits ? 'hover:border-violet-400/80 cursor-pointer' : ''
-            }`}
+            className={`bg-parish-surface border border-parish-border p-4 sm:p-5 rounded-2xl shadow-xs space-y-1 transition-all group ${canViewUnits ? 'hover:border-violet-400/80 cursor-pointer' : ''
+              }`}
             title={canViewUnits ? 'Click to view Wards & Units' : undefined}
           >
             <div className="flex items-center justify-between text-parish-text-muted text-xs font-bold uppercase tracking-wider">
@@ -477,156 +473,249 @@ export const DashboardPage: React.FC = () => {
       {activeCardIds.length > 0 && (
         <div className={`grid grid-cols-1 ${activeCardIds.length > 1 ? 'lg:grid-cols-2' : ''} gap-6`}>
 
-        {/* Chart 1: Adults vs Children & Minors (Donut Chart) */}
-        {isFeatureEnabled('DASH_DEMO_COMPOSITION') && (
-          <div className={`bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4 ${isSpanFull('demo_ratio') ? 'lg:col-span-2' : ''}`}>
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-bold text-parish-text flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-blue-600" />
-                Adults vs. Children Ratio
-              </h2>
-              <p className="text-xs text-parish-text-muted">
-                Parish generation ratio (Adults 18+ vs Children & Minors).
-              </p>
-            </div>
-            <Badge variant="subtle" size="sm">
-              Generation Split
-            </Badge>
-          </div>
-
-          <div className="h-64 sm:h-72 w-full flex flex-col sm:flex-row items-center justify-center gap-4">
-            {isLoading ? (
-              <div className="w-full h-full bg-parish-surface-subtle animate-pulse rounded-xl" />
-            ) : adultsVsKids.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-xs text-parish-text-muted">
-                No demographic data available.
-              </div>
-            ) : (
-              <>
-                <div className="w-full sm:w-1/2 h-52 relative flex items-center justify-center">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={adultsVsKids}
-                        dataKey="count"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={55}
-                        outerRadius={80}
-                        paddingAngle={5}
-                      >
-                        {adultsVsKids.map((entry) => (
-                          <Cell
-                            key={`adult-cell-${entry.name}`}
-                            fill={ADULT_KID_PALETTE[entry.name] || '#64748b'}
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: '#ffffff',
-                          borderRadius: '12px',
-                          border: '1px solid #e5e2d9',
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                          fontSize: '12px',
-                        }}
-                        formatter={(value: any, name: any) => [`${value} parishioners`, name]}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  {/* Center Stat Badge */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className="text-xl sm:text-2xl font-black text-parish-text">
-                      {stats?.totalParishioners ?? 0}
-                    </span>
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-parish-text-muted">
-                      Total Members
-                    </span>
-                  </div>
+          {/* Chart 1: Adults vs Children & Minors (Donut Chart) */}
+          {isFeatureEnabled('DASH_DEMO_COMPOSITION') && (
+            <div className={`bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4 ${isSpanFull('demo_ratio') ? 'lg:col-span-2' : ''}`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-bold text-parish-text flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-blue-600" />
+                    Adults vs. Children Ratio
+                  </h2>
+                  <p className="text-xs text-parish-text-muted">
+                    Parish generation ratio (Adults 18+ vs Children & Minors).
+                  </p>
                 </div>
+                <Badge variant="subtle" size="sm">
+                  Generation Split
+                </Badge>
+              </div>
 
-                <div className="w-full sm:w-1/2 space-y-2.5">
-                  {adultsVsKids.map((item) => {
-                    const color = ADULT_KID_PALETTE[item.name] || '#64748b';
-                    return (
-                      <div
-                        key={item.name}
-                        className="p-3 rounded-xl bg-parish-surface-subtle/70 border border-parish-border/60 space-y-1 transition-all hover:bg-parish-surface-subtle"
-                      >
-                        <div className="flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="w-3.5 h-3.5 rounded-full shrink-0 shadow-xs"
-                              style={{ backgroundColor: color }}
-                            />
-                            <span className="font-bold text-parish-text">{item.name}</span>
-                          </div>
-                          <span className="font-extrabold text-parish-text text-sm">{item.count}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-[11px] text-parish-text-muted">
-                          <span>{item.name.includes('Adult') ? 'Eligible voters & heads' : 'Sunday School & youth'}</span>
-                          <span className="font-mono font-bold text-parish-text">({item.percentage}%)</span>
-                        </div>
+              <div className="h-64 sm:h-72 w-full flex flex-col sm:flex-row items-center justify-center gap-4">
+                {isLoading ? (
+                  <div className="w-full h-full bg-parish-surface-subtle animate-pulse rounded-xl" />
+                ) : adultsVsKids.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-xs text-parish-text-muted">
+                    No demographic data available.
+                  </div>
+                ) : (
+                  <>
+                    <div className="w-full sm:w-1/2 h-52 relative flex items-center justify-center">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={adultsVsKids}
+                            dataKey="count"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={55}
+                            outerRadius={80}
+                            paddingAngle={5}
+                          >
+                            {adultsVsKids.map((entry) => (
+                              <Cell
+                                key={`adult-cell-${entry.name}`}
+                                fill={ADULT_KID_PALETTE[entry.name] || '#64748b'}
+                              />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: '#ffffff',
+                              borderRadius: '12px',
+                              border: '1px solid #e5e2d9',
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                              fontSize: '12px',
+                            }}
+                            formatter={(value: any, name: any) => [`${value} parishioners`, name]}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      {/* Center Stat Badge */}
+                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                        <span className="text-xl sm:text-2xl font-black text-parish-text">
+                          {stats?.totalParishioners ?? 0}
+                        </span>
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-parish-text-muted">
+                          Total Members
+                        </span>
                       </div>
-                    );
-                  })}
+                    </div>
 
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-        )}
+                    <div className="w-full sm:w-1/2 space-y-2.5">
+                      {adultsVsKids.map((item) => {
+                        const color = ADULT_KID_PALETTE[item.name] || '#64748b';
+                        return (
+                          <div
+                            key={item.name}
+                            className="p-3 rounded-xl bg-parish-surface-subtle/70 border border-parish-border/60 space-y-1 transition-all hover:bg-parish-surface-subtle"
+                          >
+                            <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="w-3.5 h-3.5 rounded-full shrink-0 shadow-xs"
+                                  style={{ backgroundColor: color }}
+                                />
+                                <span className="font-bold text-parish-text">{item.name}</span>
+                              </div>
+                              <span className="font-extrabold text-parish-text text-sm">{item.count}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-[11px] text-parish-text-muted">
+                              <span>{item.name.includes('Adult') ? 'Eligible voters & heads' : 'Sunday School & youth'}</span>
+                              <span className="font-mono font-bold text-parish-text">({item.percentage}%)</span>
+                            </div>
+                          </div>
+                        );
+                      })}
 
-        {/* Chart 2: Household Registration Demographics (Donut Chart) */}
-        {isFeatureEnabled('DASH_DEMO_COMPOSITION') && (
-          <div className={`bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4 ${isSpanFull('demo_types') ? 'lg:col-span-2' : ''}`}>
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-bold text-parish-text flex items-center gap-2">
-                <Home className="w-4 h-4 text-emerald-600" />
-                Household Registration Types
-              </h2>
-              <p className="text-xs text-parish-text-muted">
-                Family units, international students, and single youth.
-              </p>
-            </div>
-            <Badge variant="default" size="sm">
-              Categorized
-            </Badge>
-          </div>
-
-          <div className="h-64 sm:h-72 w-full flex flex-col sm:flex-row items-center justify-center gap-4">
-            {isLoading ? (
-              <div className="w-full h-full bg-parish-surface-subtle animate-pulse rounded-xl" />
-            ) : registrationTypes.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-xs text-parish-text-muted">
-                No demographic breakdown data available.
+                    </div>
+                  </>
+                )}
               </div>
-            ) : (
-              <>
-                <div className="w-full sm:w-1/2 h-52 relative flex items-center justify-center">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={registrationTypes}
-                        dataKey="count"
-                        nameKey="type"
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={55}
-                        outerRadius={80}
-                        paddingAngle={5}
-                      >
-                        {registrationTypes.map((entry) => (
-                          <Cell
-                            key={`demographic-cell-${entry.type}`}
-                            fill={DEMOGRAPHIC_PALETTE[entry.type] || '#8b5cf6'}
+            </div>
+          )}
+
+          {/* Chart 2: Household Registration Demographics (Donut Chart) */}
+          {isFeatureEnabled('DASH_DEMO_COMPOSITION') && (
+            <div className={`bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4 ${isSpanFull('demo_types') ? 'lg:col-span-2' : ''}`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-bold text-parish-text flex items-center gap-2">
+                    <Home className="w-4 h-4 text-emerald-600" />
+                    Household Registration Types
+                  </h2>
+                  <p className="text-xs text-parish-text-muted">
+                    Family units, international students, and single youth.
+                  </p>
+                </div>
+                <Badge variant="default" size="sm">
+                  Categorized
+                </Badge>
+              </div>
+
+              <div className="h-64 sm:h-72 w-full flex flex-col sm:flex-row items-center justify-center gap-4">
+                {isLoading ? (
+                  <div className="w-full h-full bg-parish-surface-subtle animate-pulse rounded-xl" />
+                ) : registrationTypes.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-xs text-parish-text-muted">
+                    No demographic breakdown data available.
+                  </div>
+                ) : (
+                  <>
+                    <div className="w-full sm:w-1/2 h-52 relative flex items-center justify-center">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={registrationTypes}
+                            dataKey="count"
+                            nameKey="type"
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={55}
+                            outerRadius={80}
+                            paddingAngle={5}
+                          >
+                            {registrationTypes.map((entry) => (
+                              <Cell
+                                key={`demographic-cell-${entry.type}`}
+                                fill={DEMOGRAPHIC_PALETTE[entry.type] || '#8b5cf6'}
+                              />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: '#ffffff',
+                              borderRadius: '12px',
+                              border: '1px solid #e5e2d9',
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                              fontSize: '12px',
+                            }}
+                            formatter={(value: any, name: any) => [`${value} households`, name]}
                           />
-                        ))}
-                      </Pie>
+                        </PieChart>
+                      </ResponsiveContainer>
+                      {/* Center Stat Badge */}
+                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                        <span className="text-xl sm:text-2xl font-black text-parish-text">
+                          {stats?.totalHouseholds ?? 0}
+                        </span>
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-parish-text-muted">
+                          Households
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="w-full sm:w-1/2 space-y-2">
+                      {registrationTypes.map((t) => {
+                        const color = DEMOGRAPHIC_PALETTE[t.type] || '#8b5cf6';
+                        const totalReg = registrationTypes.reduce((acc, curr) => acc + curr.count, 0);
+                        const pct = totalReg > 0 ? ((t.count / totalReg) * 100).toFixed(1) : '0';
+                        return (
+                          <div
+                            key={t.type}
+                            className="flex items-center justify-between text-xs p-2.5 rounded-xl bg-parish-surface-subtle/70 border border-parish-border/50 transition-all hover:bg-parish-surface-subtle"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="w-3.5 h-3.5 rounded-full shrink-0 shadow-xs"
+                                style={{ backgroundColor: color }}
+                              />
+                              <span className="font-semibold text-parish-text">{t.type}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-parish-text">{t.count}</span>
+                              <span className="text-[10px] text-parish-text-muted font-mono font-semibold">({pct}%)</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Chart 3: Pastoral & Catechism Age Brackets (Bar Chart) */}
+          {isFeatureEnabled('DASH_AGE_BRACKETS') && (
+            <div className={`bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4 ${isSpanFull('age_brackets') ? 'lg:col-span-2' : ''}`}>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-bold text-parish-text flex items-center gap-2">
+                    <Users className="w-4 h-4 text-emerald-600" />
+                    Age Demographics & Generations
+                  </h2>
+                  <p className="text-xs text-parish-text-muted">
+                    Age breakdown of all registered parish members.
+                  </p>
+                </div>
+                <Badge variant="subtle" size="sm">
+                  7 Cohorts
+                </Badge>
+              </div>
+
+              <div className="h-64 sm:h-72 w-full pt-2">
+                {isLoading ? (
+                  <div className="w-full h-full bg-parish-surface-subtle animate-pulse rounded-xl" />
+                ) : ageBrackets.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-xs text-parish-text-muted">
+                    No age bracket data available.
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={ageBrackets} margin={{ top: 10, right: 10, left: -20, bottom: 35 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e2d9" />
+                      <XAxis
+                        dataKey="bracket"
+                        tick={{ fontSize: 10.5, fill: '#64748b' }}
+                        interval={0}
+                        angle={-25}
+                        textAnchor="end"
+                        height={42}
+                      />
+                      <YAxis tick={{ fontSize: 11, fill: '#64748b' }} allowDecimals={false} />
                       <Tooltip
                         contentStyle={{
                           backgroundColor: '#ffffff',
@@ -635,544 +724,451 @@ export const DashboardPage: React.FC = () => {
                           boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
                           fontSize: '12px',
                         }}
-                        formatter={(value: any, name: any) => [`${value} households`, name]}
+                        formatter={(value: any, _name: any, item: any) => [
+                          `${value} parishioners`,
+                          item?.payload?.label || 'Count',
+                        ]}
                       />
-                    </PieChart>
+                      <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                        {ageBrackets.map((entry, index) => (
+                          <Cell key={`bracket-cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
                   </ResponsiveContainer>
-                  {/* Center Stat Badge */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className="text-xl sm:text-2xl font-black text-parish-text">
-                      {stats?.totalHouseholds ?? 0}
-                    </span>
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-parish-text-muted">
-                      Households
-                    </span>
+                )}
+              </div>
+              {/* Quick Bracket Tags */}
+              <div className="flex items-center gap-2 flex-wrap pt-1">
+                {ageBrackets.map((b) => (
+                  <span
+                    key={b.bracket}
+                    className="text-[10px] font-medium px-2 py-0.5 rounded-full border border-parish-border/60 bg-parish-surface-subtle flex items-center gap-1 text-parish-text-muted"
+                  >
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: b.color }} />
+                    <span>{b.bracket}: <strong>{b.count}</strong></span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Chart 4: Household Size Distribution (Bar Chart) */}
+          {isFeatureEnabled('DASH_FAMILY_SIZE') && (
+            <div className={`bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4 ${isSpanFull('family_size') ? 'lg:col-span-2' : ''}`}>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-bold text-parish-text flex items-center gap-2">
+                    <HeartHandshake className="w-4 h-4 text-purple-600" />
+                    Household Size Breakdown
+                  </h2>
+                  <p className="text-xs text-parish-text-muted">
+                    Number of registered family members.
+                  </p>
+                </div>
+                <Badge variant="subtle" size="sm">
+                  Family Size
+                </Badge>
+              </div>
+
+              <div className="h-64 sm:h-72 w-full pt-2">
+                {isLoading ? (
+                  <div className="w-full h-full bg-parish-surface-subtle animate-pulse rounded-xl" />
+                ) : familySizes.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-xs text-parish-text-muted">
+                    No household size data available.
                   </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={familySizes} margin={{ top: 10, right: 10, left: -20, bottom: 25 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e2d9" />
+                      <XAxis
+                        dataKey="size"
+                        tickFormatter={(val: string) => (val ? String(val).replace(/Members?/i, 'Mem.') : '')}
+                        tick={{ fontSize: 10.5, fill: '#64748b' }}
+                        interval={0}
+                        height={30}
+                      />
+                      <YAxis tick={{ fontSize: 11, fill: '#64748b' }} allowDecimals={false} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#ffffff',
+                          borderRadius: '12px',
+                          border: '1px solid #e5e2d9',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                          fontSize: '12px',
+                        }}
+                        formatter={(value: any, _name: any, item: any) => [
+                          `${value} families (${item?.payload?.percentage || 0}%)`,
+                          item?.payload?.description || item?.payload?.size || 'Household Size',
+                        ]}
+                      />
+                      <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                        {familySizes.map((_, index) => (
+                          <Cell
+                            key={`size-cell-${index}`}
+                            fill={FAMILY_SIZE_COLORS[index % FAMILY_SIZE_COLORS.length]}
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+
+              {/* Family Size Summary Badges */}
+              <div className="flex items-center gap-2 flex-wrap pt-1">
+                {familySizes.map((s, idx) => (
+                  <span
+                    key={s.size}
+                    className="text-[10px] font-medium px-2 py-0.5 rounded-full border border-parish-border/60 bg-parish-surface-subtle flex items-center gap-1 text-parish-text-muted"
+                  >
+                    <span
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ backgroundColor: FAMILY_SIZE_COLORS[idx % FAMILY_SIZE_COLORS.length] }}
+                    />
+                    <span>{(s.size || '').replace(/Members?/i, 'Mem.')}: <strong>{s.count}</strong> ({s.percentage}%)</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Chart 5: Year-Wise Registration Growth (Area Chart) */}
+          {isFeatureEnabled('DASH_TREND_CHART') && (
+            <div className={`bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4 ${isSpanFull('trend_timeline') ? 'lg:col-span-2' : ''}`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-bold text-parish-text flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-emerald-600" />
+                    Parish Registration Timeline
+                  </h2>
+                  <p className="text-xs text-parish-text-muted">
+                    Annual new family intake and growth trajectory over time.
+                  </p>
+                </div>
+                <Badge variant="success" size="sm">
+                  Annual Influx
+                </Badge>
+              </div>
+
+              <div className="h-64 sm:h-72 w-full pt-2">
+                {isLoading ? (
+                  <div className="w-full h-full bg-parish-surface-subtle animate-pulse rounded-xl" />
+                ) : yearlyRegistrations.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-xs text-parish-text-muted">
+                    No registration timeline data available.
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={yearlyRegistrations} margin={{ top: 10, right: 10, left: -20, bottom: 25 }}>
+                      <defs>
+                        <linearGradient id="growthGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
+                          <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.02} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e2d9" />
+                      <XAxis
+                        dataKey="year"
+                        tick={{ fontSize: 11, fill: '#64748b' }}
+                        interval={0}
+                        angle={-20}
+                        textAnchor="end"
+                        height={35}
+                      />
+                      <YAxis tick={{ fontSize: 11, fill: '#64748b' }} allowDecimals={false} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#ffffff',
+                          borderRadius: '12px',
+                          border: '1px solid #e5e2d9',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                          fontSize: '12px',
+                        }}
+                        formatter={(value: any, _name: any, item: any) => [
+                          `${value} new families (Cumulative: ${item?.payload?.cumulative || value})`,
+                          `Year ${item?.payload?.year}`,
+                        ]}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="count"
+                        stroke="#059669"
+                        strokeWidth={2.5}
+                        fillOpacity={1}
+                        fill="url(#growthGradient)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+              <p className="text-[11px] text-parish-text-muted italic pt-1">
+                📈 Displays year-on-year family integration history across the parish.
+              </p>
+            </div>
+          )}
+
+          {/* Chart 6: Top Suburbs in Brisbane / Queensland (Horizontal Bar Chart) */}
+          {isFeatureEnabled('DASH_SUBURB_CHART') && (
+            <div className={`bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4 ${isSpanFull('trend_suburbs') ? 'lg:col-span-2' : ''}`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-bold text-parish-text flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-cyan-600" />
+                    Top Suburbs Spread
+                  </h2>
+                  <p className="text-xs text-parish-text-muted">
+                    Geographic distribution of registered households across residential suburbs.
+                  </p>
+                </div>
+                <Badge variant="subtle" size="sm">
+                  Top 8 Suburbs
+                </Badge>
+              </div>
+
+              <div className="h-64 sm:h-72 w-full pt-2">
+                {isLoading ? (
+                  <div className="w-full h-full bg-parish-surface-subtle animate-pulse rounded-xl" />
+                ) : suburbDistribution.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-xs text-parish-text-muted">
+                    No suburb distribution data available.
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={suburbDistribution}
+                      layout="vertical"
+                      margin={{ top: 5, right: 20, left: 25, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e2d9" />
+                      <XAxis type="number" tick={{ fontSize: 11, fill: '#64748b' }} allowDecimals={false} />
+                      <YAxis
+                        dataKey="suburb"
+                        type="category"
+                        tick={{ fontSize: 11, fill: '#1e293b', fontWeight: 600 }}
+                        width={90}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#ffffff',
+                          borderRadius: '12px',
+                          border: '1px solid #e5e2d9',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                          fontSize: '12px',
+                        }}
+                        formatter={(value: any, _name: any, item: any) => [
+                          `${value} registered families`,
+                          item?.payload?.suburb || 'Suburb',
+                        ]}
+                      />
+                      <Bar dataKey="count" radius={[0, 6, 6, 0]}>
+                        {suburbDistribution.map((_, index) => (
+                          <Cell
+                            key={`suburb-cell-${index}`}
+                            fill={SUBURB_COLORS[index % SUBURB_COLORS.length]}
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Chart 7: Families by Ward (Bar Chart) */}
+          {isFeatureEnabled('DASH_WARD_CHART') && (
+            <div className={`bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4 ${isSpanFull('ward_chart') ? 'lg:col-span-2' : ''}`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-bold text-parish-text flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-parish-primary" />
+                    Families by Ward Jurisdiction
+                  </h2>
+                  <p className="text-xs text-parish-text-muted">
+                    Distribution of registered families across active parish prayer wards.
+                  </p>
+                </div>
+                <Badge variant="subtle" size="sm">
+                  {wardDistribution.length} Wards
+                </Badge>
+              </div>
+
+              <div className="h-64 sm:h-72 w-full pt-2">
+                {isLoading ? (
+                  <div className="w-full h-full bg-parish-surface-subtle animate-pulse rounded-xl" />
+                ) : wardDistribution.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-xs text-parish-text-muted">
+                    No ward distribution data available.
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={wardDistribution} margin={{ top: 10, right: 10, left: -20, bottom: 35 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e2d9" />
+                      <XAxis
+                        dataKey="name"
+                        tick={{ fontSize: 11, fill: '#64748b' }}
+                        interval={0}
+                        angle={-25}
+                        textAnchor="end"
+                        height={45}
+                      />
+                      <YAxis tick={{ fontSize: 11, fill: '#64748b' }} allowDecimals={false} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#ffffff',
+                          borderRadius: '12px',
+                          border: '1px solid #e5e2d9',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
+                          fontSize: '12px',
+                        }}
+                        formatter={(value: any, _name: any, item: any) => [
+                          `${value} families`,
+                          item?.payload?.name ? `${item.payload.name} Ward` : 'Registered',
+                        ]}
+                      />
+                      <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                        {wardDistribution.map((_, index) => (
+                          <Cell
+                            key={`ward-cell-${index}`}
+                            fill={WARD_BAR_COLORS[index % WARD_BAR_COLORS.length]}
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Chart 8: Dioceses of Origin in Kerala / India (Searchable List) */}
+          {isFeatureEnabled('DASH_ORIGIN_DIOCESES') && (
+            <div className={`bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft flex flex-col space-y-4 ${isSpanFull('origin_dioceses') ? 'lg:col-span-2' : ''}`}>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-base font-bold text-parish-text flex items-center gap-2">
+                      <Church className="w-4 h-4 text-parish-primary" />
+                      Dioceses of Origin (Kerala / India)
+                    </h2>
+                    <p className="text-xs text-parish-text-muted">
+                      Parishioners native roots across Kerala & India ({diocesesDistribution.length} dioceses).
+                    </p>
+                  </div>
+                  {isFeatureEnabled('PAGE_SETTINGS') && (
+                    <button
+                      onClick={() => navigate('/settings')}
+                      className="text-xs font-semibold text-parish-primary hover:underline"
+                    >
+                      Settings
+                    </button>
+                  )}
                 </div>
 
-                <div className="w-full sm:w-1/2 space-y-2">
-                  {registrationTypes.map((t) => {
-                    const color = DEMOGRAPHIC_PALETTE[t.type] || '#8b5cf6';
-                    const totalReg = registrationTypes.reduce((acc, curr) => acc + curr.count, 0);
-                    const pct = totalReg > 0 ? ((t.count / totalReg) * 100).toFixed(1) : '0';
+                {/* Quick Search */}
+                {diocesesDistribution.length > 5 && (
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Find diocese (e.g. Mananthavady, Palai)..."
+                      value={dioceseSearch}
+                      onChange={(e) => setDioceseSearch(e.target.value)}
+                      className="w-full bg-parish-surface-subtle text-xs text-parish-text placeholder:text-parish-text-muted/60 px-2.5 py-1.5 pl-7 pr-7 rounded-lg border border-parish-border focus:outline-none focus:ring-1 focus:ring-parish-primary"
+                    />
+                    <Search className="w-3.5 h-3.5 text-parish-text-muted absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    {dioceseSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setDioceseSearch('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-parish-text-muted hover:text-parish-text"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className={`space-y-1 ${isSpanFull('origin_dioceses') ? 'md:grid md:grid-cols-2 md:gap-x-6 md:gap-y-1 md:space-y-0' : ''} ${showAllDioceses || dioceseSearch ? 'max-h-80 overflow-y-auto pr-1' : ''}`}>
+                {isLoading ? (
+                  <div className="space-y-2">
+                    {[1, 2, 3, 4, 5, 6].map((i) => (
+                      <div key={i} className="h-8 bg-parish-surface-subtle animate-pulse rounded" />
+                    ))}
+                  </div>
+                ) : filteredDioceses.length === 0 ? (
+                  <div className="text-xs text-parish-text-muted py-6 text-center">
+                    {dioceseSearch ? `No diocese matching "${dioceseSearch}"` : 'No origin diocese data logged yet.'}
+                  </div>
+                ) : (
+                  filteredDioceses.map((d, idx) => {
+                    const rawPct = totalFamiliesWithDiocese > 0 ? (d.count / totalFamiliesWithDiocese) * 100 : 0;
+                    const pctDisplay = rawPct === 0 ? '0%' : rawPct < 1 ? '<1%' : `${Math.round(rawPct)}%`;
                     return (
                       <div
-                        key={t.type}
-                        className="flex items-center justify-between text-xs p-2.5 rounded-xl bg-parish-surface-subtle/70 border border-parish-border/50 transition-all hover:bg-parish-surface-subtle"
+                        key={d.diocese}
+                        className="flex items-center justify-between text-xs py-1.5 px-2 rounded-lg hover:bg-parish-surface-subtle transition-colors border-b border-parish-border/40 last:border-b-0"
                       >
                         <div className="flex items-center gap-2">
                           <span
-                            className="w-3.5 h-3.5 rounded-full shrink-0 shadow-xs"
-                            style={{ backgroundColor: color }}
-                          />
-                          <span className="font-semibold text-parish-text">{t.type}</span>
+                            className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] shrink-0 ${idx === 0
+                              ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                              : idx === 1
+                                ? 'bg-slate-200 text-slate-700 border border-slate-300'
+                                : idx === 2
+                                  ? 'bg-orange-100 text-orange-800 border border-orange-300'
+                                  : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border/50'
+                              }`}
+                          >
+                            {idx + 1}
+                          </span>
+                          <span className="font-semibold text-parish-text">{d.diocese}</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-parish-text">{t.count}</span>
-                          <span className="text-[10px] text-parish-text-muted font-mono font-semibold">({pct}%)</span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <Badge variant="subtle" size="sm" title={`${d.count} families`}>
+                            {d.count}
+                          </Badge>
+                          <span
+                            className="text-[10px] text-parish-text-muted/70 w-8 text-right font-mono"
+                            title={`${rawPct.toFixed(2)}% of families`}
+                          >
+                            {pctDisplay}
+                          </span>
                         </div>
                       </div>
                     );
-                  })}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-        )}
-
-        {/* Chart 3: Pastoral & Catechism Age Brackets (Bar Chart) */}
-        {isFeatureEnabled('DASH_AGE_BRACKETS') && (
-          <div className={`bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4 ${isSpanFull('age_brackets') ? 'lg:col-span-2' : ''}`}>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-bold text-parish-text flex items-center gap-2">
-                <Users className="w-4 h-4 text-emerald-600" />
-                Age Demographics & Generations
-              </h2>
-              <p className="text-xs text-parish-text-muted">
-                Age breakdown of all registered parish members.
-              </p>
-            </div>
-            <Badge variant="subtle" size="sm">
-              7 Cohorts
-            </Badge>
-          </div>
-
-          <div className="h-64 sm:h-72 w-full pt-2">
-            {isLoading ? (
-              <div className="w-full h-full bg-parish-surface-subtle animate-pulse rounded-xl" />
-            ) : ageBrackets.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-xs text-parish-text-muted">
-                No age bracket data available.
+                  })
+                )}
               </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={ageBrackets} margin={{ top: 10, right: 10, left: -20, bottom: 35 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e2d9" />
-                  <XAxis
-                    dataKey="bracket"
-                    tick={{ fontSize: 10.5, fill: '#64748b' }}
-                    interval={0}
-                    angle={-25}
-                    textAnchor="end"
-                    height={42}
-                  />
-                  <YAxis tick={{ fontSize: 11, fill: '#64748b' }} allowDecimals={false} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#ffffff',
-                      borderRadius: '12px',
-                      border: '1px solid #e5e2d9',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                      fontSize: '12px',
-                    }}
-                    formatter={(value: any, _name: any, item: any) => [
-                      `${value} parishioners`,
-                      item?.payload?.label || 'Count',
-                    ]}
-                  />
-                  <Bar dataKey="count" radius={[6, 6, 0, 0]}>
-                    {ageBrackets.map((entry, index) => (
-                      <Cell key={`bracket-cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-          {/* Quick Bracket Tags */}
-          <div className="flex items-center gap-2 flex-wrap pt-1">
-            {ageBrackets.map((b) => (
-              <span
-                key={b.bracket}
-                className="text-[10px] font-medium px-2 py-0.5 rounded-full border border-parish-border/60 bg-parish-surface-subtle flex items-center gap-1 text-parish-text-muted"
-              >
-                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: b.color }} />
-                <span>{b.bracket}: <strong>{b.count}</strong></span>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
 
-      {/* Chart 4: Household Size Distribution (Bar Chart) */}
-      {isFeatureEnabled('DASH_FAMILY_SIZE') && (
-        <div className={`bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4 ${isSpanFull('family_size') ? 'lg:col-span-2' : ''}`}>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-bold text-parish-text flex items-center gap-2">
-                <HeartHandshake className="w-4 h-4 text-purple-600" />
-                Household Size Breakdown
-              </h2>
-              <p className="text-xs text-parish-text-muted">
-                Number of registered family members.
-              </p>
-            </div>
-            <Badge variant="subtle" size="sm">
-              Family Size
-            </Badge>
-          </div>
-
-          <div className="h-64 sm:h-72 w-full pt-2">
-            {isLoading ? (
-              <div className="w-full h-full bg-parish-surface-subtle animate-pulse rounded-xl" />
-            ) : familySizes.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-xs text-parish-text-muted">
-                No household size data available.
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={familySizes} margin={{ top: 10, right: 10, left: -20, bottom: 25 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e2d9" />
-                  <XAxis
-                    dataKey="size"
-                    tickFormatter={(val: string) => (val ? String(val).replace(/Members?/i, 'Mem.') : '')}
-                    tick={{ fontSize: 10.5, fill: '#64748b' }}
-                    interval={0}
-                    height={30}
-                  />
-                  <YAxis tick={{ fontSize: 11, fill: '#64748b' }} allowDecimals={false} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#ffffff',
-                      borderRadius: '12px',
-                      border: '1px solid #e5e2d9',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                      fontSize: '12px',
-                    }}
-                    formatter={(value: any, _name: any, item: any) => [
-                      `${value} families (${item?.payload?.percentage || 0}%)`,
-                      item?.payload?.description || item?.payload?.size || 'Household Size',
-                    ]}
-                  />
-                  <Bar dataKey="count" radius={[6, 6, 0, 0]}>
-                    {familySizes.map((_, index) => (
-                      <Cell
-                        key={`size-cell-${index}`}
-                        fill={FAMILY_SIZE_COLORS[index % FAMILY_SIZE_COLORS.length]}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-
-          {/* Family Size Summary Badges */}
-          <div className="flex items-center gap-2 flex-wrap pt-1">
-            {familySizes.map((s, idx) => (
-              <span
-                key={s.size}
-                className="text-[10px] font-medium px-2 py-0.5 rounded-full border border-parish-border/60 bg-parish-surface-subtle flex items-center gap-1 text-parish-text-muted"
-              >
-                <span
-                  className="w-2 h-2 rounded-full shrink-0"
-                  style={{ backgroundColor: FAMILY_SIZE_COLORS[idx % FAMILY_SIZE_COLORS.length] }}
-                />
-                <span>{(s.size || '').replace(/Members?/i, 'Mem.')}: <strong>{s.count}</strong> ({s.percentage}%)</span>
-              </span>
-            ))}
-            </div>
-          </div>
-        )}
-
-        {/* Chart 5: Year-Wise Registration Growth (Area Chart) */}
-        {isFeatureEnabled('DASH_TREND_CHART') && (
-          <div className={`bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4 ${isSpanFull('trend_timeline') ? 'lg:col-span-2' : ''}`}>
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-bold text-parish-text flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-emerald-600" />
-                Parish Registration Timeline
-              </h2>
-              <p className="text-xs text-parish-text-muted">
-                Annual new family intake and growth trajectory over time.
-              </p>
-            </div>
-            <Badge variant="success" size="sm">
-              Annual Influx
-            </Badge>
-          </div>
-
-          <div className="h-64 sm:h-72 w-full pt-2">
-            {isLoading ? (
-              <div className="w-full h-full bg-parish-surface-subtle animate-pulse rounded-xl" />
-            ) : yearlyRegistrations.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-xs text-parish-text-muted">
-                No registration timeline data available.
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={yearlyRegistrations} margin={{ top: 10, right: 10, left: -20, bottom: 25 }}>
-                  <defs>
-                    <linearGradient id="growthGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.02} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e2d9" />
-                  <XAxis
-                    dataKey="year"
-                    tick={{ fontSize: 11, fill: '#64748b' }}
-                    interval={0}
-                    angle={-20}
-                    textAnchor="end"
-                    height={35}
-                  />
-                  <YAxis tick={{ fontSize: 11, fill: '#64748b' }} allowDecimals={false} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#ffffff',
-                      borderRadius: '12px',
-                      border: '1px solid #e5e2d9',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                      fontSize: '12px',
-                    }}
-                    formatter={(value: any, _name: any, item: any) => [
-                      `${value} new families (Cumulative: ${item?.payload?.cumulative || value})`,
-                      `Year ${item?.payload?.year}`,
-                    ]}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="count"
-                    stroke="#059669"
-                    strokeWidth={2.5}
-                    fillOpacity={1}
-                    fill="url(#growthGradient)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-          <p className="text-[11px] text-parish-text-muted italic pt-1">
-            📈 Displays year-on-year family integration history across the parish.
-          </p>
-        </div>
-        )}
-
-        {/* Chart 6: Top Suburbs in Brisbane / Queensland (Horizontal Bar Chart) */}
-        {isFeatureEnabled('DASH_SUBURB_CHART') && (
-          <div className={`bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4 ${isSpanFull('trend_suburbs') ? 'lg:col-span-2' : ''}`}>
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-bold text-parish-text flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-cyan-600" />
-                Top Suburbs Spread
-              </h2>
-              <p className="text-xs text-parish-text-muted">
-                Geographic distribution of registered households across residential suburbs.
-              </p>
-            </div>
-            <Badge variant="subtle" size="sm">
-              Top 8 Suburbs
-            </Badge>
-          </div>
-
-          <div className="h-64 sm:h-72 w-full pt-2">
-            {isLoading ? (
-              <div className="w-full h-full bg-parish-surface-subtle animate-pulse rounded-xl" />
-            ) : suburbDistribution.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-xs text-parish-text-muted">
-                No suburb distribution data available.
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={suburbDistribution}
-                  layout="vertical"
-                  margin={{ top: 5, right: 20, left: 25, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e2d9" />
-                  <XAxis type="number" tick={{ fontSize: 11, fill: '#64748b' }} allowDecimals={false} />
-                  <YAxis
-                    dataKey="suburb"
-                    type="category"
-                    tick={{ fontSize: 11, fill: '#1e293b', fontWeight: 600 }}
-                    width={90}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#ffffff',
-                      borderRadius: '12px',
-                      border: '1px solid #e5e2d9',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                      fontSize: '12px',
-                    }}
-                    formatter={(value: any, _name: any, item: any) => [
-                      `${value} registered families`,
-                      item?.payload?.suburb || 'Suburb',
-                    ]}
-                  />
-                  <Bar dataKey="count" radius={[0, 6, 6, 0]}>
-                    {suburbDistribution.map((_, index) => (
-                      <Cell
-                        key={`suburb-cell-${index}`}
-                        fill={SUBURB_COLORS[index % SUBURB_COLORS.length]}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </div>
-        )}
-
-        {/* Chart 7: Families by Ward (Bar Chart) */}
-        {isFeatureEnabled('DASH_WARD_CHART') && (
-          <div className={`bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft space-y-4 ${isSpanFull('ward_chart') ? 'lg:col-span-2' : ''}`}>
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-bold text-parish-text flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-parish-primary" />
-                Families by Ward Jurisdiction
-              </h2>
-              <p className="text-xs text-parish-text-muted">
-                Distribution of registered families across active parish prayer wards.
-              </p>
-            </div>
-            <Badge variant="subtle" size="sm">
-              {wardDistribution.length} Wards
-            </Badge>
-          </div>
-
-          <div className="h-64 sm:h-72 w-full pt-2">
-            {isLoading ? (
-              <div className="w-full h-full bg-parish-surface-subtle animate-pulse rounded-xl" />
-            ) : wardDistribution.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-xs text-parish-text-muted">
-                No ward distribution data available.
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={wardDistribution} margin={{ top: 10, right: 10, left: -20, bottom: 35 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e2d9" />
-                  <XAxis
-                    dataKey="name"
-                    tick={{ fontSize: 11, fill: '#64748b' }}
-                    interval={0}
-                    angle={-25}
-                    textAnchor="end"
-                    height={45}
-                  />
-                  <YAxis tick={{ fontSize: 11, fill: '#64748b' }} allowDecimals={false} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#ffffff',
-                      borderRadius: '12px',
-                      border: '1px solid #e5e2d9',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
-                      fontSize: '12px',
-                    }}
-                    formatter={(value: any, _name: any, item: any) => [
-                      `${value} families`,
-                      item?.payload?.name ? `${item.payload.name} Ward` : 'Registered',
-                    ]}
-                  />
-                  <Bar dataKey="count" radius={[6, 6, 0, 0]}>
-                    {wardDistribution.map((_, index) => (
-                      <Cell
-                        key={`ward-cell-${index}`}
-                        fill={WARD_BAR_COLORS[index % WARD_BAR_COLORS.length]}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </div>
-        )}
-
-        {/* Chart 8: Dioceses of Origin in Kerala / India (Searchable List) */}
-        {isFeatureEnabled('DASH_ORIGIN_DIOCESES') && (
-          <div className={`bg-parish-surface border border-parish-border rounded-2xl p-5 sm:p-6 shadow-soft flex flex-col space-y-4 ${isSpanFull('origin_dioceses') ? 'lg:col-span-2' : ''}`}>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-base font-bold text-parish-text flex items-center gap-2">
-                  <Church className="w-4 h-4 text-parish-primary" />
-                  Dioceses of Origin (Kerala / India)
-                </h2>
-                <p className="text-xs text-parish-text-muted">
-                  Parishioners native roots across Kerala & India ({diocesesDistribution.length} dioceses).
-                </p>
-              </div>
-              {isFeatureEnabled('PAGE_SETTINGS') && (
-                <button
-                  onClick={() => navigate('/settings')}
-                  className="text-xs font-semibold text-parish-primary hover:underline"
-                >
-                  Settings
-                </button>
-              )}
-            </div>
-
-            {/* Quick Search */}
-            {diocesesDistribution.length > 5 && (
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Find diocese (e.g. Mananthavady, Palai)..."
-                  value={dioceseSearch}
-                  onChange={(e) => setDioceseSearch(e.target.value)}
-                  className="w-full bg-parish-surface-subtle text-xs text-parish-text placeholder:text-parish-text-muted/60 px-2.5 py-1.5 pl-7 pr-7 rounded-lg border border-parish-border focus:outline-none focus:ring-1 focus:ring-parish-primary"
-                />
-                <Search className="w-3.5 h-3.5 text-parish-text-muted absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-                {dioceseSearch && (
+              {/* Show More / Show Less Toggle Button */}
+              {!dioceseSearch && diocesesDistribution.length > 10 && (
+                <div className="pt-2 border-t border-parish-border/60 mt-auto">
                   <button
                     type="button"
-                    onClick={() => setDioceseSearch('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-parish-text-muted hover:text-parish-text"
+                    onClick={() => setShowAllDioceses(!showAllDioceses)}
+                    className="w-full py-1.5 text-xs font-semibold text-parish-primary hover:bg-parish-primary/5 rounded-lg transition-colors flex items-center justify-center gap-1.5"
                   >
-                    <X className="w-3 h-3" />
+                    {showAllDioceses ? (
+                      <>
+                        <ChevronUp className="w-3.5 h-3.5" />
+                        <span>Show Top 10 Only</span>
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="w-3.5 h-3.5" />
+                        <span>Show All {diocesesDistribution.length} Dioceses</span>
+                      </>
+                    )}
                   </button>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className={`space-y-1 ${isSpanFull('origin_dioceses') ? 'md:grid md:grid-cols-2 md:gap-x-6 md:gap-y-1 md:space-y-0' : ''} ${showAllDioceses || dioceseSearch ? 'max-h-80 overflow-y-auto pr-1' : ''}`}>
-            {isLoading ? (
-              <div className="space-y-2">
-                {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <div key={i} className="h-8 bg-parish-surface-subtle animate-pulse rounded" />
-                ))}
-              </div>
-            ) : filteredDioceses.length === 0 ? (
-              <div className="text-xs text-parish-text-muted py-6 text-center">
-                {dioceseSearch ? `No diocese matching "${dioceseSearch}"` : 'No origin diocese data logged yet.'}
-              </div>
-            ) : (
-              filteredDioceses.map((d, idx) => {
-                const rawPct = totalFamiliesWithDiocese > 0 ? (d.count / totalFamiliesWithDiocese) * 100 : 0;
-                const pctDisplay = rawPct === 0 ? '0%' : rawPct < 1 ? '<1%' : `${Math.round(rawPct)}%`;
-                return (
-                  <div
-                    key={d.diocese}
-                    className="flex items-center justify-between text-xs py-1.5 px-2 rounded-lg hover:bg-parish-surface-subtle transition-colors border-b border-parish-border/40 last:border-b-0"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] shrink-0 ${idx === 0
-                          ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                          : idx === 1
-                            ? 'bg-slate-200 text-slate-700 border border-slate-300'
-                            : idx === 2
-                              ? 'bg-orange-100 text-orange-800 border border-orange-300'
-                              : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border/50'
-                          }`}
-                      >
-                        {idx + 1}
-                      </span>
-                      <span className="font-semibold text-parish-text">{d.diocese}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <Badge variant="subtle" size="sm" title={`${d.count} families`}>
-                        {d.count}
-                      </Badge>
-                      <span
-                        className="text-[10px] text-parish-text-muted/70 w-8 text-right font-mono"
-                        title={`${rawPct.toFixed(2)}% of families`}
-                      >
-                        {pctDisplay}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-          {/* Show More / Show Less Toggle Button */}
-          {!dioceseSearch && diocesesDistribution.length > 10 && (
-            <div className="pt-2 border-t border-parish-border/60 mt-auto">
-              <button
-                type="button"
-                onClick={() => setShowAllDioceses(!showAllDioceses)}
-                className="w-full py-1.5 text-xs font-semibold text-parish-primary hover:bg-parish-primary/5 rounded-lg transition-colors flex items-center justify-center gap-1.5"
-              >
-                {showAllDioceses ? (
-                  <>
-                    <ChevronUp className="w-3.5 h-3.5" />
-                    <span>Show Top 10 Only</span>
-                  </>
-                ) : (
-                  <>
-                    <ChevronDown className="w-3.5 h-3.5" />
-                    <span>Show All {diocesesDistribution.length} Dioceses</span>
-                  </>
-                )}
-              </button>
+                </div>
+              )}
             </div>
           )}
         </div>
-        )}
-      </div>
       )}
 
       {/* 7. SECTION 5: RECENT AUDIT TRAIL & QUICK NAVIGATION TOOLS */}

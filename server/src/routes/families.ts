@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { authenticateJWT } from '../middleware/auth.js';
 import { FamilyStatus, RegistrationType, MemberRole, UserRole, Prisma } from '@prisma/client';
-import { canUserApproveRegistration, getUserDirectDebitPermissions, canUserExportModule } from './permissions.js';
+import { canUserApproveRegistration, getUserDirectDebitPermissions, canUserExportModule, checkUserPermission } from './permissions.js';
 import { normalizeAustralianState } from '../lib/address.js';
 import ExcelJS from 'exceljs';
 
@@ -878,7 +878,7 @@ familiesRouter.post('/', async (req: Request, res: Response) => {
   try {
     const parishId = req.activeParishId;
     const user = req.user;
-    const canApprove = user ? await canUserApproveRegistration(user.userId, user.role) : false;
+    const canApprove = user ? await canUserApproveRegistration(user.userId, user.role, parishId, 'REGISTER_NEW') : false;
 
     const {
       registrationType = RegistrationType.FAMILY,
@@ -1055,7 +1055,7 @@ familiesRouter.put('/:id', async (req: Request, res: Response) => {
       }
     }
 
-    const canApprove = user ? await canUserApproveRegistration(user.userId, user.role) : false;
+    const canApprove = user ? await canUserApproveRegistration(user.userId, user.role, parishId, 'REGISTER_NEW') : false;
 
     const {
       registrationType = existing.registrationType,
@@ -1202,7 +1202,7 @@ familiesRouter.post('/:id/approve', async (req: Request, res: Response) => {
 
     if (!user) return res.status(401).json({ error: 'Unauthorized.' });
 
-    const canApprove = await canUserApproveRegistration(user.userId, user.role);
+    const canApprove = await canUserApproveRegistration(user.userId, user.role, parishId, 'REGISTER_NEW');
     if (!canApprove) {
       return res.status(403).json({ error: 'Access denied: You do not have permission to approve registrations.' });
     }
@@ -1386,7 +1386,7 @@ familiesRouter.post('/:id/reject', async (req: Request, res: Response) => {
 
     if (!user) return res.status(401).json({ error: 'Unauthorized.' });
 
-    const canApprove = await canUserApproveRegistration(user.userId, user.role);
+    const canApprove = await canUserApproveRegistration(user.userId, user.role, parishId, 'REGISTER_NEW');
     if (!canApprove) {
       return res.status(403).json({ error: 'Access denied: You do not have permission to reject registrations.' });
     }
@@ -1426,8 +1426,8 @@ familiesRouter.post('/:id/inactivate', async (req: Request, res: Response) => {
 
     if (!user) return res.status(401).json({ error: 'Unauthorized.' });
 
-    const canApprove = await canUserApproveRegistration(user.userId, user.role);
-    if (!canApprove) {
+    const canArchive = await checkUserPermission(user.userId, user.role, parishId, 'REGISTER', 'canArchive');
+    if (!canArchive) {
       return res.status(403).json({ error: 'Access denied: You do not have permission to inactivate household records.' });
     }
 
@@ -1505,8 +1505,8 @@ familiesRouter.post('/:id/reactivate', async (req: Request, res: Response) => {
 
     if (!user) return res.status(401).json({ error: 'Unauthorized.' });
 
-    const canApprove = await canUserApproveRegistration(user.userId, user.role);
-    if (!canApprove) {
+    const canArchive = await checkUserPermission(user.userId, user.role, parishId, 'REGISTER', 'canArchive');
+    if (!canArchive) {
       return res.status(403).json({ error: 'Access denied: You do not have permission to reactivate household records.' });
     }
 

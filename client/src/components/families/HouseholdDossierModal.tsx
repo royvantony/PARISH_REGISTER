@@ -7,7 +7,6 @@ import {
   Home,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { CLIENT_BRANDING } from '../../config/branding';
 
 export interface DossierMember {
   id: number;
@@ -492,7 +491,7 @@ export const HouseholdDossierModal: React.FC<HouseholdDossierModalProps> = ({
               <!-- 1. Header Banner -->
               <div class="header-banner">
                 <div class="header-left">
-                  <img src="${parishLogo || CLIENT_BRANDING.logoUrl}" alt="${parishName}" style="height: 38px; width: auto; object-fit: contain;" onerror="this.onerror=null; this.src='/branding/logo.png';" />
+                  <img src="${parishLogo || '/branding/logo.png'}" alt="${parishName}" style="height: 38px; width: auto; object-fit: contain;" onerror="this.onerror=null; this.src='/branding/logo.png';" />
                   <div id="fallback-crest" class="crest-box" style="display: none;">&#9877;</div>
                   <div class="header-title">
                     <h1>${parishName}</h1>
@@ -709,8 +708,8 @@ export const HouseholdDossierModal: React.FC<HouseholdDossierModalProps> = ({
               >
                 <div className="flex items-center gap-3">
                   <img
-                    src={parishLogo || CLIENT_BRANDING.logoUrl}
-                    alt={activeParish?.parishName || CLIENT_BRANDING.logoAlt}
+                    src={parishLogo || '/branding/logo.png'}
+                    alt={activeParish?.parishName || 'Parish Official Seal'}
                     className="h-10 w-auto object-contain shrink-0"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;

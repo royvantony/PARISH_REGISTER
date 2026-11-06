@@ -19,7 +19,7 @@ import { ForgotPasswordModal } from '../components/auth/ForgotPasswordModal';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { login, logout, user, availableParishes, setActiveParishById } = useAuth();
+  const { login, devLogin, logout, user, availableParishes, setActiveParishById } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -29,6 +29,7 @@ export const LoginPage: React.FC = () => {
   const [inactivityNotice, setInactivityNotice] = useState<string | null>(null);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
+  const [isDevRevealed, setIsDevRevealed] = useState(false);
 
   useEffect(() => {
     const notice = sessionStorage.getItem('inactivity_logout_notice');
@@ -36,6 +37,18 @@ export const LoginPage: React.FC = () => {
       setInactivityNotice(notice);
       sessionStorage.removeItem('inactivity_logout_notice');
     }
+  }, []);
+
+  // Stealth Shortcut Listener: Ctrl + Shift + D (or Cmd + Shift + D) toggles Developer Fast Access
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'd' || e.key === 'D')) {
+        e.preventDefault();
+        setIsDevRevealed((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -57,11 +70,23 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  // Quick autofill helper for easy testing
-  const handleQuickFill = (demoEmail: string, demoPass: string) => {
-    setEmail(demoEmail);
-    setPassword(demoPass);
+  // Developer Bypass Login: Logs in immediately without verifying password
+  const handleDevBypass = async (devEmail: string) => {
     setErrorMessage('');
+    setIsLoading(true);
+
+    const res = await devLogin(devEmail);
+    setIsLoading(false);
+
+    if (res.success) {
+      if (res.needsParishSelection) {
+        setIsChoosingParish(true);
+      } else {
+        navigate('/dashboard');
+      }
+    } else {
+      setErrorMessage(res.error || 'Developer login failed.');
+    }
   };
 
   return (
@@ -242,91 +267,102 @@ export const LoginPage: React.FC = () => {
               </div>
             </form>
 
-            {/* Quick Preset Accounts (Click to test instantly) */}
-            <div className="pt-4 border-t border-parish-border/60 space-y-2.5">
-              <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-parish-text-muted">
-                <Sparkles className="w-3.5 h-3.5 text-parish-accent" />
-                <span>One-Click Demo Credentials</span>
+            {/* Developer Fast Access (Revealed ONLY with Ctrl + Shift + D / Cmd + Shift + D) */}
+            {isDevRevealed && (
+              <div className="pt-4 border-t border-amber-500/30 space-y-2.5 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Developer Fast Access (Password Bypass)</span>
+                  </div>
+                  <Badge variant="warning" size="sm">
+                    DEV / DEMO
+                  </Badge>
+                </div>
+
+                <p className="text-[11px] text-parish-text-muted">
+                  Click any role below to bypass password verification and start a normal authenticated session:
+                </p>
+
+                <div className="grid grid-cols-1 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleDevBypass('royvadakumpadan@gmail.com')}
+                    className="w-full text-left p-2.5 rounded-xl border border-amber-500/30 hover:border-parish-primary hover:bg-parish-surface-subtle transition-all flex items-center justify-between text-xs group cursor-pointer"
+                  >
+                    <div>
+                      <div className="font-bold text-parish-text flex items-center gap-1.5">
+                        <span>⛪ Parish Priest</span>
+                        <span className="text-[10px] text-parish-text-muted font-normal">(PARISH_PRIEST)</span>
+                      </div>
+                      <div className="text-[11px] text-parish-text-muted">royvadakumpadan@gmail.com</div>
+                    </div>
+                    <Badge variant="default" size="sm" className="group-hover:bg-parish-primary group-hover:text-white transition-colors">
+                      Fast Login
+                    </Badge>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDevBypass('royvadakumpadan+trustee@gmail.com')}
+                    className="w-full text-left p-2.5 rounded-xl border border-amber-500/30 hover:border-parish-primary hover:bg-parish-surface-subtle transition-all flex items-center justify-between text-xs group cursor-pointer"
+                  >
+                    <div>
+                      <div className="font-bold text-parish-text flex items-center gap-1.5">
+                        <span>🛡️ Parish Admin</span>
+                        <span className="text-[10px] text-parish-text-muted font-normal">(Trustee)</span>
+                      </div>
+                      <div className="text-[11px] text-parish-text-muted">royvadakumpadan+trustee@gmail.com</div>
+                    </div>
+                    <Badge variant="subtle" size="sm" className="group-hover:bg-parish-primary group-hover:text-white transition-colors">
+                      Fast Login
+                    </Badge>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDevBypass('royvadakumpadan+secretary@gmail.com')}
+                    className="w-full text-left p-2.5 rounded-xl border border-amber-500/30 hover:border-parish-primary hover:bg-parish-surface-subtle transition-all flex items-center justify-between text-xs group cursor-pointer"
+                  >
+                    <div>
+                      <div className="font-bold text-parish-text flex items-center gap-1.5">
+                        <span>📋 Parish User</span>
+                        <span className="text-[10px] text-parish-text-muted font-normal">(Secretary)</span>
+                      </div>
+                      <div className="text-[11px] text-parish-text-muted">royvadakumpadan+secretary@gmail.com</div>
+                    </div>
+                    <Badge variant="subtle" size="sm" className="group-hover:bg-parish-primary group-hover:text-white transition-colors">
+                      Fast Login
+                    </Badge>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDevBypass('royvantony@gmail.com')}
+                    className="w-full text-left p-2.5 rounded-xl border border-dashed border-amber-500/40 hover:border-parish-primary hover:bg-parish-surface-subtle transition-all flex items-center justify-between text-xs group opacity-85 hover:opacity-100 cursor-pointer"
+                  >
+                    <div>
+                      <div className="font-bold text-parish-text flex items-center gap-1.5">
+                        <span>🛠️ Platform Super Admin</span>
+                        <span className="text-[10px] text-parish-text-muted font-normal">(Developer)</span>
+                      </div>
+                      <div className="text-[11px] text-parish-text-muted">royvantony@gmail.com</div>
+                    </div>
+                    <Badge variant="subtle" size="sm" className="group-hover:bg-parish-primary group-hover:text-white transition-colors">
+                      Fast Login
+                    </Badge>
+                  </button>
+                </div>
               </div>
-
-              <div className="grid grid-cols-1 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleQuickFill('royvadakumpadan@gmail.com', 'parishAdmin2026!')}
-                  className="w-full text-left p-2.5 rounded-xl border border-parish-border hover:border-parish-primary hover:bg-parish-surface-subtle transition-all flex items-center justify-between text-xs group cursor-pointer"
-                >
-                  <div>
-                    <div className="font-bold text-parish-text flex items-center gap-1.5">
-                      <span>⛪ Parish Priest</span>
-                      <span className="text-[10px] text-parish-text-muted font-normal">(PARISH_PRIEST)</span>
-                    </div>
-                    <div className="text-[11px] text-parish-text-muted">royvadakumpadan@gmail.com</div>
-                  </div>
-                  <Badge variant="default" size="sm" className="group-hover:bg-parish-primary group-hover:text-white transition-colors">
-                    Fill
-                  </Badge>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleQuickFill('royvadakumpadan+trustee@gmail.com', 'parishAdmin2026!')}
-                  className="w-full text-left p-2.5 rounded-xl border border-parish-border hover:border-parish-primary hover:bg-parish-surface-subtle transition-all flex items-center justify-between text-xs group cursor-pointer"
-                >
-                  <div>
-                    <div className="font-bold text-parish-text flex items-center gap-1.5">
-                      <span>🛡️ Parish Admin</span>
-                      <span className="text-[10px] text-parish-text-muted font-normal">(Trustee)</span>
-                    </div>
-                    <div className="text-[11px] text-parish-text-muted">royvadakumpadan+trustee@gmail.com</div>
-                  </div>
-                  <Badge variant="subtle" size="sm" className="group-hover:bg-parish-primary group-hover:text-white transition-colors">
-                    Fill
-                  </Badge>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleQuickFill('royvadakumpadan+secretary@gmail.com', 'parishAdmin2026!')}
-                  className="w-full text-left p-2.5 rounded-xl border border-parish-border hover:border-parish-primary hover:bg-parish-surface-subtle transition-all flex items-center justify-between text-xs group cursor-pointer"
-                >
-                  <div>
-                    <div className="font-bold text-parish-text flex items-center gap-1.5">
-                      <span>📋 Parish User</span>
-                      <span className="text-[10px] text-parish-text-muted font-normal">(Secretary)</span>
-                    </div>
-                    <div className="text-[11px] text-parish-text-muted">royvadakumpadan+secretary@gmail.com</div>
-                  </div>
-                  <Badge variant="subtle" size="sm" className="group-hover:bg-parish-primary group-hover:text-white transition-colors">
-                    Fill
-                  </Badge>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleQuickFill('royvantony@gmail.com', 'DevSuperAdmin2026!')}
-                  className="w-full text-left p-2.5 rounded-xl border border-dashed border-parish-border hover:border-parish-primary hover:bg-parish-surface-subtle transition-all flex items-center justify-between text-xs group opacity-75 hover:opacity-100 cursor-pointer"
-                >
-                  <div>
-                    <div className="font-bold text-parish-text flex items-center gap-1.5">
-                      <span>🛠️ Platform Super Admin</span>
-                      <span className="text-[10px] text-parish-text-muted font-normal">(Developer)</span>
-                    </div>
-                    <div className="text-[11px] text-parish-text-muted">royvantony@gmail.com</div>
-                  </div>
-                  <Badge variant="subtle" size="sm" className="group-hover:bg-parish-primary group-hover:text-white transition-colors">
-                    Fill
-                  </Badge>
-                </button>
-              </div>
-            </div>
+            )}
           </div>
         )}
 
         {/* Security Footer Notice */}
         <div className="mt-6 text-center text-xs text-parish-text-muted space-y-1">
-          <div className="flex items-center justify-center gap-1 text-[11px] text-emerald-800">
+          <div className="flex items-center justify-center gap-1.5 text-[11px] text-emerald-800 dark:text-emerald-400">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Encrypted with JWT & bcrypt • Multi-Tenant Protected</span>
+            <span>🔒 Official Diocesan Parish Register System • Protected with JWT & Bcrypt</span>
           </div>
         </div>
       </div>

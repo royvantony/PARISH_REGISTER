@@ -135,7 +135,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       isOpen={isOpen}
       onClose={handleClose}
       title="User Profile & Security"
-      description="Manage your account profile, role credentials, and account password."
+      description="Manage your account profile and password."
       maxWidth="lg"
       closeOnEsc={false}
       closeOnBackdropClick={false}
@@ -165,11 +165,10 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('details')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
-              activeTab === 'details'
-                ? 'border-parish-primary text-parish-primary bg-parish-primary/5'
-                : 'border-transparent text-parish-text-muted hover:text-parish-text hover:bg-parish-surface-subtle'
-            }`}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${activeTab === 'details'
+              ? 'border-parish-primary text-parish-primary bg-parish-primary/5'
+              : 'border-transparent text-parish-text-muted hover:text-parish-text hover:bg-parish-surface-subtle'
+              }`}
           >
             <User className="w-4 h-4" />
             <span>Account Details</span>
@@ -177,11 +176,10 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('security')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
-              activeTab === 'security'
-                ? 'border-parish-primary text-parish-primary bg-parish-primary/5'
-                : 'border-transparent text-parish-text-muted hover:text-parish-text hover:bg-parish-surface-subtle'
-            }`}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${activeTab === 'security'
+              ? 'border-parish-primary text-parish-primary bg-parish-primary/5'
+              : 'border-transparent text-parish-text-muted hover:text-parish-text hover:bg-parish-surface-subtle'
+              }`}
           >
             <KeyRound className="w-4 h-4" />
             <span>Change Password</span>

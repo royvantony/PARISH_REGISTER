@@ -107,11 +107,11 @@ export const RegisterFamilyPage: React.FC = () => {
         const [unitsRes, diocesesRes, approveRes] = await Promise.all([
           api.get<UnitOption[]>('/masters/units'),
           api.get<DioceseOption[]>('/masters/dioceses').catch(() => ({ data: [] })),
-          api.get<{ canApprove: boolean }>('/permissions/can-approve').catch(() => ({ data: { canApprove: false } })),
+          api.get<{ canApprove: boolean }>('/permissions/can-approve?module=REGISTER_NEW').catch(() => ({ data: { canApprove: false } })),
         ]);
         setUnits(unitsRes.data);
         setDioceses(diocesesRes.data);
-        const allowedToApprove = Boolean(approveRes.data.canApprove && hasPermission('REGISTER', 'canApprove'));
+        const allowedToApprove = Boolean(approveRes.data.canApprove && hasPermission('REGISTER_NEW', 'canApprove'));
         setCanApprove(allowedToApprove);
         if (!allowedToApprove) {
           setActivateImmediately(false);

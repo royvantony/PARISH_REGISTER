@@ -10,7 +10,6 @@ import {
 } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { ThemeSelector } from './ThemeSelector';
-import { CLIENT_BRANDING } from '../../config/branding';
 import { useAuth } from '../../context/AuthContext';
 import { useFeatures } from '../../context/FeatureContext';
 import { UserProfileModal } from '../profile/UserProfileModal';
@@ -99,7 +98,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
             <div className="h-9 px-1.5 sm:h-10 sm:px-2 py-0.5 rounded-xl bg-white border border-parish-border shadow-xs flex items-center justify-center shrink-0 group-hover:border-parish-primary/40 transition-colors">
               <img
                 src={parishLogo}
-                alt={activeParish?.parishName || CLIENT_BRANDING.logoAlt}
+                alt={activeParish?.parishName || 'Parish Official Seal'}
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = '/branding/logo.png';
                 }}

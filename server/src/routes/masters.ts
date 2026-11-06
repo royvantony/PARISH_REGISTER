@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import { prisma } from '../lib/prisma.js';
 import { authenticateJWT } from '../middleware/auth.js';
 import { UserRole, FamilyStatus } from '@prisma/client';
+import { checkUserPermission } from './permissions.js';
 
 export const mastersRouter = Router();
 
@@ -171,7 +172,13 @@ mastersRouter.get('/users', async (req: Request, res: Response) => {
 // POST /api/masters/users - Create/invite a user
 mastersRouter.post('/users', async (req: Request, res: Response) => {
   try {
-    const parishId = req.activeParishId;
+    const parishId = req.activeParishId || 1;
+    if (req.user) {
+      const canCreate = await checkUserPermission(req.user.userId, req.user.role, parishId, 'USERS', 'canCreate');
+      if (!canCreate) {
+        return res.status(403).json({ error: 'You do not have permission to create users.' });
+      }
+    }
     const { fullName, username, email, password, role, assignedUnitId } = req.body;
 
     if (!fullName || !email || !password || !role) {
@@ -256,6 +263,13 @@ mastersRouter.post('/users', async (req: Request, res: Response) => {
 mastersRouter.patch('/users/:id', async (req: Request, res: Response) => {
   try {
     const targetUserId = parseInt(req.params.id as string, 10);
+    const parishId = req.activeParishId || 1;
+    if (req.user) {
+      const canEdit = await checkUserPermission(req.user.userId, req.user.role, parishId, 'USERS', 'canEdit');
+      if (!canEdit) {
+        return res.status(403).json({ error: 'You do not have permission to modify users.' });
+      }
+    }
     const { fullName, username, role, assignedUnitId, newPassword } = req.body;
     const callerRole = req.user?.role;
     const callerId = req.user?.userId;
@@ -668,15 +682,12 @@ mastersRouter.put('/parishes/:id', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid parish ID.' });
     }
 
-    const isGlobalAdmin =
-      req.user?.role === UserRole.SUPER_ADMIN ||
-      req.user?.role === UserRole.DIOCESAN_ADMIN;
+    const isGlobalAdmin = req.user?.role === UserRole.SUPER_ADMIN || req.user?.role === UserRole.DIOCESAN_ADMIN;
+    const isAllowed = req.user
+      ? (isGlobalAdmin || await checkUserPermission(req.user.userId, req.user.role, id, 'SETTINGS', 'canEdit'))
+      : false;
 
-    const isParishAdmin =
-      (req.user?.role === UserRole.PARISH_PRIEST || req.user?.role === UserRole.PARISH_ADMIN) &&
-      req.user?.parishId === id;
-
-    if (!isGlobalAdmin && !isParishAdmin) {
+    if (!isAllowed) {
       return res.status(403).json({ error: 'You do not have permission to modify this parish.' });
     }
 
@@ -746,7 +757,7 @@ mastersRouter.get('/governing-diocese', async (_req: Request, res: Response) => 
         data: {
           dioceseName: 'Diocese of St. Thomas the Apostle, Melbourne',
           rite: 'Syro-Malabar',
-          bishopName: 'Bishop Bosco Puthur',
+          bishopName: 'Bishop John Panamthottathil',
           chanceryAddress: '62 Moore Rd, Mill Park VIC 3082, Australia',
           city: 'Melbourne',
           state: 'VIC',
@@ -768,11 +779,10 @@ mastersRouter.get('/governing-diocese', async (_req: Request, res: Response) => 
 // PUT /api/masters/governing-diocese - Update official governing diocese details
 mastersRouter.put('/governing-diocese', async (req: Request, res: Response) => {
   try {
-    const isAllowed =
-      req.user?.role === UserRole.SUPER_ADMIN ||
-      req.user?.role === UserRole.DIOCESAN_ADMIN ||
-      req.user?.role === UserRole.PARISH_PRIEST ||
-      req.user?.role === UserRole.PARISH_ADMIN;
+    const parishId = req.activeParishId || 1;
+    const isAllowed = req.user
+      ? await checkUserPermission(req.user.userId, req.user.role, parishId, 'SETTINGS', 'canEdit')
+      : false;
 
     if (!isAllowed) {
       return res.status(403).json({ error: 'You do not have permission to modify governing diocese details.' });

@@ -1422,17 +1422,21 @@ Upon logging in, you will be prompted to set your own permanent password.`;
 
                           {/* Approve Toggle */}
                           <td className="py-3.5 px-4 text-center">
-                            <button
-                              type="button"
-                              disabled={isLockedRole || !canEditUsers || !rec.canView}
-                              onClick={() => handleToggleMatrixCell(mod.key, 'canApprove')}
-                              className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${rec.canApprove
-                                ? 'bg-emerald-700 text-white shadow-xs'
-                                : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border hover:border-parish-text-muted'
-                                } ${isLockedRole || !canEditUsers || !rec.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
-                            >
-                              {rec.canApprove ? 'ON' : 'OFF'}
-                            </button>
+                            {['REGISTER_NEW', 'IMPORT_REGISTRATIONS'].includes(mod.key) ? (
+                              <button
+                                type="button"
+                                disabled={isLockedRole || !canEditUsers || !rec.canView}
+                                onClick={() => handleToggleMatrixCell(mod.key, 'canApprove')}
+                                className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${rec.canApprove
+                                  ? 'bg-emerald-700 text-white shadow-xs'
+                                  : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border hover:border-parish-text-muted'
+                                  } ${isLockedRole || !canEditUsers || !rec.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
+                              >
+                                {rec.canApprove ? 'ON' : 'OFF'}
+                              </button>
+                            ) : (
+                              <span className="text-parish-text-muted/40 font-mono text-xs select-none" title="Approval workflow not applicable to this screen">—</span>
+                            )}
                           </td>
                         </tr>
                       );
@@ -1688,17 +1692,21 @@ Upon logging in, you will be prompted to set your own permanent password.`;
 
                           {/* Approve Toggle */}
                           <td className="py-3.5 px-4 text-center">
-                            <button
-                              type="button"
-                              disabled={!canEditUsers || !current.canView}
-                              onClick={() => handleToggleUserOverrideCell(item.module, 'canApprove')}
-                              className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${current.canApprove
-                                ? 'bg-emerald-700 text-white shadow-xs'
-                                : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border'
-                                } ${!canEditUsers || !current.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
-                            >
-                              {current.canApprove ? 'ON' : 'OFF'}
-                            </button>
+                            {['REGISTER_NEW', 'IMPORT_REGISTRATIONS'].includes(item.module) ? (
+                              <button
+                                type="button"
+                                disabled={!canEditUsers || !current.canView}
+                                onClick={() => handleToggleUserOverrideCell(item.module, 'canApprove')}
+                                className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${current.canApprove
+                                  ? 'bg-emerald-700 text-white shadow-xs'
+                                  : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border'
+                                  } ${!canEditUsers || !current.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
+                              >
+                                {current.canApprove ? 'ON' : 'OFF'}
+                              </button>
+                            ) : (
+                              <span className="text-parish-text-muted/40 font-mono text-xs select-none" title="Approval workflow not applicable to this screen">—</span>
+                            )}
                           </td>
                         </tr>
                       );
