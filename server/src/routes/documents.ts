@@ -156,7 +156,7 @@ documentsRouter.post('/', upload.single('file'), async (req: Request, res: Respo
       return res.status(404).json({ error: 'Family record not found.' });
     }
 
-    const documentType = req.body.documentType?.trim() || 'PARISH_LETTER';
+    const documentType = (req.body.documentType?.trim() || 'Document').slice(0, 100);
     const memberId = req.body.memberId ? parseInt(req.body.memberId, 10) : null;
 
     // Save to sandboxed disk storage
@@ -193,6 +193,19 @@ documentsRouter.post('/', upload.single('file'), async (req: Request, res: Respo
         noteContent: `Document attached by ${user.fullName} (${user.role}): "${saved.fileName}" [${documentType}].`,
         recordedBy: user.fullName,
       },
+    });
+
+    // Log to System & Security ActivityLog
+    await logSystemActivity({
+      parishId: parishId || family.parishId,
+      userId: user.userId,
+      userName: user.fullName,
+      userRole: user.role,
+      actionType: 'DOCUMENT_CHANGE',
+      category: 'REGISTER',
+      description: `Document attached by ${user.fullName}: "${saved.fileName}" [${documentType}] for household ${family.houseName} (${family.familyCode || familyId}).`,
+      path: req.originalUrl,
+      req,
     });
 
     return res.status(201).json({
@@ -268,6 +281,19 @@ documentsRouter.post('/url', async (req: Request, res: Response) => {
       },
     });
 
+    // Log to System & Security ActivityLog
+    await logSystemActivity({
+      parishId: parishId || family.parishId,
+      userId: user.userId,
+      userName: user.fullName,
+      userRole: user.role,
+      actionType: 'DOCUMENT_CHANGE',
+      category: 'REGISTER',
+      description: `Document ingested from URL by ${user.fullName}: "${saved.fileName}" [${documentType}] for household ${family.houseName} (${family.familyCode || familyId}).`,
+      path: req.originalUrl,
+      req,
+    });
+
     return res.status(201).json({
       message: 'Document successfully ingested.',
       document: doc,
@@ -297,7 +323,7 @@ documentsRouter.get('/:docId/view', async (req: Request, res: Response) => {
     const doc = await prisma.familyDocument.findFirst({
       where: { id: docId, familyId },
       include: {
-        family: { select: { parishId: true } },
+        family: { select: { parishId: true, familyCode: true, houseName: true } },
       },
     });
 
@@ -310,10 +336,37 @@ documentsRouter.get('/:docId/view', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Document file not found on disk storage.' });
     }
 
+    // Log separate Document Viewed entry in Household Record History & Audit Trail
+    if (req.user) {
+      await prisma.familyNote.create({
+        data: {
+          familyId,
+          noteDate: new Date(),
+          noteContent: `Document viewed in viewer by ${req.user.fullName} (${req.user.role}): "${doc.fileName}" [${doc.documentType}].`,
+          recordedBy: req.user.fullName,
+        },
+      }).catch((e) => console.warn('Non-blocking: Failed to create view audit note:', e));
+    }
+
+    // Log separate Document Viewed event to System & Security ActivityLog
+    await logSystemActivity({
+      parishId: parishId || doc.family.parishId,
+      userId: req.user?.userId,
+      userName: req.user?.fullName,
+      userRole: req.user?.role,
+      actionType: 'DOCUMENT_VIEW',
+      category: 'REGISTER',
+      description: `Document viewed by ${req.user?.fullName || 'User'}: "${doc.fileName}" [${doc.documentType}] for household ${doc.family.houseName} (${doc.family.familyCode || doc.familyId}).`,
+      path: `${req.baseUrl}${req.path}`,
+      req,
+    });
+
     const mime = doc.mimeType || 'application/octet-stream';
     res.setHeader('Content-Type', mime);
     res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(doc.fileName)}"`);
-    res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
 
     const stream = fs.createReadStream(absPath);
     return stream.pipe(res);
@@ -356,20 +409,36 @@ documentsRouter.get('/:docId/download', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Document file not found on disk storage.' });
     }
 
-    // Log the download event for security governance
+    // Log separate Document Downloaded entry in Household Record History & Audit Trail
+    if (user) {
+      await prisma.familyNote.create({
+        data: {
+          familyId,
+          noteDate: new Date(),
+          noteContent: `Document downloaded by ${user.fullName} (${user.role}): "${doc.fileName}" [${doc.documentType}].`,
+          recordedBy: user.fullName,
+        },
+      }).catch((e) => console.warn('Non-blocking: Failed to create download audit note:', e));
+    }
+
+    // Log separate Document Downloaded event for System & Security ActivityLog
     await logSystemActivity({
       parishId: parishId || doc.family.parishId,
       userId: user?.userId,
       userName: user?.fullName,
       userRole: user?.role,
-      actionType: 'SETTINGS_CHANGE',
-      category: 'GOVERNANCE',
-      description: `User downloaded confidential document: "${doc.fileName}" for household ${doc.family.houseName} (${doc.family.familyCode || doc.familyId}).`,
+      actionType: 'DOCUMENT_DOWNLOAD',
+      category: 'REGISTER',
+      description: `Document downloaded by ${user?.fullName || 'User'}: "${doc.fileName}" [${doc.documentType}] for household ${doc.family.houseName} (${doc.family.familyCode || doc.familyId}).`,
+      path: `${req.baseUrl}${req.path}`,
       req,
     });
 
     res.setHeader('Content-Type', 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(doc.fileName)}"`);
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
 
     const stream = fs.createReadStream(absPath);
     return stream.pipe(res);
@@ -400,7 +469,7 @@ documentsRouter.delete('/:docId', async (req: Request, res: Response) => {
     const doc = await prisma.familyDocument.findFirst({
       where: { id: docId, familyId },
       include: {
-        family: { select: { parishId: true } },
+        family: { select: { parishId: true, familyCode: true, houseName: true } },
       },
     });
 
@@ -424,6 +493,19 @@ documentsRouter.delete('/:docId', async (req: Request, res: Response) => {
         noteContent: `Document removed by ${user.fullName} (${user.role}): "${doc.fileName}" [${doc.documentType}].`,
         recordedBy: user.fullName,
       },
+    });
+
+    // Log to System & Security ActivityLog
+    await logSystemActivity({
+      parishId: parishId || doc.family.parishId,
+      userId: user.userId,
+      userName: user.fullName,
+      userRole: user.role,
+      actionType: 'DOCUMENT_CHANGE',
+      category: 'REGISTER',
+      description: `Document removed by ${user.fullName}: "${doc.fileName}" [${doc.documentType}] for household ${doc.family.houseName} (${doc.family.familyCode || doc.familyId}).`,
+      path: req.originalUrl,
+      req,
     });
 
     return res.json({ message: 'Document removed successfully.' });

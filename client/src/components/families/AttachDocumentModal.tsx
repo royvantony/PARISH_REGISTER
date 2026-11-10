@@ -26,12 +26,11 @@ interface AttachDocumentModalProps {
   onSuccess: (newDoc: any) => void;
 }
 
-const DOCUMENT_TYPES = [
-  { value: 'PARISH_LETTER', label: 'Parish Release Letter' },
-  { value: 'BAPTISM_CERT', label: 'Baptism Certificate' },
-  { value: 'ID_PROOF', label: 'ID Proof (Passport / Drivers License)' },
-  { value: 'SIGNATURE', label: 'Consent / Signature Record' },
-  { value: 'OTHER', label: 'Other Official Document' },
+const SUGGESTED_DOCUMENT_TYPES = [
+  'Parish Release Letter',
+  'Baptism Certificate',
+  'Marriage Certificate',
+  'Consent / Signature Record',
 ];
 
 export const AttachDocumentModal: React.FC<AttachDocumentModalProps> = ({
@@ -42,7 +41,7 @@ export const AttachDocumentModal: React.FC<AttachDocumentModalProps> = ({
   onSuccess,
 }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [documentType, setDocumentType] = useState<string>('PARISH_LETTER');
+  const [documentType, setDocumentType] = useState<string>('');
   const [memberId, setMemberId] = useState<string>('');
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,13 +81,19 @@ export const AttachDocumentModal: React.FC<AttachDocumentModalProps> = ({
       return;
     }
 
+    const cleanDocType = documentType.trim();
+    if (!cleanDocType) {
+      setError('Please enter what type of document this is.');
+      return;
+    }
+
     try {
       setIsUploading(true);
       setError(null);
 
       const formData = new FormData();
       formData.append('file', selectedFile);
-      formData.append('documentType', documentType);
+      formData.append('documentType', cleanDocType);
       if (memberId) {
         formData.append('memberId', memberId);
       }
@@ -111,7 +116,7 @@ export const AttachDocumentModal: React.FC<AttachDocumentModalProps> = ({
 
   const handleClose = () => {
     setSelectedFile(null);
-    setDocumentType('PARISH_LETTER');
+    setDocumentType('');
     setMemberId('');
     setError(null);
     setIsUploading(false);
@@ -143,11 +148,10 @@ export const AttachDocumentModal: React.FC<AttachDocumentModalProps> = ({
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
-            className={`border-2 border-dashed rounded-2xl p-5 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2 ${
-              selectedFile
+            className={`border-2 border-dashed rounded-2xl p-5 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2 ${selectedFile
                 ? 'border-emerald-400 bg-emerald-50/40 dark:bg-emerald-950/20'
                 : 'border-parish-border hover:border-parish-primary/50 bg-parish-surface-subtle'
-            }`}
+              }`}
           >
             <input
               type="file"
@@ -202,23 +206,31 @@ export const AttachDocumentModal: React.FC<AttachDocumentModalProps> = ({
           </div>
         </div>
 
-        {/* Document Type Selector */}
+        {/* Document Type Input */}
         <div className="space-y-1.5">
           <label className="block text-xs font-semibold text-parish-text flex items-center gap-1.5">
             <Tag className="w-3.5 h-3.5 text-parish-primary" />
-            <span>Document Classification</span>
+            <span>Document Type</span>
+            <span className="text-rose-500">*</span>
           </label>
-          <select
+          <input
+            type="text"
+            list="suggested-document-types"
             value={documentType}
-            onChange={(e) => setDocumentType(e.target.value)}
-            className="w-full px-3 py-2 text-xs rounded-xl border border-parish-border bg-parish-surface text-parish-text focus:outline-none focus:ring-2 focus:ring-parish-primary cursor-pointer font-medium"
-          >
-            {DOCUMENT_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
+            onChange={(e) => {
+              setDocumentType(e.target.value);
+              if (error) setError(null);
+            }}
+            maxLength={100}
+            placeholder="e.g. Baptism Certificate, Marriage Certificate, Parish Release Letter..."
+            className="w-full px-3 py-2 text-xs rounded-xl border border-parish-border bg-parish-surface text-parish-text placeholder:text-parish-text-muted/60 focus:outline-none focus:ring-2 focus:ring-parish-primary font-medium"
+            required
+          />
+          <datalist id="suggested-document-types">
+            {SUGGESTED_DOCUMENT_TYPES.map((label) => (
+              <option key={label} value={label} />
             ))}
-          </select>
+          </datalist>
         </div>
 
         {/* Member Linkage (Optional) */}

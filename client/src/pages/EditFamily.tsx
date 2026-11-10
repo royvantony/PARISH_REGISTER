@@ -361,6 +361,18 @@ export const EditFamilyPage: React.FC = () => {
     loadFamilyData();
   }, [id]);
 
+  // Lightweight background refresh so viewing/downloading/attaching docs updates Audit Trail without resetting unsaved form fields
+  const refreshAuditNotesAndDocs = async () => {
+    if (!id) return;
+    try {
+      const res = await api.get<any>(`/families/${id}`);
+      if (res.data?.notes) setAuditNotes(res.data.notes);
+      if (res.data?.documents) setDocuments(res.data.documents);
+    } catch {
+      // non-blocking
+    }
+  };
+
   const handleDeleteDirectDebit = async (ddId: number) => {
     if (!id) return;
     try {
@@ -1566,7 +1578,8 @@ export const EditFamilyPage: React.FC = () => {
                 .filter((c) => c.id && c.fullName.trim())
                 .map((c) => ({ id: c.id!, fullName: c.fullName.trim(), role: c.role || 'CHILD' })),
             ]}
-            onDocumentsUpdated={loadFamilyData}
+            onDocumentsUpdated={refreshAuditNotesAndDocs}
+            onAuditUpdated={refreshAuditNotesAndDocs}
           />
         )}
 

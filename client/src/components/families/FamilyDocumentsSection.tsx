@@ -24,6 +24,7 @@ interface FamilyDocumentsSectionProps {
   canDownload?: boolean;
   members?: Array<{ id: number; fullName: string; role: string }>;
   onDocumentsUpdated?: () => void;
+  onAuditUpdated?: () => void;
 }
 
 export const FamilyDocumentsSection: React.FC<FamilyDocumentsSectionProps> = ({
@@ -36,6 +37,7 @@ export const FamilyDocumentsSection: React.FC<FamilyDocumentsSectionProps> = ({
   canDownload = true,
   members = [],
   onDocumentsUpdated,
+  onAuditUpdated,
 }) => {
   const [selectedDocForView, setSelectedDocForView] = useState<FamilyDocumentItem | null>(null);
   const [isAttachModalOpen, setIsAttachModalOpen] = useState<boolean>(false);
@@ -61,7 +63,7 @@ export const FamilyDocumentsSection: React.FC<FamilyDocumentsSectionProps> = ({
       case 'ID_PROOF':
         return <Badge variant="warning" size="sm">ID Document</Badge>;
       default:
-        return <Badge variant="outline" size="sm">{type.replace('_', ' ')}</Badge>;
+        return <Badge variant="outline" size="sm">{type.replace(/_/g, ' ')}</Badge>;
     }
   };
 
@@ -221,6 +223,7 @@ export const FamilyDocumentsSection: React.FC<FamilyDocumentsSectionProps> = ({
         document={selectedDocForView}
         familyId={familyId}
         canDownload={canDownload}
+        onActivityLogged={onAuditUpdated || onDocumentsUpdated}
       />
 
       {/* Upload Modal (Edit mode only) */}

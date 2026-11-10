@@ -375,6 +375,16 @@ export const ParishRegisterPage: React.FC = () => {
     }
   };
 
+  // Silent refresh for audit notes after document view/download
+  const refreshFamilyDetailSilent = async (familyId: number) => {
+    try {
+      const res = await api.get<FamilyDetail>(`/families/${familyId}`);
+      setFamilyDetail(res.data);
+    } catch {
+      // non-blocking
+    }
+  };
+
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case 'ACTIVE':
@@ -1578,6 +1588,7 @@ export const ParishRegisterPage: React.FC = () => {
                   readOnly={true}
                   canView={true}
                   canDownload={hasPermission('DOCUMENTS', 'canExport')}
+                  onAuditUpdated={() => refreshFamilyDetailSilent(familyDetail.id)}
                 />
               </div>
             )}

@@ -25,6 +25,7 @@ import {
   Home,
   CreditCard,
   FileText,
+  Eye,
 } from 'lucide-react';
 
 interface ActivityLogItem {
@@ -272,7 +273,21 @@ export const ActivityLogsTab: React.FC = () => {
         return (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-50 text-purple-800 border border-purple-200">
             <FileText className="w-3 h-3 text-purple-600" />
-            DOCUMENT
+            DOC ATTACH/DEL
+          </span>
+        );
+      case 'DOCUMENT_VIEW':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sky-50 text-sky-800 border border-sky-200">
+            <Eye className="w-3 h-3 text-sky-600" />
+            DOC VIEWED
+          </span>
+        );
+      case 'DOCUMENT_DOWNLOAD':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+            <Download className="w-3 h-3 text-amber-600" />
+            DOC DOWNLOADED
           </span>
         );
       default:
@@ -460,7 +475,9 @@ export const ActivityLogsTab: React.FC = () => {
             <option value="ALL">All Actions</option>
             <option value="FAMILY_UPDATE">FAMILY / MEMBER UPDATE</option>
             <option value="DIRECT_DEBIT_CHANGE">DIRECT DEBIT CHANGE</option>
-            <option value="DOCUMENT_CHANGE">DOCUMENT CHANGE</option>
+            <option value="DOCUMENT_VIEW">DOCUMENT VIEWED</option>
+            <option value="DOCUMENT_DOWNLOAD">DOCUMENT DOWNLOADED</option>
+            <option value="DOCUMENT_CHANGE">DOCUMENT ATTACH / REMOVE</option>
             <option value="LOGIN">LOGIN</option>
             <option value="LOGOUT">LOGOUT</option>
             <option value="LOGIN_FAILED">LOGIN FAILED</option>
@@ -605,8 +622,7 @@ export const ActivityLogsTab: React.FC = () => {
                   <th className="py-3 px-4">User & Role</th>
                   <th className="py-3 px-4">Action</th>
                   <th className="py-3 px-4">Activity Description & Captions</th>
-                  <th className="py-3 px-4">Context / IP</th>
-                  <th className="py-3 px-4 text-right">Details</th>
+                  <th className="py-3 px-4 text-right">Context / IP</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-parish-border">
@@ -656,38 +672,36 @@ export const ActivityLogsTab: React.FC = () => {
                         </td>
 
                         {/* Description */}
-                        <td className="py-3 px-4 text-parish-text max-w-md">
-                          <p className="line-clamp-2">{log.description}</p>
-                          {log.path && (
-                            <span className="inline-block mt-1 px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-mono text-slate-600">
-                              {log.path}
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Context & IP */}
-                        <td className="py-3 px-4 whitespace-nowrap text-parish-text-muted font-mono text-[11px]">
-                          <div>{log.ipAddress || '127.0.0.1'}</div>
-                          {log.userAgent && (
-                            <div className="text-[10px] font-sans truncate max-w-[140px] text-parish-text-muted/70" title={log.userAgent}>
-                              {log.userAgent.split(' ')[0]}
+                        <td className="py-3 px-4 text-parish-text max-w-lg">
+                          <p className="leading-relaxed">{log.description}</p>
+                          {(log.path || log.details) && (
+                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                              {log.path && (
+                                <span className="inline-block px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-mono text-slate-600">
+                                  {log.path}
+                                </span>
+                              )}
+                              {log.details && (
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold text-parish-primary hover:bg-parish-surface border border-parish-border transition-colors cursor-pointer"
+                                >
+                                  <span>Diff Metadata</span>
+                                  {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                </button>
+                              )}
                             </div>
                           )}
                         </td>
 
-                        {/* Details Toggle */}
-                        <td className="py-3 px-4 text-right whitespace-nowrap">
-                          {log.details ? (
-                            <button
-                              type="button"
-                              onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-parish-primary hover:bg-parish-surface border border-parish-border transition-colors cursor-pointer"
-                            >
-                              <span>Diffs</span>
-                              {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                            </button>
-                          ) : (
-                            <span className="text-[11px] text-parish-text-muted/40">—</span>
+                        {/* Context & IP */}
+                        <td className="py-3 px-4 text-right whitespace-nowrap text-parish-text-muted font-mono text-[11px]">
+                          <div>{log.ipAddress || '127.0.0.1'}</div>
+                          {log.userAgent && (
+                            <div className="text-[10px] font-sans truncate max-w-[140px] ml-auto text-parish-text-muted/70" title={log.userAgent}>
+                              {log.userAgent.split(' ')[0]}
+                            </div>
                           )}
                         </td>
                       </tr>
@@ -695,7 +709,7 @@ export const ActivityLogsTab: React.FC = () => {
                       {/* Expandable JSON details row */}
                       {isExpanded && log.details && (
                         <tr className="bg-slate-50/80">
-                          <td colSpan={6} className="py-3 px-5">
+                          <td colSpan={5} className="py-3 px-5">
                             <div className="text-[11px] font-mono p-3 rounded-xl bg-white border border-parish-border text-slate-700 overflow-x-auto space-y-1">
                               <span className="font-bold uppercase tracking-wider text-parish-text-muted text-[10px] block">
                                 Technical Payload / Diff Metadata:

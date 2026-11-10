@@ -38,6 +38,7 @@ interface DocumentViewerModalProps {
   document: FamilyDocumentItem | null;
   familyId: number;
   canDownload?: boolean;
+  onActivityLogged?: () => void;
 }
 
 export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
@@ -46,6 +47,7 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
   document,
   familyId,
   canDownload = true,
+  onActivityLogged,
 }) => {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -72,10 +74,8 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
         return <Badge variant="success" size="sm">Baptism Certificate</Badge>;
       case 'SIGNATURE':
         return <Badge variant="subtle" size="sm">Signature</Badge>;
-      case 'ID_PROOF':
-        return <Badge variant="warning" size="sm">Identification (ID)</Badge>;
       default:
-        return <Badge variant="outline" size="sm">{type.replace('_', ' ')}</Badge>;
+        return <Badge variant="outline" size="sm">{type.replace(/_/g, ' ')}</Badge>;
     }
   };
 
@@ -101,19 +101,27 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
 
         const response = await api.get(
           `/families/${familyId}/documents/${document.id}/view`,
-          { responseType: 'blob' }
+          {
+            responseType: 'blob',
+            params: { _t: Date.now() },
+            headers: {
+              'Cache-Control': 'no-cache',
+              Pragma: 'no-cache',
+            },
+          }
         );
 
         if (active) {
           const url = URL.createObjectURL(response.data);
           setBlobUrl(url);
+          onActivityLogged?.();
         }
       } catch (err: any) {
         if (active) {
           console.error('Failed to load document stream:', err);
           setError(
             err.response?.data?.error ||
-              'Unable to load document. You may not have permission to view this attachment.'
+            'Unable to load document. You may not have permission to view this attachment.'
           );
         }
       } finally {
@@ -166,7 +174,10 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
     try {
       const response = await api.get(
         `/families/${familyId}/documents/${document.id}/download`,
-        { responseType: 'blob' }
+        {
+          responseType: 'blob',
+          params: { _t: Date.now() },
+        }
       );
       const url = URL.createObjectURL(response.data);
       const link = window.document.createElement('a');
@@ -176,6 +187,7 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
+      onActivityLogged?.();
     } catch (err: any) {
       console.error('Failed to download document:', err);
       alert('Failed to download document. Please check your permissions.');

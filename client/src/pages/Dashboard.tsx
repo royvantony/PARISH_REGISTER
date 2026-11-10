@@ -310,7 +310,7 @@ export const DashboardPage: React.FC = () => {
           </h1>
           <p className="text-xs sm:text-sm text-parish-text-muted leading-relaxed">
 
-            Welcome to your parish dashboard. View verified family directories, sacramental records, and community statistics for {activeParish?.city || 'Brisbane'} in real time.
+            Welcome to your parish dashboard. View verified family directories, and community statistics for {activeParish?.city || 'Brisbane'} in real time.
           </p>
 
           {/* Quick Action Buttons (Touch Friendly) */}

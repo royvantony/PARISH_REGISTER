@@ -13,7 +13,9 @@ export type ActivityActionType =
   | 'FAMILY_UPDATE'
   | 'FAMILY_APPROVE'
   | 'DIRECT_DEBIT_CHANGE'
-  | 'DOCUMENT_CHANGE';
+  | 'DOCUMENT_CHANGE'
+  | 'DOCUMENT_VIEW'
+  | 'DOCUMENT_DOWNLOAD';
 
 export type ActivityCategory =
   | 'AUTH'
