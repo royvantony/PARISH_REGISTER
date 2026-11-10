@@ -396,6 +396,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
+    const currentToken = localStorage.getItem('parish_token');
+    const currentUser = user;
+
+    // Send keepalive logout request BEFORE removing local token so browser guarantees delivery on navigation
+    if (currentToken || currentUser) {
+      try {
+        fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(currentToken ? { Authorization: `Bearer ${currentToken}` } : {}),
+          },
+          body: JSON.stringify({ user: currentUser }),
+          keepalive: true,
+        }).catch(() => {});
+      } catch (e) {
+        // Fallback ignore
+      }
+    }
+
     // 1. Remove all authentication tokens and stored keys completely
     localStorage.removeItem('parish_token');
     localStorage.removeItem('parish_user');

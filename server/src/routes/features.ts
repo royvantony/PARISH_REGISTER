@@ -167,6 +167,20 @@ export const SYSTEM_FEATURES: FeatureDefinition[] = [
     description: 'Database latency, uptime monitor, and diagnostic telemetry',
     defaultEnabled: true,
   },
+  {
+    key: 'SETTING_ACTIVITY_LOGS',
+    name: 'Security & System Activity Logs Tab',
+    category: 'SETTINGS',
+    description: 'System audit logs, user authentication tracking, and settings change history',
+    defaultEnabled: true,
+  },
+  {
+    key: 'SYS_ACTIVITY_LOGGING',
+    name: 'Global System Activity Logging Engine',
+    category: 'SETTINGS',
+    description: 'Master switch to record user logins, logouts, page visits, and administrative changes',
+    defaultEnabled: true,
+  },
 
   // 4. Users Page Tabs
   {
@@ -197,6 +211,13 @@ export const SYSTEM_FEATURES: FeatureDefinition[] = [
     name: 'Direct Debit Banking Feature',
     category: 'REGISTER',
     description: 'Direct debit pledge amounts, frequencies, and management drawer',
+    defaultEnabled: true,
+  },
+  {
+    key: 'REGISTER_DOCUMENTS',
+    name: 'Family Documents & Certificates',
+    category: 'REGISTER',
+    description: 'Secure attachments repository for parish release letters, baptism certificates, and ID documents',
     defaultEnabled: true,
   },
   {

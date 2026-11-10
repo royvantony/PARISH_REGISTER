@@ -84,6 +84,28 @@ interface VerifyRegistrationModalProps {
   }) => void;
 }
 
+/**
+ * Normalizes any date string (YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY)
+ * to standard ISO YYYY-MM-DD format strictly required by HTML5 <input type="date">
+ */
+function toDateInputString(val?: string | null): string {
+  if (!val || !val.trim()) return '';
+  const s = val.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const parts = s.split(/[\/\-\.]/);
+  if (parts.length === 3) {
+    let day = parts[0].padStart(2, '0');
+    let month = parts[1].padStart(2, '0');
+    let year = parts[2];
+    if (parseInt(day, 10) > 1000) {
+      return `${parts[0]}-${month}-${parts[2].padStart(2, '0')}`;
+    }
+    if (year.length === 2) year = '20' + year;
+    return `${year}-${month}-${day}`;
+  }
+  return s;
+}
+
 export const VerifyRegistrationModal: React.FC<VerifyRegistrationModalProps> = ({
   isOpen,
   onClose,
@@ -99,7 +121,7 @@ export const VerifyRegistrationModal: React.FC<VerifyRegistrationModalProps> = (
 
   // Head
   const [headName, setHeadName] = useState<string>(record?.data?.headName || '');
-  const [headDob, setHeadDob] = useState<string>(record?.data?.headDob || '');
+  const [headDob, setHeadDob] = useState<string>(toDateInputString(record?.data?.headDob));
   const [headPob, setHeadPob] = useState<string>(record?.data?.headPob || '');
   const [headPhone, setHeadPhone] = useState<string>(record?.data?.headPhone || '');
   const [headEmail, setHeadEmail] = useState<string>(record?.data?.headEmail || '');
@@ -107,13 +129,18 @@ export const VerifyRegistrationModal: React.FC<VerifyRegistrationModalProps> = (
   // Spouse
   const [hasSpouse, setHasSpouse] = useState<boolean>(record?.data?.hasSpouse || Boolean(record?.data?.spouseName));
   const [spouseName, setSpouseName] = useState<string>(record?.data?.spouseName || '');
-  const [spouseDob, setSpouseDob] = useState<string>(record?.data?.spouseDob || '');
+  const [spouseDob, setSpouseDob] = useState<string>(toDateInputString(record?.data?.spouseDob));
   const [spousePob, setSpousePob] = useState<string>(record?.data?.spousePob || '');
   const [spousePhone, setSpousePhone] = useState<string>(record?.data?.spousePhone || '');
   const [spouseEmail, setSpouseEmail] = useState<string>(record?.data?.spouseEmail || '');
 
   // Children
-  const [children, setChildren] = useState<ChildItem[]>(record?.data?.children || []);
+  const [children, setChildren] = useState<ChildItem[]>(
+    (record?.data?.children || []).map((c) => ({
+      ...c,
+      dateOfBirth: toDateInputString(c.dateOfBirth),
+    }))
+  );
 
   // Address
   const [streetAddress, setStreetAddress] = useState<string>(record?.data?.streetAddress || '');
@@ -139,17 +166,22 @@ export const VerifyRegistrationModal: React.FC<VerifyRegistrationModalProps> = (
       setHouseName(record.data.houseName || '');
       setUnitId(record.data.unitId ? String(record.data.unitId) : 'UNASSIGNED');
       setHeadName(record.data.headName || '');
-      setHeadDob(record.data.headDob || '');
+      setHeadDob(toDateInputString(record.data.headDob));
       setHeadPob(record.data.headPob || '');
       setHeadPhone(record.data.headPhone || '');
       setHeadEmail(record.data.headEmail || '');
       setHasSpouse(record.data.hasSpouse || Boolean(record.data.spouseName));
       setSpouseName(record.data.spouseName || '');
-      setSpouseDob(record.data.spouseDob || '');
+      setSpouseDob(toDateInputString(record.data.spouseDob));
       setSpousePob(record.data.spousePob || '');
       setSpousePhone(record.data.spousePhone || '');
       setSpouseEmail(record.data.spouseEmail || '');
-      setChildren(record.data.children || []);
+      setChildren(
+        (record.data.children || []).map((c) => ({
+          ...c,
+          dateOfBirth: toDateInputString(c.dateOfBirth),
+        }))
+      );
       setStreetAddress(record.data.streetAddress || '');
       setCity(record.data.city || '');
       setState(record.data.state || '');
@@ -636,11 +668,11 @@ export const VerifyRegistrationModal: React.FC<VerifyRegistrationModalProps> = (
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold text-parish-text mb-1">General Notes</label>
+              <label className="block text-[11px] font-bold text-parish-text mb-1">Pastoral & Household Notes</label>
               <Input
                 value={generalNotes}
                 onChange={(e) => setGeneralNotes(e.target.value)}
-                placeholder="Comments or notes..."
+                placeholder="Confidential pastoral care notes, comments..."
               />
             </div>
           </div>

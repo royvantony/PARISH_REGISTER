@@ -777,27 +777,30 @@ Upon logging in, you will be prompted to set your own permanent password.`;
         </div>
       </div>
 
-      {/* 2. Sub-Navigation Tabs */}
-      <div className="flex border-b border-parish-border gap-2 overflow-x-auto">
+      {/* 2. Sub-Navigation Tabs - Responsive Wrapping without Scrollbar */}
+      <div className="flex flex-wrap items-center gap-1.5 p-1.5 bg-parish-surface border border-parish-border rounded-2xl shadow-2xs">
         {isFeatureEnabled('USERS_TAB_LIST') && (
           <button
             onClick={() => setActiveTab('users')}
-            className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap min-h-[42px] ${activeTab === 'users'
-              ? 'border-parish-primary text-parish-primary'
-              : 'border-transparent text-parish-text-muted hover:text-parish-text'
+            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'users'
+              ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
+              : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
               }`}
           >
             <UsersIcon className="w-4 h-4" />
-            <span>Authorized Users ({parishUsers.length})</span>
+            <span>Authorized Users</span>
+            <span className="text-[10px] bg-parish-primary/10 text-parish-primary px-1.5 py-0.5 rounded-full font-mono font-semibold">
+              {parishUsers.length}
+            </span>
           </button>
         )}
 
         {isFeatureEnabled('USERS_TAB_MATRIX') && (
           <button
             onClick={() => setActiveTab('matrix')}
-            className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap min-h-[42px] ${activeTab === 'matrix'
-              ? 'border-parish-primary text-parish-primary'
-              : 'border-transparent text-parish-text-muted hover:text-parish-text'
+            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'matrix'
+              ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
+              : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
               }`}
           >
             <Sliders className="w-4 h-4" />
@@ -808,9 +811,9 @@ Upon logging in, you will be prompted to set your own permanent password.`;
         {isFeatureEnabled('USERS_TAB_OVERRIDES') && (
           <button
             onClick={() => setActiveTab('overrides')}
-            className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap min-h-[42px] ${activeTab === 'overrides'
-              ? 'border-parish-primary text-parish-primary'
-              : 'border-transparent text-parish-text-muted hover:text-parish-text'
+            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'overrides'
+              ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
+              : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
               }`}
           >
             <UserCog className="w-4 h-4" />
@@ -888,7 +891,7 @@ Upon logging in, you will be prompted to set your own permanent password.`;
             </div>
 
             {/* Filter Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+            <div className="flex flex-wrap items-center gap-1.5">
               {[
                 { key: 'ALL', label: 'All Roles' },
                 { key: 'PARISH_PRIEST', label: 'Priests' },
@@ -1222,7 +1225,7 @@ Upon logging in, you will be prompted to set your own permanent password.`;
             </div>
 
             {/* Role Pills */}
-            <div className="flex items-center gap-2 overflow-x-auto pt-1">
+            <div className="flex flex-wrap items-center gap-2 pt-1">
               {[
                 { role: 'PARISH_PRIEST', label: 'Parish Priest' },
                 { role: 'PARISH_ADMIN', label: 'Parish Admin' },

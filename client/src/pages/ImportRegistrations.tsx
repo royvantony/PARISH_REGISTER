@@ -519,8 +519,13 @@ export const ImportRegistrationsPage: React.FC = () => {
                             <User className="w-3.5 h-3.5 text-parish-text-muted shrink-0" />
                             <span>{rec.data.headName || 'Missing Name'}</span>
                           </div>
-                          <div className="text-[11px] text-parish-text-muted font-mono mt-0.5">
-                            {rec.data.headPhone || rec.data.headEmail || 'No contact'}
+                          <div className="text-[11px] text-parish-text-muted font-mono mt-0.5 flex items-center gap-1.5 flex-wrap">
+                            <span>{rec.data.headPhone || rec.data.headEmail || 'No contact'}</span>
+                            {rec.data.headDob && (
+                              <span className="text-parish-text-muted/80">
+                                • DOB: {rec.data.headDob}
+                              </span>
+                            )}
                           </div>
                         </td>
 

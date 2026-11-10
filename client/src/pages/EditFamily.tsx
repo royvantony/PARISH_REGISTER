@@ -43,6 +43,8 @@ import { RejectFamilyModal } from '../components/families/RejectFamilyModal';
 import { DirectDebitModal, type DirectDebitItem } from '../components/families/DirectDebitModal';
 import { HouseholdDossierModal } from '../components/families/HouseholdDossierModal';
 import type { DossierMember, DossierFamily } from '../components/families/HouseholdDossierModal';
+import { FamilyDocumentsSection } from '../components/families/FamilyDocumentsSection';
+import type { FamilyDocumentItem } from '../components/families/DocumentViewerModal';
 
 interface MemberFormData {
   id?: number;
@@ -139,6 +141,7 @@ export const EditFamilyPage: React.FC = () => {
   const [isDeletingDirectDebit, setIsDeletingDirectDebit] = useState(false);
   const [directDebitPerms, setDirectDebitPerms] = useState<{ canView: boolean; canEdit: boolean }>({ canView: false, canEdit: false });
   const [auditNotes, setAuditNotes] = useState<Array<{ id: number; noteDate: string; noteContent: string; recordedBy: string }>>([]);
+  const [documents, setDocuments] = useState<FamilyDocumentItem[]>([]);
   const [isAllAuditNotesShown, setIsAllAuditNotesShown] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -285,6 +288,7 @@ export const EditFamilyPage: React.FC = () => {
         setDirectDebitPerms(f.directDebitPermissions);
       }
       setAuditNotes(f.notes || []);
+      setDocuments(f.documents || []);
 
       setStatus(f.status || 'ACTIVE');
       setFamilyCode(f.familyCode || null);
@@ -1544,6 +1548,27 @@ export const EditFamilyPage: React.FC = () => {
             </div>
           );
         })()}
+
+        {/* Official Documents & Certificates Management */}
+        {id && isFeatureEnabled('REGISTER_DOCUMENTS') && hasPermission('DOCUMENTS', 'canView') && (
+          <FamilyDocumentsSection
+            familyId={Number(id)}
+            documents={documents}
+            readOnly={false}
+            canView={true}
+            canEdit={hasPermission('DOCUMENTS', 'canEdit')}
+            canDelete={hasPermission('DOCUMENTS', 'canDelete')}
+            canDownload={hasPermission('DOCUMENTS', 'canExport')}
+            members={[
+              ...(headMemberId && headName.trim() ? [{ id: headMemberId, fullName: headName.trim(), role: 'HEAD' }] : []),
+              ...(hasSpouse && spouseMemberId && spouseName.trim() ? [{ id: spouseMemberId, fullName: spouseName.trim(), role: 'SPOUSE' }] : []),
+              ...children
+                .filter((c) => c.id && c.fullName.trim())
+                .map((c) => ({ id: c.id!, fullName: c.fullName.trim(), role: c.role || 'CHILD' })),
+            ]}
+            onDocumentsUpdated={loadFamilyData}
+          />
+        )}
 
         {/* Form Bottom Actions */}
         <div className="flex items-center justify-between pt-2">

@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma.js';
 import { authenticateJWT } from '../middleware/auth.js';
 import { UserRole, FamilyStatus } from '@prisma/client';
 import { checkUserPermission } from './permissions.js';
+import { logSystemActivity, diffFieldsWithCaptions } from '../lib/activityLogger.js';
 
 export const mastersRouter = Router();
 
@@ -491,6 +492,16 @@ mastersRouter.post('/dioceses', async (req: Request, res: Response) => {
       },
     });
 
+    // Record in system activity log
+    await logSystemActivity({
+      parishId,
+      actionType: 'SETTINGS_CHANGE',
+      category: 'SETTINGS',
+      description: `Added Native Diocese: "${newDiocese.dioceseName}" (State: ${newDiocese.stateInIndia}, Rite: ${newDiocese.rite})`,
+      details: { diocese: newDiocese },
+      req,
+    });
+
     return res.status(201).json(newDiocese);
   } catch (err: any) {
     console.error('Failed to create diocese:', err);
@@ -564,6 +575,21 @@ mastersRouter.put('/dioceses/:id', async (req: Request, res: Response) => {
       });
     }
 
+    // Record in system activity log with diffs
+    const diffs: string[] = [];
+    if (existing.dioceseName !== updated.dioceseName) diffs.push(`Name: "${existing.dioceseName}" → "${updated.dioceseName}"`);
+    if (existing.stateInIndia !== updated.stateInIndia) diffs.push(`State: "${existing.stateInIndia}" → "${updated.stateInIndia}"`);
+    if (existing.rite !== updated.rite) diffs.push(`Rite: "${existing.rite}" → "${updated.rite}"`);
+
+    await logSystemActivity({
+      parishId,
+      actionType: 'SETTINGS_CHANGE',
+      category: 'SETTINGS',
+      description: `Updated Native Diocese "${existing.dioceseName}": ${diffs.join(', ') || 'No fields altered'}`,
+      details: { old: existing, new: updated },
+      req,
+    });
+
     return res.json(updated);
   } catch (err: any) {
     console.error('Failed to update diocese:', err);
@@ -590,6 +616,16 @@ mastersRouter.delete('/dioceses/:id', async (req: Request, res: Response) => {
 
     await prisma.nativeDiocese.delete({
       where: { id },
+    });
+
+    // Record in system activity log
+    await logSystemActivity({
+      parishId,
+      actionType: 'SETTINGS_CHANGE',
+      category: 'SETTINGS',
+      description: `Deleted Native Diocese: "${existing.dioceseName}" (State: ${existing.stateInIndia}, Rite: ${existing.rite})`,
+      details: { deleted: existing },
+      req,
     });
 
     return res.json({ message: `Diocese '${existing.dioceseName}' removed successfully.` });
@@ -741,6 +777,32 @@ mastersRouter.put('/parishes/:id', async (req: Request, res: Response) => {
       },
     });
 
+    // Record in system activity log with captions
+    const parishCaptions = {
+      parishName: { caption: 'Parish Name' },
+      city: { caption: 'City / Suburb' },
+      state: { caption: 'State' },
+      postalCode: { caption: 'Postal Code' },
+      contactEmail: { caption: 'Contact Email' },
+      contactPhone: { caption: 'Contact Phone' },
+      idPrefix: { caption: 'Family ID Prefix' },
+      nextFamilyNumber: { caption: 'Next Family Number' },
+      priestName: { caption: 'Parish Priest Name' },
+      priestEmail: { caption: 'Priest Email' },
+      priestPhone: { caption: 'Priest Phone' },
+      logoUrl: { caption: 'Parish Logo / Crest' },
+    };
+    const { summary, diffs } = diffFieldsWithCaptions(existing, updated, parishCaptions);
+
+    await logSystemActivity({
+      parishId: id,
+      actionType: 'SETTINGS_CHANGE',
+      category: 'SETTINGS',
+      description: `Updated Parish Profile: ${summary}`,
+      details: { diffs },
+      req,
+    });
+
     return res.json(updated);
   } catch (err: any) {
     console.error('Update parish error:', err);
@@ -842,6 +904,32 @@ mastersRouter.put('/governing-diocese', async (req: Request, res: Response) => {
         },
       });
     }
+
+    // Record in system activity log
+    const govCaptions = {
+      dioceseName: { caption: 'Governing Diocese Name' },
+      rite: { caption: 'Ecclesiastical Rite' },
+      bishopName: { caption: 'Bishop / Chancellor' },
+      chanceryAddress: { caption: 'Chancery Address' },
+      city: { caption: 'City' },
+      state: { caption: 'State' },
+      postalCode: { caption: 'Postal Code' },
+      contactPhone: { caption: 'Contact Phone' },
+      contactEmail: { caption: 'Contact Email' },
+      website: { caption: 'Official Website' },
+    };
+    const { summary, diffs } = existing
+      ? diffFieldsWithCaptions(existing, updated, govCaptions)
+      : { summary: 'Created official governing diocese profile', diffs: [] };
+
+    await logSystemActivity({
+      parishId,
+      actionType: 'SETTINGS_CHANGE',
+      category: 'SETTINGS',
+      description: `Updated Governing Diocese Profile: ${summary}`,
+      details: { diffs },
+      req,
+    });
 
     return res.json(updated);
   } catch (err: any) {

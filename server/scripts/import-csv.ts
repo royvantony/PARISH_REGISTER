@@ -231,7 +231,7 @@ async function run() {
         status: status,
         agreementConsent: agreement,
         registrationDate: regDate,
-        generalNotes: row['General Notes']?.trim() || null,
+        generalNotes: [comments, row['General Notes']?.trim()].filter(Boolean).join('\n\n') || null,
       },
     });
 

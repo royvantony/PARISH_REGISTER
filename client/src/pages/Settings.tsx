@@ -42,7 +42,8 @@ import { useAuth } from '../context/AuthContext';
 import { useFeatures } from '../context/FeatureContext';
 import { DeveloperControlsTab } from '../components/settings/DeveloperControlsTab';
 import { EmailSmtpTab } from '../components/settings/EmailSmtpTab';
-import { ShieldAlert } from 'lucide-react';
+import { ActivityLogsTab } from '../components/settings/ActivityLogsTab';
+import { ShieldAlert, Shield } from 'lucide-react';
 
 interface SystemHealthResponse {
 
@@ -136,7 +137,7 @@ export const SettingsPage: React.FC = () => {
   } = useAuth();
   const { isFeatureEnabled, isDeveloper, getStoredFlag, isSimulatingClient } = useFeatures();
   const isDev = (isDeveloper || user?.role === 'SUPER_ADMIN') && !isSimulatingClient;
-  const [activeSubTab, setActiveSubTab] = useState<'governing' | 'dioceses' | 'email' | 'general' | 'developer'>('governing');
+  const [activeSubTab, setActiveSubTab] = useState<'governing' | 'dioceses' | 'email' | 'general' | 'logs' | 'developer'>('governing');
 
   // Sync tab from URL query params (e.g. /settings?tab=developer)
   useEffect(() => {
@@ -146,6 +147,8 @@ export const SettingsPage: React.FC = () => {
       setActiveSubTab('developer');
     } else if (tabParam === 'email') {
       setActiveSubTab('email');
+    } else if (tabParam === 'logs') {
+      setActiveSubTab('logs');
     } else if (tabParam === 'dioceses' && (isDev || isFeatureEnabled('SETTING_NATIVE_DIOCESES'))) {
       setActiveSubTab('dioceses');
     } else if (tabParam === 'general' && (isDev || isFeatureEnabled('SETTING_SYSTEM_HEALTH'))) {
@@ -617,68 +620,91 @@ export const SettingsPage: React.FC = () => {
         </p>
       </div>
 
-      {/* Settings Sub-Navigation Tabs */}
-      <div className="flex border-b border-parish-border gap-2 overflow-x-auto">
+      {/* Settings Sub-Navigation Tabs - Responsive Wrapping without Scrollbar */}
+      <div className="flex flex-wrap items-center gap-1.5 p-1.5 bg-parish-surface border border-parish-border rounded-2xl shadow-2xs">
         <button
           onClick={() => setActiveSubTab('governing')}
-          className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${activeSubTab === 'governing'
-            ? 'border-parish-primary text-parish-primary'
-            : 'border-transparent text-parish-text-muted hover:text-parish-text'
+          className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'governing'
+            ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
+            : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
             }`}
         >
           <Church className="w-3.5 h-3.5" />
-          <span>Diocese & Parish Settings</span>
+          <span>Diocese & Parish</span>
         </button>
+
         {(isDev || isFeatureEnabled('SETTING_NATIVE_DIOCESES')) && (
           <button
             onClick={() => setActiveSubTab('dioceses')}
-            className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${activeSubTab === 'dioceses'
-              ? 'border-parish-primary text-parish-primary'
-              : 'border-transparent text-parish-text-muted hover:text-parish-text'
+            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'dioceses'
+              ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
+              : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
               }`}
           >
             <MapPin className="w-3.5 h-3.5" />
-            <span>Origin Dioceses from India ({dioceses.length})</span>
+            <span>Origin Dioceses</span>
+            <span className="text-[10px] bg-parish-primary/10 text-parish-primary px-1.5 py-0.5 rounded-full font-mono font-semibold">
+              {dioceses.length}
+            </span>
             {isDev && !getStoredFlag('SETTING_NATIVE_DIOCESES') && (
               <span className="text-[9px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1 py-0.2 rounded font-mono">Hidden</span>
             )}
           </button>
         )}
+
         <button
           onClick={() => setActiveSubTab('email')}
-          className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${activeSubTab === 'email'
-            ? 'border-parish-primary text-parish-primary'
-            : 'border-transparent text-parish-text-muted hover:text-parish-text'
+          className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'email'
+            ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
+            : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
             }`}
         >
           <Mail className="w-3.5 h-3.5" />
-          <span>Email & SMTP Gateway</span>
+          <span>Email & SMTP</span>
         </button>
+
         {(isDev || isFeatureEnabled('SETTING_SYSTEM_HEALTH')) && (
           <button
             onClick={() => setActiveSubTab('general')}
-            className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${activeSubTab === 'general'
-              ? 'border-parish-primary text-parish-primary'
-              : 'border-transparent text-parish-text-muted hover:text-parish-text'
+            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'general'
+              ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
+              : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
               }`}
           >
             <Sliders className="w-3.5 h-3.5" />
-            <span>General Configurations</span>
+            <span>System Health</span>
             {isDev && !getStoredFlag('SETTING_SYSTEM_HEALTH') && (
               <span className="text-[9px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1 py-0.2 rounded font-mono">Hidden</span>
             )}
           </button>
         )}
+
+        {(isDev || isFeatureEnabled('SETTING_ACTIVITY_LOGS') || hasPermission('AUDIT_LOGS', 'canView')) && (
+          <button
+            onClick={() => setActiveSubTab('logs')}
+            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'logs'
+              ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
+              : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
+              }`}
+          >
+            <Shield className="w-3.5 h-3.5" />
+            <span>Activity Logs</span>
+            {isDev && !getStoredFlag('SETTING_ACTIVITY_LOGS') && (
+              <span className="text-[9px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1 py-0.2 rounded font-mono">Hidden</span>
+            )}
+          </button>
+        )}
+
         {(isDeveloper || user?.role === 'SUPER_ADMIN') && (
           <button
             onClick={() => setActiveSubTab('developer')}
-            className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${activeSubTab === 'developer'
-              ? 'border-amber-600 text-amber-700 dark:text-amber-400 font-extrabold'
-              : 'border-transparent text-amber-600 hover:text-amber-700'
+            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'developer'
+              ? 'bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-400 shadow-xs border border-amber-300/80 font-extrabold'
+              : 'text-amber-700 dark:text-amber-400 hover:bg-amber-50/60'
               }`}
           >
             <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
-            <span>Developer Controls</span>
+            <span>Developer</span>
             <span className="text-[10px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded font-mono font-bold">DEV</span>
           </button>
         )}
@@ -2124,6 +2150,10 @@ export const SettingsPage: React.FC = () => {
 
           {activeSubTab === 'email' && (
             <EmailSmtpTab />
+          )}
+
+          {activeSubTab === 'logs' && (
+            <ActivityLogsTab />
           )}
 
           {activeSubTab === 'developer' && (isDeveloper || user?.role === 'SUPER_ADMIN') && (

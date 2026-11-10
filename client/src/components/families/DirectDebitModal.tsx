@@ -8,7 +8,6 @@ import { cn, calculateMonthlyEquivalent } from '../../lib/utils';
 import {
   CreditCard,
   AlertCircle,
-  ShieldCheck,
   Save,
   Home,
   Hash,
@@ -61,7 +60,7 @@ export const DirectDebitModal: React.FC<DirectDebitModalProps> = ({
 }) => {
   const isEditing = Boolean(directDebit && directDebit.id);
   const [reference, setReference] = useState('');
-  const [active, setActive] = useState(true);
+  const [active, setActive] = useState(Boolean(directDebit?.active));
   const [amount, setAmount] = useState('');
   const [frequency, setFrequency] = useState('Monthly');
   const [comments, setComments] = useState('');
@@ -74,13 +73,15 @@ export const DirectDebitModal: React.FC<DirectDebitModalProps> = ({
       setError(null);
       if (directDebit) {
         setReference(directDebit.reference || '');
-        setActive(directDebit.active !== false);
+        // Enabled ONLY if it is setup and active in DB
+        setActive(Boolean(directDebit.active));
         setAmount(directDebit.amount !== null && directDebit.amount !== undefined ? String(directDebit.amount) : '');
         setFrequency(directDebit.frequency || 'Monthly');
         setComments(directDebit.comments || '');
       } else {
         setReference('');
-        setActive(true);
+        // New schedule (first time adding) defaults to FALSE (disabled / inactive)
+        setActive(false);
         setAmount('');
         setFrequency('Monthly');
         setComments('');
@@ -223,19 +224,29 @@ export const DirectDebitModal: React.FC<DirectDebitModalProps> = ({
           className={cn(
             "p-3 rounded-xl border transition-all flex items-center justify-between cursor-pointer",
             active
-              ? "border-parish-primary/40 bg-parish-primary-light/20"
+              ? "border-emerald-500/40 bg-emerald-50/50 dark:bg-emerald-950/20"
               : "border-parish-border bg-parish-surface-subtle"
           )}
           onClick={() => canEdit && !isLoading && setActive(!active)}
         >
           <div className="space-y-0.5 select-none pr-3">
-            <label htmlFor="dd-active-toggle" className="text-xs font-bold text-parish-text cursor-pointer">
-              Schedule Status
-            </label>
+            <div className="flex items-center gap-2">
+              <label htmlFor="dd-active-toggle" className="text-xs font-bold text-parish-text cursor-pointer">
+                Schedule Status:
+              </label>
+              <span className={cn(
+                "text-[10px] font-extrabold px-1.5 py-0.5 rounded tracking-wide",
+                active
+                  ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300"
+                  : "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+              )}>
+                {active ? 'ACTIVE' : 'INACTIVE'}
+              </span>
+            </div>
             <p className="text-[11px] text-parish-text-muted">
               {active
                 ? 'Active (currently contributing to parish).'
-                : 'Paused / Inactive schedule.'}
+                : 'Disabled (toggle ON when direct debit is set up and active).'}
             </p>
           </div>
 
@@ -248,7 +259,7 @@ export const DirectDebitModal: React.FC<DirectDebitModalProps> = ({
               disabled={!canEdit || isLoading}
               className="sr-only peer"
             />
-            <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-parish-primary"></div>
+            <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
           </label>
         </div>
 
@@ -265,10 +276,10 @@ export const DirectDebitModal: React.FC<DirectDebitModalProps> = ({
               type="number"
               step="0.01"
               min="0"
-              placeholder={active ? "50.00" : "Turn status ON above to enter amount"}
+              placeholder={active ? "50.00" : "50.00 (optional while inactive)"}
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              disabled={!canEdit || isLoading || !active}
+              disabled={!canEdit || isLoading}
               className="pl-7 text-xs font-semibold"
               required={active}
             />
@@ -345,13 +356,6 @@ export const DirectDebitModal: React.FC<DirectDebitModalProps> = ({
           />
         </div>
 
-        {/* Audit Trail Guarantee Notice */}
-        <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200/80 text-[11px] text-amber-900 flex items-start gap-2.5">
-          <ShieldCheck className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-          <p className="leading-relaxed">
-            <strong>Audit Guarantee:</strong> Any adjustment to direct debit schedules is automatically logged into the <strong>Record History & Audit Trail</strong> with your user name and exact timestamp.
-          </p>
-        </div>
 
         {/* Modal Actions */}
         <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-parish-border">

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useFeatures } from '../../context/FeatureContext';
 import { AppNavbar } from './AppNavbar';
@@ -44,6 +45,28 @@ export const AppLayout: React.FC = () => {
   };
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Record page navigation in system activity log
+  const lastLoggedPathRef = useRef<string>('');
+  useEffect(() => {
+    if (!user || !location.pathname) return;
+    if (lastLoggedPathRef.current === location.pathname) return;
+    lastLoggedPathRef.current = location.pathname;
+
+    const pageTitles: Record<string, string> = {
+      '/': 'Home / Dashboard',
+      '/dashboard': 'Dashboard Overview',
+      '/register': 'Parish Register Directory',
+      '/register/new': 'Register New Family',
+      '/register/import': 'Import Registrations (CSV)',
+      '/units': 'Family Units / Wards',
+      '/users': 'Users & Roles Management',
+      '/settings': 'System Settings & Masters',
+    };
+
+    const title = pageTitles[location.pathname] || (location.pathname.startsWith('/register/edit') ? 'Edit Family Record' : location.pathname);
+    api.post('/activity/page-view', { path: location.pathname, pageTitle: title }).catch(() => {});
+  }, [location.pathname, user]);
 
   // Determine active tab from current URL path
   const getActiveTab = () => {

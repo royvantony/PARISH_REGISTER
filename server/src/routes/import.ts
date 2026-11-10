@@ -15,14 +15,18 @@ function parseDateFlexible(dateStr: string | undefined | null): Date | null {
   if (!dateStr || !dateStr.trim()) return null;
   const s = dateStr.trim();
 
-  // Try ISO YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-    const d = new Date(s);
+  // 1. Try ISO YYYY-MM-DD
+  if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(s)) {
+    const parts = s.split('-');
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    const d = new Date(Date.UTC(year, month, day));
     return isNaN(d.getTime()) ? null : d;
   }
 
-  // Try DD/MM/YYYY or DD-MM-YYYY
-  const parts = s.split(/[\/\-]/);
+  // 2. Try DD/MM/YYYY or DD-MM-YYYY or D/M/YYYY or DD.MM.YYYY
+  const parts = s.split(/[\/\-\.]/);
   if (parts.length === 3) {
     let day = parseInt(parts[0], 10);
     let month = parseInt(parts[1], 10) - 1;
@@ -45,6 +49,20 @@ function parseDateFlexible(dateStr: string | undefined | null): Date | null {
 
   const fallback = new Date(s);
   return isNaN(fallback.getTime()) ? null : fallback;
+}
+
+/**
+ * Normalizes any date string (DD/MM/YYYY, D/M/YYYY, YYYY-MM-DD, etc.)
+ * into standard YYYY-MM-DD so HTML5 <input type="date"> can display it seamlessly.
+ */
+function normalizeDateStr(dateStr: string | undefined | null): string {
+  if (!dateStr || !dateStr.trim()) return '';
+  const d = parseDateFlexible(dateStr);
+  if (!d) return '';
+  const year = d.getUTCFullYear();
+  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 // Clean and standardize diocese names
@@ -112,6 +130,56 @@ function getRowValue(row: Record<string, any>, possibleKeys: string[]): string {
   return '';
 }
 
+// Helper to extract all pastoral / household comments & notes from any comment/notes column
+function getNotesAndComments(row: Record<string, any>): string {
+  const collected: string[] = [];
+  const seen = new Set<string>();
+
+  const addVal = (v: any) => {
+    if (v !== undefined && v !== null) {
+      const trimmed = String(v).trim();
+      if (trimmed && !seen.has(trimmed.toLowerCase())) {
+        seen.add(trimmed.toLowerCase());
+        collected.push(trimmed);
+      }
+    }
+  };
+
+  // 1. Exact priority keys commonly found in CSVs and templates
+  const priorityKeys = [
+    'Comments (DD.MM.YY - put comments)',
+    'Pastoral & Household Notes',
+    'Pastoral & Household Notes / Comments',
+    'Pastoral Notes',
+    'Household Notes',
+    'General Notes',
+    'Comments',
+    'Comment',
+    'Notes',
+    'Remarks',
+  ];
+  for (const k of priorityKeys) {
+    if (row[k]) addVal(row[k]);
+  }
+
+  // 2. Fallback key search across all columns (excluding direct debit)
+  for (const [colName, val] of Object.entries(row)) {
+    const lower = colName.toLowerCase();
+    if (lower.includes('direct debit')) continue;
+    if (
+      lower.includes('comment') ||
+      lower.includes('pastoral') ||
+      lower.includes('general note') ||
+      lower === 'notes' ||
+      lower === 'remarks'
+    ) {
+      addVal(val);
+    }
+  }
+
+  return collected.join('\n\n');
+}
+
 // GET /api/import/template - Download pre-populated CSV template
 importRouter.get('/template', async (req: Request, res: Response) => {
   const parishId = req.activeParishId || 1;
@@ -158,7 +226,7 @@ importRouter.get('/template', async (req: Request, res: Response) => {
     'Postal Code',
     'Origin Parish in India',
     'Origin Diocese in India',
-    'General Notes',
+    'Pastoral & Household Notes / Comments',
   ];
 
   const sampleRows = [
@@ -406,7 +474,15 @@ importRouter.post('/preview', async (req: Request, res: Response) => {
       // 5. Contact & Address
       const headPhone = getRowValue(row, ['Head Phone', 'Phone|phone-1', 'Phone|phone-2', 'Phone', 'Mobile']);
       const headEmail = getRowValue(row, ['Head Email', 'Email Address|email-1', 'Email Address|email-2', 'Email']);
-      const headDob = getRowValue(row, ['Head Date of Birth (YYYY-MM-DD)', 'Date of Birth|date-1', 'Head DOB', 'DOB']);
+      const rawHeadDob = getRowValue(row, [
+        'Head Date of Birth (YYYY-MM-DD)',
+        'Head Date of Birth',
+        'Head DOB',
+        'Date of Birth|date-1',
+        'Date of Birth',
+        'DOB',
+      ]);
+      const headDob = normalizeDateStr(rawHeadDob);
       const headPob = getRowValue(row, ['Head Place of Birth', 'Place of Birth|text-1', 'Head POB', 'Place of Birth']);
 
       const streetAddress = getRowValue(row, [
@@ -422,7 +498,13 @@ importRouter.post('/preview', async (req: Request, res: Response) => {
 
       // 6. Spouse
       const spouseName = getRowValue(row, ['Spouse Full Name', 'Name|name-2', 'Spouse Name']);
-      const spouseDob = getRowValue(row, ['Spouse Date of Birth (YYYY-MM-DD)', 'Date of Birth|date-2', 'Spouse DOB']);
+      const rawSpouseDob = getRowValue(row, [
+        'Spouse Date of Birth (YYYY-MM-DD)',
+        'Spouse Date of Birth',
+        'Spouse DOB',
+        'Date of Birth|date-2',
+      ]);
+      const spouseDob = normalizeDateStr(rawSpouseDob);
       const spousePob = getRowValue(row, ['Spouse Place of Birth', 'Spouse POB']);
       const spousePhone = getRowValue(row, ['Spouse Phone', 'Phone|phone-3']);
       const spouseEmail = getRowValue(row, ['Spouse Email', 'Email Address|email-3']);
@@ -465,7 +547,7 @@ importRouter.post('/preview', async (req: Request, res: Response) => {
           n === 4 ? 'Full Name of Child|text-9' : '',
         ].filter(Boolean));
 
-        const cDob = getRowValue(row, [
+        const rawCDob = getRowValue(row, [
           `Child ${n} Date of Birth (YYYY-MM-DD)`,
           `Child ${n} Date of Birth`,
           `Child ${n} DOB`,
@@ -478,6 +560,7 @@ importRouter.post('/preview', async (req: Request, res: Response) => {
           n === 3 ? 'Date of Birth|date-5' : '',
           n === 4 ? 'Date of Birth|date-6' : '',
         ].filter(Boolean));
+        const cDob = normalizeDateStr(rawCDob);
 
         const cPob = getRowValue(row, [
           `Child ${n} Place of Birth`,
@@ -511,7 +594,7 @@ importRouter.post('/preview', async (req: Request, res: Response) => {
       // 8. Roots
       const originParish = getRowValue(row, ['Origin Parish in India', 'Parish in India|text-3', 'Origin Parish', 'Home Parish']);
       const originDiocese = cleanDiocese(getRowValue(row, ['Origin Diocese in India', 'Diocese in India|text-4', 'Origin Diocese', 'Diocese']));
-      const generalNotes = getRowValue(row, ['General Notes', 'Comments', 'Notes']);
+      const generalNotes = getNotesAndComments(row);
 
       // 9. Duplicate detection against database
       let duplicateMatch = null;

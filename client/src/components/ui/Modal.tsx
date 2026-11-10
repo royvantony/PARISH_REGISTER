@@ -27,18 +27,23 @@ export const Modal: React.FC<ModalProps> = ({
   // Handle escape key only if explicitly configured
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (closeOnEsc && e.key === 'Escape') onClose();
+      if (closeOnEsc && e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        onClose();
+      }
     };
     if (isOpen) {
       document.body.style.overflow = 'hidden';
       if (closeOnEsc) {
-        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keydown', handleKeyDown, true);
       }
     }
     return () => {
       document.body.style.overflow = 'unset';
       if (closeOnEsc) {
-        window.removeEventListener('keydown', handleKeyDown);
+        window.removeEventListener('keydown', handleKeyDown, true);
       }
     };
   }, [isOpen, onClose, closeOnEsc]);

@@ -40,6 +40,8 @@ import {
 } from 'lucide-react';
 import { HouseholdDossierModal } from '../components/families/HouseholdDossierModal';
 import { ParishRegisterListPrintModal } from '../components/families/ParishRegisterListPrintModal';
+import { FamilyDocumentsSection } from '../components/families/FamilyDocumentsSection';
+import type { FamilyDocumentItem } from '../components/families/DocumentViewerModal';
 
 interface FamilyListItem {
   id: number;
@@ -140,6 +142,7 @@ interface FamilyDetail {
     noteContent: string;
     recordedBy: string;
   }>;
+  documents?: FamilyDocumentItem[];
   mergedIntoFamily: {
     id: number;
     familyCode: string;
@@ -1565,6 +1568,19 @@ export const ParishRegisterPage: React.FC = () => {
                 </div>
               );
             })()}
+
+            {/* 3. Official Documents & Certificates (Read-Only Preview) */}
+            {isFeatureEnabled('REGISTER_DOCUMENTS') && hasPermission('DOCUMENTS', 'canView') && (
+              <div className="pt-4 border-t border-parish-border">
+                <FamilyDocumentsSection
+                  familyId={familyDetail.id}
+                  documents={familyDetail.documents || []}
+                  readOnly={true}
+                  canView={true}
+                  canDownload={hasPermission('DOCUMENTS', 'canExport')}
+                />
+              </div>
+            )}
 
             {/* Drawer Bottom Actions */}
             <div className="pt-4 border-t border-parish-border flex items-center justify-between gap-3">

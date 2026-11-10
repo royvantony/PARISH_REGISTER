@@ -4,12 +4,18 @@ import { authenticateJWT } from '../middleware/auth.js';
 import { FamilyStatus, RegistrationType, MemberRole, UserRole, Prisma } from '@prisma/client';
 import { canUserApproveRegistration, getUserDirectDebitPermissions, canUserExportModule, checkUserPermission } from './permissions.js';
 import { normalizeAustralianState } from '../lib/address.js';
+import { generateFamilyAuditDiff } from '../lib/familyAuditDiff.js';
+import { logSystemActivity } from '../lib/activityLogger.js';
+import { documentsRouter } from './documents.js';
 import ExcelJS from 'exceljs';
 
 export const familiesRouter = Router();
 
 // Apply auth to all family endpoints
 familiesRouter.use(authenticateJWT);
+
+// Mount Document Attachments sub-router
+familiesRouter.use('/:familyId/documents', documentsRouter);
 
 /**
  * Helper to construct Prisma where and orderBy filters for parish families
@@ -707,6 +713,9 @@ familiesRouter.get('/:id', async (req: Request, res: Response) => {
         },
         documents: {
           orderBy: { uploadedAt: 'desc' },
+          include: {
+            member: { select: { id: true, fullName: true, role: true } },
+          },
         },
         notes: {
           orderBy: { noteDate: 'desc' },
@@ -774,6 +783,7 @@ familiesRouter.patch('/:id', async (req: Request, res: Response) => {
 
     const existing = await prisma.family.findFirst({
       where: { id: familyId, parishId },
+      include: { unit: true, members: true },
     });
 
     if (!existing) {
@@ -865,6 +875,36 @@ familiesRouter.patch('/:id', async (req: Request, res: Response) => {
         },
       },
     });
+
+    // Record field-level audit note for partial update
+    try {
+      const auditNote = generateFamilyAuditDiff(existing, req.body, undefined, req.user?.fullName);
+      if (!auditNote.includes('(no changes recorded)')) {
+        await prisma.familyNote.create({
+          data: {
+            familyId,
+            noteDate: new Date(),
+            noteContent: auditNote,
+            recordedBy: req.user?.fullName || 'System',
+          },
+        });
+
+        // Also record to System & Security ActivityLog
+        await logSystemActivity({
+          parishId,
+          userId: req.user?.userId,
+          userName: req.user?.fullName,
+          userRole: req.user?.role,
+          actionType: 'FAMILY_UPDATE',
+          category: 'REGISTER',
+          description: `Family #${existing.familyCode || familyId} (${existing.houseName}): ${auditNote}`,
+          path: req.originalUrl,
+          req,
+        });
+      }
+    } catch (noteErr) {
+      console.warn('Non-blocking: Failed to create family audit note on PATCH:', noteErr);
+    }
 
     return res.json(updated);
   } catch (err: any) {
@@ -1041,7 +1081,7 @@ familiesRouter.put('/:id', async (req: Request, res: Response) => {
 
     const existing = await prisma.family.findFirst({
       where: { id: familyId, parishId },
-      include: { members: true },
+      include: { members: true, unit: true },
     });
 
     if (!existing) {
@@ -1056,6 +1096,24 @@ familiesRouter.put('/:id', async (req: Request, res: Response) => {
     }
 
     const canApprove = user ? await canUserApproveRegistration(user.userId, user.role, parishId, 'REGISTER_NEW') : false;
+
+    // Pre-resolve ward lookup map if unitId is modified
+    let wardLookup: Map<number, string> | undefined;
+    if (req.body.unitId !== undefined && req.body.unitId !== existing.unitId) {
+      const units = await prisma.familyUnit.findMany({
+        where: { parishId },
+        select: { id: true, unitName: true },
+      });
+      wardLookup = new Map(units.map((u) => [u.id, u.unitName]));
+    }
+
+    // Generate human-friendly field-level audit diff note
+    const auditNoteContent = generateFamilyAuditDiff(
+      existing,
+      req.body,
+      wardLookup,
+      user?.fullName
+    );
 
     const {
       registrationType = existing.registrationType,
@@ -1178,10 +1236,25 @@ familiesRouter.put('/:id', async (req: Request, res: Response) => {
         data: {
           familyId,
           noteDate: new Date(),
-          noteContent: `Household details and family members updated by ${user?.fullName || 'User'}.`,
+          noteContent: auditNoteContent,
           recordedBy: user?.fullName || 'System',
         },
       });
+
+      // 4. Log to System & Security ActivityLog
+      if (!auditNoteContent.includes('(no changes recorded)')) {
+        await logSystemActivity({
+          parishId,
+          userId: user?.userId,
+          userName: user?.fullName,
+          userRole: user?.role,
+          actionType: 'FAMILY_UPDATE',
+          category: 'REGISTER',
+          description: `Family #${existing.familyCode || familyId} (${existing.houseName}): ${auditNoteContent}`,
+          path: req.originalUrl,
+          req,
+        });
+      }
 
       return f;
     });
@@ -1609,6 +1682,19 @@ familiesRouter.post('/:id/direct-debits', async (req: Request, res: Response) =>
         },
       });
 
+      // System activity audit
+      await logSystemActivity({
+        parishId: parishId || family.parishId,
+        userId: user.userId,
+        userName: user.fullName,
+        userRole: user.role,
+        actionType: 'DIRECT_DEBIT_CHANGE',
+        category: 'REGISTER',
+        description: `Family #${family.familyCode || familyId} (${family.houseName}): ${auditMsg}`,
+        path: req.originalUrl,
+        req,
+      });
+
       return dd;
     });
 
@@ -1698,6 +1784,19 @@ familiesRouter.put('/:id/direct-debits/:ddId', async (req: Request, res: Respons
             noteContent: auditMessage,
             recordedBy: user.fullName,
           },
+        });
+
+        // System activity audit
+        await logSystemActivity({
+          parishId: parishId || existing.parishId,
+          userId: user.userId,
+          userName: user.fullName,
+          userRole: user.role,
+          actionType: 'DIRECT_DEBIT_CHANGE',
+          category: 'REGISTER',
+          description: `Family #${familyId}: ${auditMessage}`,
+          path: req.originalUrl,
+          req,
         });
       }
 

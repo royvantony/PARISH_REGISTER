@@ -104,6 +104,8 @@ model Parish {
   rolePermissions    RolePermission[]
   featureVault       SystemFeatureVault?
   smtpSetting        SmtpSetting?
+  activityLoggingEnabled Boolean   @default(true)
+  systemActivityLogs SystemActivityLog[]
 
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
@@ -286,11 +288,15 @@ model FamilyDocument {
   family       Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
   memberId     Int?
   member       FamilyMember? @relation(fields: [memberId], references: [id], onDelete: SetNull)
-  documentType String        // "PARISH_LETTER", "SIGNATURE", "CERTIFICATE"
+  documentType String        // "PARISH_LETTER", "SIGNATURE", "CERTIFICATE", "ID_PROOF", "OTHER"
   fileName     String
   localPath    String
   originalUrl  String?
+  mimeType     String?       @default("application/octet-stream")
+  fileSize     Int?          @default(0)
   uploadedAt   DateTime      @default(now())
+
+  @@index([familyId])
 }
 
 model DirectDebit {
@@ -319,6 +325,9 @@ model FamilyNote {
   noteContent String
   recordedBy  String?
   createdAt   DateTime  @default(now())
+
+  @@index([familyId])
+  @@index([noteDate])
 }
 
 // ----------------------------------------------------
@@ -376,5 +385,32 @@ model PasswordResetToken {
 
   @@index([email])
 }
+
+// ----------------------------------------------------
+// 8. GLOBAL SYSTEM & SECURITY ACTIVITY AUDIT LOG
+// ----------------------------------------------------
+
+model SystemActivityLog {
+  id          Int      @id @default(autoincrement())
+  parishId    Int
+  parish      Parish   @relation(fields: [parishId], references: [id], onDelete: Cascade)
+  userId      Int?
+  userName    String   // Preserved username / display name
+  userRole    String?  // e.g. "SUPER_ADMIN", "PARISH_ADMIN", "PRIEST"
+  actionType  String   // "LOGIN", "LOGOUT", "LOGIN_FAILED", "PAGE_VIEW", "SETTINGS_CHANGE", "USER_CHANGE", "WARD_CHANGE", "SECURITY_ALERT"
+  category    String   @default("GENERAL") // "AUTH", "NAVIGATION", "SETTINGS", "GOVERNANCE", "SECURITY"
+  description String   // Human readable description using field captions
+  details     String?  // JSON formatted details or field diffs
+  path        String?  // e.g. "/settings", "/users", "/api/masters/dioceses"
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([parishId, createdAt])
+  @@index([parishId, actionType])
+  @@index([parishId, category])
+  @@index([userId])
+}
+
 
 

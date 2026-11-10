@@ -2,9 +2,10 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma.js';
-import { authenticateJWT, AuthenticatedUser } from '../middleware/auth.js';
+import { authenticateJWT, optionalAuth, AuthenticatedUser } from '../middleware/auth.js';
 import { UserRole } from '@prisma/client';
 import { sendParishEmail } from '../lib/email.js';
+import { logSystemActivity } from '../lib/activityLogger.js';
 
 export const authRouter = Router();
 
@@ -33,11 +34,28 @@ authRouter.post('/login', async (req: Request, res: Response) => {
     });
 
     if (!user || !user.isActive) {
+      await logSystemActivity({
+        parishId: 1,
+        actionType: 'LOGIN_FAILED',
+        category: 'AUTH',
+        description: `Failed login attempt for identifier: "${identifier}" (User not found or inactive)`,
+        req,
+      });
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
 
     const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) {
+      await logSystemActivity({
+        parishId: user.parishId || 1,
+        userId: user.id,
+        userName: user.fullName || user.username || user.email,
+        userRole: user.role,
+        actionType: 'LOGIN_FAILED',
+        category: 'AUTH',
+        description: `Failed login attempt for "${user.fullName || user.email}" (Invalid password)`,
+        req,
+      });
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
 
@@ -52,6 +70,18 @@ authRouter.post('/login', async (req: Request, res: Response) => {
     };
 
     const token = jwt.sign(payload, getJwtSecret(), { expiresIn: '7d' });
+
+    // Record successful login in system activity log
+    await logSystemActivity({
+      parishId: user.parishId || 1,
+      userId: user.id,
+      userName: user.fullName,
+      userRole: user.role,
+      actionType: 'LOGIN',
+      category: 'AUTH',
+      description: `User "${user.fullName}" (${user.role}) logged in successfully`,
+      req,
+    });
 
     // Return user info and available parishes for tenant switcher
     let availableParishes: any[] = [];
@@ -169,6 +199,18 @@ authRouter.post('/dev-login', async (req: Request, res: Response) => {
 
     const token = jwt.sign(payload, getJwtSecret(), { expiresIn: '7d' });
 
+    // Record developer fast-login in activity log
+    await logSystemActivity({
+      parishId: user.parishId || 1,
+      userId: user.id,
+      userName: user.fullName,
+      userRole: user.role,
+      actionType: 'LOGIN',
+      category: 'AUTH',
+      description: `Developer Fast-Login as "${user.fullName}" (${user.role})`,
+      req,
+    });
+
     let availableParishes: any[] = [];
     const isGlobalRole =
       user.role === UserRole.SUPER_ADMIN ||
@@ -238,6 +280,33 @@ authRouter.post('/dev-login', async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error('Dev login error:', err);
     return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/auth/logout - End user session and record in activity log
+authRouter.post('/logout', optionalAuth, async (req: Request, res: Response) => {
+  try {
+    const user = req.user;
+    const bodyUser = req.body?.user;
+    const userId = user?.userId || bodyUser?.id || null;
+    const userName = user?.fullName || bodyUser?.fullName || user?.username || bodyUser?.username || user?.email || bodyUser?.email || 'User';
+    const userRole = user?.role || bodyUser?.role || null;
+    const parishId = user?.parishId || bodyUser?.parishId || req.activeParishId || 1;
+
+    await logSystemActivity({
+      parishId,
+      userId,
+      userName,
+      userRole,
+      actionType: 'LOGOUT',
+      category: 'AUTH',
+      description: `User "${userName}" (${userRole ? userRole.replace('_', ' ') : 'User'}) logged out`,
+      req,
+    });
+    return res.json({ message: 'Logged out successfully' });
+  } catch (err: any) {
+    console.error('Logout error:', err);
+    return res.status(500).json({ error: 'Logout failed' });
   }
 });
 

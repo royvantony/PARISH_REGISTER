@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma.js';
 import { authenticateJWT } from '../middleware/auth.js';
 import { verifyAndTestSmtp, SmtpConfigInput } from '../lib/email.js';
 import { checkUserPermission } from './permissions.js';
+import { logSystemActivity } from '../lib/activityLogger.js';
 
 export const settingsRouter = Router();
 
@@ -113,6 +114,23 @@ settingsRouter.post('/smtp', authenticateJWT, async (req: Request, res: Response
       },
     });
 
+    // Record in system activity log
+    await logSystemActivity({
+      parishId,
+      actionType: 'SETTINGS_CHANGE',
+      category: 'SETTINGS',
+      description: `Updated Email (SMTP) Configuration: Host "${updated.host}", Port ${updated.port}, User "${updated.user || 'None'}", Status ${updated.isEnabled ? 'Active' : 'Disabled'}`,
+      details: {
+        host: updated.host,
+        port: updated.port,
+        secure: updated.secure,
+        user: updated.user,
+        fromEmail: updated.fromEmail,
+        isEnabled: updated.isEnabled,
+      },
+      req,
+    });
+
     return res.json({
       message: 'SMTP settings updated successfully.',
       setting: {
@@ -185,6 +203,17 @@ settingsRouter.post('/smtp/test', authenticateJWT, async (req: Request, res: Res
     }
 
     const result = await verifyAndTestSmtp(configToTest, targetRecipient);
+    
+    // Record test in system activity log
+    await logSystemActivity({
+      parishId,
+      actionType: 'SETTINGS_CHANGE',
+      category: 'SETTINGS',
+      description: `Executed SMTP Test to "${targetRecipient}" - Result: ${result.success ? 'Success' : 'Failed'} (${result.message})`,
+      details: { recipient: targetRecipient, result },
+      req,
+    });
+
     if (!result.success) {
       return res.status(400).json({ error: result.message });
     }
