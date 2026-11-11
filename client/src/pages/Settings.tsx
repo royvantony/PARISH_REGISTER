@@ -679,7 +679,7 @@ export const SettingsPage: React.FC = () => {
           </button>
         )}
 
-        {(isDev || isFeatureEnabled('SETTING_ACTIVITY_LOGS') || hasPermission('AUDIT_LOGS', 'canView')) && (
+        {(isDev || (isFeatureEnabled('SETTING_ACTIVITY_LOGS') && hasPermission('AUDIT_LOGS', 'canView'))) && (
           <button
             onClick={() => setActiveSubTab('logs')}
             className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'logs'

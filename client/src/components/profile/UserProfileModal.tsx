@@ -115,8 +115,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
         return 'Parish Admin';
       case 'PARISH_USER':
         return 'Parish User';
-      case 'WARD_USER':
-        return 'Ward Coordinator';
       case 'SUPER_ADMIN':
         return 'System Developer / Super Admin';
       case 'DIOCESAN_ADMIN':

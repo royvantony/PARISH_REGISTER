@@ -462,7 +462,7 @@ The entire frontend is engineered following strict reactive design guidelines ac
 
 ### 9.3 Live Executive Dashboard (`/dashboard`)
 - **Backend API**: `GET /api/dashboard/stats` and `GET /api/dashboard/charts`.
-- **People & Community KPI Cards (Finance Omitted)**:
+- **People & Community Summary Cards (Finance Omitted)**:
   - **Registered Families**: Active household count with instant link to family register.
   - **Parishioners (All Souls)**: Total parish membership headcount across all registered households.
   - **Adults (18+)**: Adult parishioner count and percentage share (~71%).

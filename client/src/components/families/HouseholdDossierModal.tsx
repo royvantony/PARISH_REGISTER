@@ -1,6 +1,7 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
+import { api } from '../../lib/api';
 import {
   Printer,
   Church,
@@ -120,9 +121,52 @@ export const HouseholdDossierModal: React.FC<HouseholdDossierModalProps> = ({
     [uniqueMembers, headMember, spouseMember]
   );
 
+  // Audit when Household Dossier preview modal is opened (Developer opted out)
+  const lastLoggedDossierRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!isOpen || !family) {
+      lastLoggedDossierRef.current = null;
+      return;
+    }
+    if (user?.role === 'SUPER_ADMIN') return;
+    if (lastLoggedDossierRef.current === family.id) return;
+    lastLoggedDossierRef.current = family.id;
+
+    const headLabel = headMember?.fullName ? `${headMember.fullName} — ` : '';
+    const codeTag = family.familyCode || `#${family.id}`;
+    api.post('/activity/report-event', {
+      actionType: 'REPORT_VIEW',
+      description: `Opened Household Dossier Report Preview: ${headLabel}${family.houseName} (${codeTag}).`,
+      details: {
+        reportFormat: 'HOUSEHOLD_DOSSIER_PREVIEW',
+        familyId: family.id,
+        familyCode: family.familyCode,
+        houseName: family.houseName,
+      },
+      path: `/register (${codeTag} Dossier)`,
+    }).catch(() => {});
+  }, [isOpen, family?.id, user?.role, headMember?.fullName]);
+
   // Isolated hidden iframe printing to guarantee EXACTLY 1 A4 page with ZERO repetition
   const handleTriggerPrint = () => {
     if (!family) return;
+
+    if (user?.role !== 'SUPER_ADMIN') {
+      const headLabel = headMember?.fullName ? `${headMember.fullName} — ` : '';
+      const codeTag = family.familyCode || `#${family.id}`;
+      api.post('/activity/report-event', {
+        actionType: 'REPORT_EXPORT',
+        description: `Printed / Saved PDF Household Dossier Report: ${headLabel}${family.houseName} (${codeTag}) (${printTheme}).`,
+        details: {
+          reportFormat: 'HOUSEHOLD_DOSSIER_PRINT_PDF',
+          familyId: family.id,
+          familyCode: family.familyCode,
+          houseName: family.houseName,
+          theme: printTheme,
+        },
+        path: `/register (${codeTag} Dossier)`,
+      }).catch(() => {});
+    }
 
     // Create a dedicated hidden iframe
     const iframe = document.createElement('iframe');

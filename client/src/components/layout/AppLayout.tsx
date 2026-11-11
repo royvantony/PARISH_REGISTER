@@ -49,9 +49,15 @@ export const AppLayout: React.FC = () => {
   // Record page navigation in system activity log
   const lastLoggedPathRef = useRef<string>('');
   useEffect(() => {
-    if (!user || !location.pathname) return;
+    // Developer (SUPER_ADMIN) is opted out from all logging
+    if (!user || user.role === 'SUPER_ADMIN' || !location.pathname) return;
     if (lastLoggedPathRef.current === location.pathname) return;
     lastLoggedPathRef.current = location.pathname;
+
+    // Individual family edit pages log a richer FAMILY_VIEW entry with member/family name & code
+    if (/^\/register\/\d+\/edit\/?$/.test(location.pathname)) {
+      return;
+    }
 
     const pageTitles: Record<string, string> = {
       '/': 'Home / Dashboard',

@@ -366,7 +366,10 @@ export const ParishRegisterPage: React.FC = () => {
     setIsAllAuditTrailShown(false);
     setIsDetailLoading(true);
     try {
-      const res = await api.get<FamilyDetail>(`/families/${familyId}`);
+      const res = await api.get<FamilyDetail>(
+        `/families/${familyId}`,
+        user?.role === 'SUPER_ADMIN' ? undefined : { params: { auditView: 'drawer' } }
+      );
       setFamilyDetail(res.data);
     } catch (err: any) {
       console.error('Failed to fetch family profile details:', err);
@@ -838,10 +841,13 @@ export const ParishRegisterPage: React.FC = () => {
                     </div>
                   )}
 
-                  {(f.primaryPhone || f.headOfFamily?.phone) && (
-                    <div className="flex items-center gap-1.5">
-                      <Phone className="w-3.5 h-3.5 text-parish-text-muted" />
-                      <span>{f.primaryPhone || f.headOfFamily?.phone}</span>
+                  {(f.primaryPhone || f.headOfFamily?.phone || f.spouse?.phone) && (
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <Phone className="w-3.5 h-3.5 text-parish-text-muted shrink-0" />
+                      <span>{f.primaryPhone || f.headOfFamily?.phone || f.spouse?.phone}</span>
+                      {f.spouse?.phone && (f.primaryPhone || f.headOfFamily?.phone) && f.spouse.phone !== (f.primaryPhone || f.headOfFamily?.phone) && (
+                        <span className="text-parish-text-muted">• {f.spouse.phone}</span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -990,12 +996,17 @@ export const ParishRegisterPage: React.FC = () => {
 
                       <td className="py-3.5 px-4">
                         <div className="font-medium text-parish-text flex items-center gap-1.5">
-                          <Phone className="w-3 h-3 text-parish-text-muted" />
-                          <span>{f.primaryPhone || f.headOfFamily?.phone || 'No phone'}</span>
+                          <Phone className="w-3 h-3 text-parish-text-muted shrink-0" />
+                          <span>{f.primaryPhone || f.headOfFamily?.phone || f.spouse?.phone || 'No phone'}</span>
                         </div>
+                        {f.spouse?.phone && (f.primaryPhone || f.headOfFamily?.phone) && f.spouse.phone !== (f.primaryPhone || f.headOfFamily?.phone) && (
+                          <div className="text-[11px] text-parish-text-muted flex items-center gap-1.5 mt-0.5 pl-[18px]">
+                            <span>{f.spouse.phone}</span>
+                          </div>
+                        )}
                         {f.primaryEmail && (
                           <div className="text-[11px] text-parish-text-muted truncate max-w-[180px] flex items-center gap-1.5 mt-0.5">
-                            <Mail className="w-3 h-3 text-parish-text-muted" />
+                            <Mail className="w-3 h-3 text-parish-text-muted shrink-0" />
                             <span>{f.primaryEmail}</span>
                           </div>
                         )}

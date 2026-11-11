@@ -9,7 +9,6 @@ export interface AuthenticatedUser {
   fullName: string;
   role: UserRole;
   parishId: number | null; // NULL for Diocesan Admins
-  assignedUnitId?: number | null; // For Unit Coordinators
 }
 
 // Extend Express Request to carry authenticated user and active parish

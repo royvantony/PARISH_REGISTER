@@ -66,7 +66,6 @@ authRouter.post('/login', async (req: Request, res: Response) => {
       fullName: user.fullName,
       role: user.role,
       parishId: user.parishId,
-      assignedUnitId: user.assignedUnitId,
     };
 
     const token = jwt.sign(payload, getJwtSecret(), { expiresIn: '7d' });
@@ -144,7 +143,6 @@ authRouter.post('/login', async (req: Request, res: Response) => {
         email: user.email,
         role: user.role,
         parishId: user.parishId,
-        assignedUnitId: user.assignedUnitId,
         mustChangePassword: user.mustChangePassword,
       },
       availableParishes,
@@ -194,7 +192,6 @@ authRouter.post('/dev-login', async (req: Request, res: Response) => {
       fullName: user.fullName,
       role: user.role,
       parishId: user.parishId,
-      assignedUnitId: user.assignedUnitId,
     };
 
     const token = jwt.sign(payload, getJwtSecret(), { expiresIn: '7d' });
@@ -271,7 +268,6 @@ authRouter.post('/dev-login', async (req: Request, res: Response) => {
         email: user.email,
         role: user.role,
         parishId: user.parishId,
-        assignedUnitId: user.assignedUnitId,
         mustChangePassword: user.mustChangePassword,
       },
       availableParishes,
@@ -379,7 +375,6 @@ authRouter.get('/me', authenticateJWT, async (req: Request, res: Response) => {
         email: true,
         role: true,
         parishId: true,
-        assignedUnitId: true,
         isActive: true,
         mustChangePassword: true,
         parish: {

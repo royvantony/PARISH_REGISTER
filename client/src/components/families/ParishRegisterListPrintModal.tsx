@@ -167,11 +167,18 @@ export const ParishRegisterListPrintModal: React.FC<ParishRegisterListPrintModal
     filters.sortOrder,
   ]);
 
+  const loggedFiltersKeyRef = useRef<string | null>(null);
+
   useEffect(() => {
     let isCancelled = false;
 
     if (isOpen) {
       setIsLoading(true);
+      const isDevUser = user?.role === 'SUPER_ADMIN';
+      const shouldAudit = !isDevUser && loggedFiltersKeyRef.current !== filtersKey;
+      if (shouldAudit) {
+        loggedFiltersKeyRef.current = filtersKey;
+      }
 
       const fetchExportData = async () => {
         try {
@@ -183,6 +190,7 @@ export const ParishRegisterListPrintModal: React.FC<ParishRegisterListPrintModal
           if (filters.directDebit) params.directDebit = filters.directDebit;
           if (filters.sortBy) params.sortBy = filters.sortBy;
           if (filters.sortOrder) params.sortOrder = filters.sortOrder;
+          if (shouldAudit) params.auditReport = 'pdf_preview';
 
           const res = await api.get<{
             total: number;
@@ -203,6 +211,7 @@ export const ParishRegisterListPrintModal: React.FC<ParishRegisterListPrintModal
 
       fetchExportData();
     } else {
+      loggedFiltersKeyRef.current = null;
       setFamilies([]);
       setIsLoading(true);
     }
@@ -210,7 +219,7 @@ export const ParishRegisterListPrintModal: React.FC<ParishRegisterListPrintModal
     return () => {
       isCancelled = true;
     };
-  }, [isOpen, filtersKey]);
+  }, [isOpen, filtersKey, user?.role]);
 
   const isColour = printTheme === 'COLOUR';
   const isWholeFamily = exportDetailLevel === 'WHOLE_FAMILY';
@@ -319,6 +328,31 @@ export const ParishRegisterListPrintModal: React.FC<ParishRegisterListPrintModal
   // This guarantees: 1) Zero blank pages, 2) Landscape orientation, 3) Repeating table headers on every page, 4) ZERO overlapping!
   const handleTriggerPrint = () => {
     if (families.length === 0) return;
+
+    // Log PDF Print / Export event (Developer SUPER_ADMIN opted out)
+    if (user?.role !== 'SUPER_ADMIN') {
+      const scopeParts = [
+        `Status: ${formatStatusLabel(filters.status)}`,
+        `Ward: ${filters.unitName ? formatWardName(filters.unitName) : (filters.unitId === 'UNASSIGNED' ? 'Unassigned' : 'All Wards')}`,
+      ];
+      if (filters.type) scopeParts.push(`Type: ${filters.type}`);
+      if (filters.search?.trim()) scopeParts.push(`Search: "${filters.search.trim()}"`);
+
+      api.post('/activity/report-event', {
+        actionType: 'REPORT_EXPORT',
+        description: `Printed / Saved PDF Parish Register Report: ${families.length} household(s), ${totalParishioners} member(s) [${scopeParts.join(', ')}] (${exportDetailLevel === 'WHOLE_FAMILY' ? 'Whole Family' : 'Compact'}, ${orientation}, ${printTheme}).`,
+        details: {
+          reportFormat: 'PDF_PRINT_OR_SAVE',
+          householdCount: families.length,
+          memberCount: totalParishioners,
+          detailLevel: exportDetailLevel,
+          orientation,
+          theme: printTheme,
+          filters,
+        },
+        path: '/register',
+      }).catch(() => {});
+    }
 
     // Create a dedicated hidden iframe
     const iframe = document.createElement('iframe');

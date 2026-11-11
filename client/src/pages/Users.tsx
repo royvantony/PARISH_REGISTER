@@ -31,6 +31,9 @@ import {
   Check,
   Pencil,
   Sparkles,
+  FileText,
+  FileSpreadsheet,
+  Activity,
 } from 'lucide-react';
 
 interface ParishUserItem {
@@ -43,14 +46,7 @@ interface ParishUserItem {
   parishId: number | null;
   parishName: string;
   parishCode: string;
-  assignedUnitId: number | null;
-  unitName: string | null;
   createdAt: string;
-}
-
-interface UnitOption {
-  id: number;
-  unitName: string;
 }
 
 interface SystemModule {
@@ -63,11 +59,13 @@ const MODULE_TO_FEATURE_KEY: Record<string, string> = {
   REGISTER: 'PAGE_REGISTER',
   REGISTER_NEW: 'PAGE_REGISTER_NEW',
   IMPORT_REGISTRATIONS: 'PAGE_REGISTER_IMPORT',
+  DOCUMENTS: 'REGISTER_DOCUMENTS',
   DIRECT_DEBIT: 'REGISTER_DIRECT_DEBIT',
   WARDS: 'PAGE_UNITS',
   USERS: 'PAGE_USERS',
   DASHBOARD_ACTIVITY: 'DASH_ACTIVITY_FEED',
   SETTINGS: 'PAGE_SETTINGS',
+  AUDIT_LOGS: 'SETTING_ACTIVITY_LOGS',
 };
 
 interface RolePermRecord {
@@ -136,10 +134,11 @@ export const UsersPage: React.FC = () => {
 
   // Users List State
   const [users, setUsers] = useState<ParishUserItem[]>([]);
-  const [units, setUnits] = useState<UnitOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
+  const [hideInactiveUsers, setHideInactiveUsers] = useState<boolean>(false);
+  const [isSavingHideInactive, setIsSavingHideInactive] = useState<boolean>(false);
 
   // Role Permissions Matrix State
   const [modules, setModules] = useState<SystemModule[]>([]);
@@ -179,7 +178,6 @@ export const UsersPage: React.FC = () => {
   const [inviteEmail, setInviteEmail] = useState('');
   const [invitePassword, setInvitePassword] = useState('Parish2026!');
   const [inviteRole, setInviteRole] = useState<UserRole>('PARISH_USER');
-  const [inviteUnitId, setInviteUnitId] = useState<string>('');
   const [inviteSubmitting, setInviteSubmitting] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [createdSuccessData, setCreatedSuccessData] = useState<{
@@ -197,7 +195,6 @@ export const UsersPage: React.FC = () => {
   const [editFullName, setEditFullName] = useState('');
   const [editUsername, setEditUsername] = useState('');
   const [editRole, setEditRole] = useState<UserRole>('PARISH_USER');
-  const [editUnitId, setEditUnitId] = useState<string>('');
   const [editPassword, setEditPassword] = useState('');
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
@@ -211,18 +208,25 @@ export const UsersPage: React.FC = () => {
   const fetchData = async () => {
     try {
       setIsLoading(true);
-      const [usersRes, unitsRes] = await Promise.all([
+      const [usersRes, prefsRes] = await Promise.all([
         api.get<ParishUserItem[]>('/masters/users'),
-        api.get<UnitOption[]>('/masters/units'),
+        api.get<{ hideInactiveUsers: boolean }>('/masters/users/preferences').catch(() => ({
+          data: { hideInactiveUsers: false },
+        })),
       ]);
       setUsers(usersRes.data);
-      setUnits(unitsRes.data);
+      setHideInactiveUsers(Boolean(prefsRes.data?.hideInactiveUsers));
 
-      if (usersRes.data.length > 0 && !selectedOverrideUserId) {
-        setSelectedOverrideUserId(usersRes.data[0].id);
+      const firstActiveParishUser = usersRes.data.find(
+        (u) =>
+          u.isActive &&
+          (u.role === 'PARISH_PRIEST' || u.role === 'PARISH_ADMIN' || u.role === 'PARISH_USER')
+      );
+      if (firstActiveParishUser && !selectedOverrideUserId) {
+        setSelectedOverrideUserId(firstActiveParishUser.id);
       }
     } catch (err: any) {
-      console.error('Failed to fetch users or units:', err);
+      console.error('Failed to fetch users:', err);
     } finally {
       setIsLoading(false);
     }
@@ -230,7 +234,24 @@ export const UsersPage: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [activeParish?.id]);
+
+  const handleToggleHideInactiveUsers = async (nextValue: boolean) => {
+    const previous = hideInactiveUsers;
+    setHideInactiveUsers(nextValue);
+    try {
+      setIsSavingHideInactive(true);
+      const res = await api.patch<{ hideInactiveUsers: boolean }>('/masters/users/preferences', {
+        hideInactiveUsers: nextValue,
+      });
+      setHideInactiveUsers(Boolean(res.data.hideInactiveUsers));
+    } catch (err: any) {
+      console.error('Failed to save hideInactiveUsers preference:', err);
+      setHideInactiveUsers(previous);
+    } finally {
+      setIsSavingHideInactive(false);
+    }
+  };
 
   // Fetch Matrix
   const fetchMatrix = async () => {
@@ -313,7 +334,6 @@ export const UsersPage: React.FC = () => {
     setInviteEmail('');
     setInvitePassword('Parish2026!');
     setInviteRole('PARISH_USER');
-    setInviteUnitId('');
     setInviteError(null);
     setCreatedSuccessData(null);
     setCopiedInvite(false);
@@ -371,7 +391,6 @@ export const UsersPage: React.FC = () => {
         email: inviteEmail.trim().toLowerCase(),
         password: invitePassword,
         role: inviteRole,
-        assignedUnitId: inviteRole === 'WARD_USER' && inviteUnitId ? parseInt(inviteUnitId, 10) : null,
       });
 
       setCreatedSuccessData({
@@ -428,7 +447,7 @@ Upon logging in, you will be prompted to set your own permanent password.`;
     if (targetUser.role === 'SUPER_ADMIN') return false;
     if (currentUser.role === 'PARISH_PRIEST') return true;
     if (currentUser.role === 'PARISH_ADMIN') {
-      return targetUser.role === 'PARISH_USER' || targetUser.role === 'WARD_USER' || targetUser.id === currentUser.id;
+      return targetUser.role === 'PARISH_USER' || targetUser.id === currentUser.id;
     }
     return targetUser.id === currentUser.id;
   };
@@ -438,7 +457,7 @@ Upon logging in, you will be prompted to set your own permanent password.`;
     if (targetUser.id === currentUser.id) return false; // Cannot change own role
     if (currentUser.role === 'SUPER_ADMIN') return true;
     if (currentUser.role === 'PARISH_PRIEST' && targetUser.role !== 'PARISH_PRIEST') return true;
-    if (currentUser.role === 'PARISH_ADMIN' && (targetUser.role === 'PARISH_USER' || targetUser.role === 'WARD_USER')) return true;
+    if (currentUser.role === 'PARISH_ADMIN' && targetUser.role === 'PARISH_USER') return true;
     return false;
   };
 
@@ -447,7 +466,6 @@ Upon logging in, you will be prompted to set your own permanent password.`;
     setEditFullName(user.fullName);
     setEditUsername(user.username || '');
     setEditRole(user.role);
-    setEditUnitId(user.assignedUnitId ? String(user.assignedUnitId) : '');
     setEditPassword('');
     setEditError(null);
     setIsEditOpen(true);
@@ -457,10 +475,6 @@ Upon logging in, you will be prompted to set your own permanent password.`;
     if (!editingUser) return false;
     if (!editFullName.trim()) {
       setEditError('Full name is required.');
-      return false;
-    }
-    if (editRole === 'WARD_USER' && !editUnitId) {
-      setEditError('Please select an assigned ward for the Ward User.');
       return false;
     }
     return true;
@@ -478,7 +492,6 @@ Upon logging in, you will be prompted to set your own permanent password.`;
         fullName: editFullName.trim(),
         username: editUsername.trim() || null,
         role: editRole,
-        assignedUnitId: editRole === 'WARD_USER' ? parseInt(editUnitId, 10) : null,
       };
 
       if (editPassword.trim()) {
@@ -678,8 +691,6 @@ Upon logging in, you will be prompted to set your own permanent password.`;
         return 'success';
       case 'PARISH_USER':
         return 'info';
-      case 'WARD_USER':
-        return 'outline';
       default:
         return 'outline';
     }
@@ -699,8 +710,6 @@ Upon logging in, you will be prompted to set your own permanent password.`;
         return 'Parish Admin';
       case 'PARISH_USER':
         return 'Parish User';
-      case 'WARD_USER':
-        return 'Ward User';
       default:
         return role;
     }
@@ -712,6 +721,10 @@ Upon logging in, you will be prompted to set your own permanent password.`;
         return <UsersIcon className="w-4 h-4 text-parish-primary" />;
       case 'REGISTER_NEW':
         return <UserPlus className="w-4 h-4 text-emerald-600" />;
+      case 'IMPORT_REGISTRATIONS':
+        return <FileSpreadsheet className="w-4 h-4 text-teal-600" />;
+      case 'DOCUMENTS':
+        return <FileText className="w-4 h-4 text-rose-600" />;
       case 'DIRECT_DEBIT':
         return <CreditCard className="w-4 h-4 text-sky-600" />;
       case 'WARDS':
@@ -722,27 +735,54 @@ Upon logging in, you will be prompted to set your own permanent password.`;
         return <Clock className="w-4 h-4 text-indigo-600" />;
       case 'SETTINGS':
         return <SettingsIcon className="w-4 h-4 text-slate-600" />;
+      case 'AUDIT_LOGS':
+        return <Activity className="w-4 h-4 text-cyan-600" />;
       default:
         return <ShieldCheck className="w-4 h-4" />;
     }
   };
 
-  const parishUsers = users.filter(
-    (u) =>
-      u.role === 'PARISH_PRIEST' ||
-      u.role === 'PARISH_ADMIN' ||
-      u.role === 'PARISH_USER' ||
-      u.role === 'WARD_USER'
+  const parishUsers = useMemo(
+    () =>
+      users.filter(
+        (u) =>
+          u.role === 'PARISH_PRIEST' ||
+          u.role === 'PARISH_ADMIN' ||
+          u.role === 'PARISH_USER'
+      ),
+    [users]
   );
+
+  const activeParishUsers = useMemo(
+    () => parishUsers.filter((u) => u.isActive),
+    [parishUsers]
+  );
+
+  const inactiveParishUsersCount = parishUsers.length - activeParishUsers.length;
+
+  // Keep Custom User Overrides selector restricted to active parish users only
+  useEffect(() => {
+    if (activeParishUsers.length === 0) {
+      if (selectedOverrideUserId !== null) {
+        setSelectedOverrideUserId(null);
+      }
+      setOverrideUserData(null);
+      return;
+    }
+    const stillActive = activeParishUsers.some((u) => u.id === selectedOverrideUserId);
+    if (!stillActive) {
+      setSelectedOverrideUserId(activeParishUsers[0].id);
+    }
+  }, [activeParishUsers, selectedOverrideUserId]);
 
   const filteredUsers = parishUsers.filter((u) => {
     const matchesSearch =
       u.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (u.username && u.username.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (u.unitName && u.unitName.toLowerCase().includes(searchQuery.toLowerCase()));
+      u.email.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesRole = roleFilter === 'ALL' || u.role === roleFilter;
-    return matchesSearch && matchesRole;
+    const matchesActive = !hideInactiveUsers || u.isActive;
+    return matchesSearch && matchesRole && matchesActive;
   });
 
   return (
@@ -790,7 +830,7 @@ Upon logging in, you will be prompted to set your own permanent password.`;
             <UsersIcon className="w-4 h-4" />
             <span>Authorized Users</span>
             <span className="text-[10px] bg-parish-primary/10 text-parish-primary px-1.5 py-0.5 rounded-full font-mono font-semibold">
-              {parishUsers.length}
+              {activeParishUsers.length}
             </span>
           </button>
         )}
@@ -827,14 +867,14 @@ Upon logging in, you will be prompted to set your own permanent password.`;
       {/* ========================================================================= */}
       {activeTab === 'users' && (
         <div className="space-y-6">
-          {/* Summary Stat Bar */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4">
+          {/* Summary Stat Bar (Active Users Only) */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
             <div className="bg-parish-surface border border-parish-border rounded-xl p-3.5 sm:p-4 shadow-xs">
               <div className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-parish-text-muted">
                 Total Accounts
               </div>
-              <div className="text-xl sm:text-2xl font-extrabold text-parish-text mt-1">{parishUsers.length}</div>
-              <div className="text-[11px] text-parish-text-muted mt-0.5">Authorized logins</div>
+              <div className="text-xl sm:text-2xl font-extrabold text-parish-text mt-1">{activeParishUsers.length}</div>
+              <div className="text-[11px] text-parish-text-muted mt-0.5">Active logins</div>
             </div>
 
             <div className="bg-parish-surface border border-parish-border rounded-xl p-3.5 sm:p-4 shadow-xs">
@@ -842,7 +882,7 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                 Parish Priests
               </div>
               <div className="text-xl sm:text-2xl font-extrabold text-parish-primary mt-1">
-                {parishUsers.filter((u) => u.role === 'PARISH_PRIEST').length}
+                {activeParishUsers.filter((u) => u.role === 'PARISH_PRIEST').length}
               </div>
               <div className="text-[11px] text-parish-text-muted mt-0.5">Parish Priest</div>
             </div>
@@ -852,7 +892,7 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                 Admins
               </div>
               <div className="text-xl sm:text-2xl font-extrabold text-emerald-700 mt-1">
-                {parishUsers.filter((u) => u.role === 'PARISH_ADMIN').length}
+                {activeParishUsers.filter((u) => u.role === 'PARISH_ADMIN').length}
               </div>
               <div className="text-[11px] text-parish-text-muted mt-0.5">Parish Admin</div>
             </div>
@@ -862,27 +902,17 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                 Users
               </div>
               <div className="text-xl sm:text-2xl font-extrabold text-sky-700 mt-1">
-                {parishUsers.filter((u) => u.role === 'PARISH_USER').length}
+                {activeParishUsers.filter((u) => u.role === 'PARISH_USER').length}
               </div>
               <div className="text-[11px] text-parish-text-muted mt-0.5">Parish User</div>
             </div>
-
-            <div className="bg-parish-surface border border-parish-border rounded-xl p-3.5 sm:p-4 shadow-xs">
-              <div className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-parish-text-muted">
-                Ward Users
-              </div>
-              <div className="text-xl sm:text-2xl font-extrabold text-amber-700 mt-1">
-                {parishUsers.filter((u) => u.role === 'WARD_USER').length}
-              </div>
-              <div className="text-[11px] text-parish-text-muted mt-0.5">Ward Leaders</div>
-            </div>
           </div>
 
-          {/* Search and Role Filter Bar */}
-          <div className="bg-parish-surface border border-parish-border rounded-2xl p-4 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          {/* Search, Role Filter Bar & Parish Hide-Inactive Setting */}
+          <div className="bg-parish-surface border border-parish-border rounded-2xl p-4 shadow-xs flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
             <div className="relative flex-1 max-w-md">
               <Input
-                placeholder="Search by name, email, or ward..."
+                placeholder="Search by name, username, or email..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 icon={<Search className="w-4 h-4" />}
@@ -890,27 +920,48 @@ Upon logging in, you will be prompted to set your own permanent password.`;
               />
             </div>
 
-            {/* Filter Pills */}
-            <div className="flex flex-wrap items-center gap-1.5">
-              {[
-                { key: 'ALL', label: 'All Roles' },
-                { key: 'PARISH_PRIEST', label: 'Priests' },
-                { key: 'PARISH_ADMIN', label: 'Admins' },
-                { key: 'PARISH_USER', label: 'Users' },
-                { key: 'WARD_USER', label: 'Ward Leaders' },
-              ].map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => setRoleFilter(item.key)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors min-h-[38px] ${roleFilter === item.key
-                    ? 'bg-parish-primary text-white shadow-xs'
-                    : 'bg-parish-surface-subtle text-parish-text-muted hover:text-parish-text'
-                    }`}
-                >
-                  {item.label}
-                </button>
-              ))}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Filter Pills */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                {[
+                  { key: 'ALL', label: 'All Roles' },
+                  { key: 'PARISH_PRIEST', label: 'Priests' },
+                  { key: 'PARISH_ADMIN', label: 'Admins' },
+                  { key: 'PARISH_USER', label: 'Users' },
+                ].map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => setRoleFilter(item.key)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors min-h-[38px] ${roleFilter === item.key
+                      ? 'bg-parish-primary text-white shadow-xs'
+                      : 'bg-parish-surface-subtle text-parish-text-muted hover:text-parish-text'
+                      }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Parish-wide Hide Inactive Users Toggle */}
+              <label
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-parish-border bg-parish-surface-subtle text-xs font-semibold text-parish-text cursor-pointer select-none min-h-[38px] hover:border-parish-primary/50 transition-colors"
+                title="Saved per parish for all users on this screen"
+              >
+                <input
+                  type="checkbox"
+                  checked={hideInactiveUsers}
+                  disabled={isSavingHideInactive}
+                  onChange={(e) => handleToggleHideInactiveUsers(e.target.checked)}
+                  className="w-4 h-4 rounded border-parish-border text-parish-primary focus:ring-parish-primary accent-parish-primary cursor-pointer"
+                />
+                <span>Hide inactive users</span>
+                {inactiveParishUsersCount > 0 && (
+                  <span className="text-[11px] font-mono text-parish-text-muted">
+                    ({inactiveParishUsersCount})
+                  </span>
+                )}
+              </label>
             </div>
           </div>
 
@@ -980,17 +1031,10 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                           {formatRoleLabel(u.role)}
                         </Badge>
 
-                        {u.unitName ? (
-                          <div className="text-[11px] text-parish-text-muted flex items-center gap-1">
-                            <MapPin className="w-3 h-3 text-amber-600" />
-                            <span>{u.unitName} Ward</span>
-                          </div>
-                        ) : (
-                          <div className="text-[11px] text-parish-text-muted flex items-center gap-1">
-                            <Church className="w-3 h-3 text-parish-primary" />
-                            <span>{u.parishName}</span>
-                          </div>
-                        )}
+                        <div className="text-[11px] text-parish-text-muted flex items-center gap-1">
+                          <Church className="w-3 h-3 text-parish-primary" />
+                          <span>{u.parishName}</span>
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-1.5">
@@ -1050,7 +1094,7 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                   <tr>
                     <th className="py-3.5 px-4">User</th>
                     <th className="py-3.5 px-4">Role</th>
-                    <th className="py-3.5 px-4">Jurisdiction & Ward</th>
+                    <th className="py-3.5 px-4">Parish</th>
                     <th className="py-3.5 px-4">Status</th>
                     <th className="py-3.5 px-4 text-right">Actions</th>
                   </tr>
@@ -1107,17 +1151,10 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                           </td>
 
                           <td className="py-3.5 px-4">
-                            {u.unitName ? (
-                              <div className="flex items-center gap-1.5 font-semibold text-amber-700">
-                                <MapPin className="w-3.5 h-3.5" />
-                                <span>{u.unitName} Ward</span>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-1.5 text-parish-text">
-                                <Church className="w-3.5 h-3.5 text-parish-primary" />
-                                <span>{u.parishName}</span>
-                              </div>
-                            )}
+                            <div className="flex items-center gap-1.5 text-parish-text">
+                              <Church className="w-3.5 h-3.5 text-parish-primary" />
+                              <span>{u.parishName}</span>
+                            </div>
                           </td>
 
                           <td className="py-3.5 px-4">
@@ -1230,7 +1267,6 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                 { role: 'PARISH_PRIEST', label: 'Parish Priest' },
                 { role: 'PARISH_ADMIN', label: 'Parish Admin' },
                 { role: 'PARISH_USER', label: 'Parish User' },
-                { role: 'WARD_USER', label: 'Ward User' },
               ].map((r) => (
                 <button
                   key={r.role}
@@ -1246,25 +1282,6 @@ Upon logging in, you will be prompted to set your own permanent password.`;
               ))}
             </div>
 
-            {/* Parish Priest Policy Callout */}
-            {selectedRole === 'PARISH_PRIEST' && (
-              <div className="p-3.5 rounded-xl bg-parish-primary-light/60 border border-parish-border text-parish-text text-xs flex items-start gap-2.5">
-                <Church className="w-4 h-4 shrink-0 text-parish-primary mt-0.5" />
-                <div className="leading-relaxed">
-                  <strong>Supreme Parish Authority (Parish Priest):</strong> The Parish Priest holds ultimate executive authority in the parish. Has full rights to approve new family registrations, block or deactivate parish admins (trustees), manage user access, and oversee confidential Direct Debit details.
-                </div>
-              </div>
-            )}
-
-            {/* Ward Isolation Policy Callout */}
-            {selectedRole === 'WARD_USER' && (
-              <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-start gap-2.5">
-                <MapPin className="w-4 h-4 shrink-0 text-amber-700 mt-0.5" />
-                <div className="leading-relaxed">
-                  <strong>Ward Isolation Policy Active:</strong> Ward Users are strictly locked to their assigned ward (<code className="font-mono text-[11px] bg-white px-1 py-0.5 rounded border border-amber-300">assignedUnitId</code>). They cannot view, search, or access any families outside their ward boundary.
-                </div>
-              </div>
-            )}
             {/* Uninitialized Parish Notice */}
             {!isMatrixInitialized && (
               <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center justify-between gap-3 animate-in fade-in duration-200">
@@ -1508,14 +1525,19 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                 <label className="block text-xs font-bold text-parish-text mb-1">Select Target User:</label>
                 <select
                   value={selectedOverrideUserId || ''}
-                  onChange={(e) => setSelectedOverrideUserId(parseInt(e.target.value, 10))}
-                  className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-parish-border bg-parish-surface text-parish-text focus:outline-none focus:ring-2 focus:ring-parish-primary"
+                  onChange={(e) => setSelectedOverrideUserId(e.target.value ? parseInt(e.target.value, 10) : null)}
+                  disabled={activeParishUsers.length === 0}
+                  className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-parish-border bg-parish-surface text-parish-text focus:outline-none focus:ring-2 focus:ring-parish-primary disabled:opacity-60"
                 >
-                  {users.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.fullName} ({formatRoleLabel(u.role)})
-                    </option>
-                  ))}
+                  {activeParishUsers.length === 0 ? (
+                    <option value="">No active parish users found</option>
+                  ) : (
+                    activeParishUsers.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.fullName} ({formatRoleLabel(u.role)})
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
 
@@ -1529,11 +1551,6 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                     <Badge variant={getRoleBadgeVariant(overrideUserData.user.role)} size="sm">
                       Base: {formatRoleLabel(overrideUserData.user.role)}
                     </Badge>
-                    {overrideUserData.user.unitName && (
-                      <div className="text-[11px] text-amber-700 font-semibold">
-                        Locked to {overrideUserData.user.unitName} Ward
-                      </div>
-                    )}
                   </div>
                 </div>
               )}
@@ -1815,7 +1832,6 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                 <option value="PARISH_USER">Parish User (Secretary / Office)</option>
                 <option value="PARISH_ADMIN">Parish Admin (Trustee / Executive)</option>
                 <option value="PARISH_PRIEST">Parish Priest</option>
-                <option value="WARD_USER">Ward User (Ward Coordinator)</option>
               </select>
             </div>
 
@@ -1874,29 +1890,7 @@ Upon logging in, you will be prompted to set your own permanent password.`;
               )
             )}
 
-            {/* 3. Assigned Ward (if WARD_USER) */}
-            {inviteRole === 'WARD_USER' && (
-              <div>
-                <label className="block text-xs font-semibold text-parish-text mb-1">
-                  Assigned Ward <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={inviteUnitId}
-                  onChange={(e) => setInviteUnitId(e.target.value)}
-                  required
-                  className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-parish-border bg-parish-surface text-parish-text focus:outline-none focus:ring-2 focus:ring-parish-primary"
-                >
-                  <option value="">Select a ward...</option>
-                  {units.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.unitName} Ward
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* 4. Username */}
+            {/* 3. Username */}
             <div>
               <label className="block text-xs font-semibold text-parish-text mb-1">
                 User Name <span className="text-xs text-parish-text-muted font-normal">(Login identifier)</span>
@@ -2022,7 +2016,6 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                   <option value="PARISH_ADMIN">Parish Admin (Trustee / Executive)</option>
                 )}
                 <option value="PARISH_USER">Parish User (Secretary / Office)</option>
-                <option value="WARD_USER">Ward User (Ward Coordinator)</option>
               </select>
             </div>
 
@@ -2081,32 +2074,7 @@ Upon logging in, you will be prompted to set your own permanent password.`;
               )
             )}
 
-            {/* 3. Assigned Ward (if WARD_USER) */}
-            {editRole === 'WARD_USER' && (
-              <div>
-                <label className="block text-xs font-semibold text-parish-text mb-1">
-                  Assigned Ward Jurisdiction <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={editUnitId}
-                  onChange={(e) => setEditUnitId(e.target.value)}
-                  required
-                  className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-parish-border bg-parish-surface text-parish-text focus:outline-none focus:ring-2 focus:ring-parish-primary"
-                >
-                  <option value="">Select a ward...</option>
-                  {units.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.unitName} Ward
-                    </option>
-                  ))}
-                </select>
-                <p className="text-[10px] text-parish-text-muted mt-1">
-                  Ward Coordinators only have query access to family records inside their assigned prayer ward.
-                </p>
-              </div>
-            )}
-
-            {/* 4. Username */}
+            {/* 3. Username */}
             <div>
               <label className="block text-xs font-semibold text-parish-text mb-1">
                 User Name <span className="text-xs text-parish-text-muted font-normal">(Login identifier)</span>

@@ -255,6 +255,13 @@ export const ActivityLogsTab: React.FC = () => {
             SETTINGS
           </span>
         );
+      case 'FAMILY_VIEW':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-cyan-50 text-cyan-800 border border-cyan-200">
+            <Eye className="w-3 h-3 text-cyan-600" />
+            FAMILY VIEWED
+          </span>
+        );
       case 'FAMILY_UPDATE':
         return (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
@@ -288,6 +295,20 @@ export const ActivityLogsTab: React.FC = () => {
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
             <Download className="w-3 h-3 text-amber-600" />
             DOC DOWNLOADED
+          </span>
+        );
+      case 'REPORT_VIEW':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-800 border border-indigo-200">
+            <FileText className="w-3 h-3 text-indigo-600" />
+            REPORT VIEWED
+          </span>
+        );
+      case 'REPORT_EXPORT':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-800 border border-rose-200">
+            <Download className="w-3 h-3 text-rose-600" />
+            REPORT EXPORTED
           </span>
         );
       default:
@@ -361,7 +382,7 @@ export const ActivityLogsTab: React.FC = () => {
           </div>
         )}
 
-        {/* 2. KPI Metrics Bar */}
+        {/* 2. Top Summary Count Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-parish-border">
           <div className="p-3 rounded-xl bg-parish-surface border border-parish-border/60">
             <span className="text-[10px] font-bold uppercase tracking-wider text-parish-text-muted">Total Events</span>
@@ -473,11 +494,14 @@ export const ActivityLogsTab: React.FC = () => {
             className="px-3 py-1.5 text-xs rounded-xl border border-parish-border bg-parish-surface text-parish-text focus:outline-none focus:ring-2 focus:ring-parish-primary cursor-pointer shrink-0"
           >
             <option value="ALL">All Actions</option>
+            <option value="FAMILY_VIEW">FAMILY / MEMBER VIEWED</option>
             <option value="FAMILY_UPDATE">FAMILY / MEMBER UPDATE</option>
             <option value="DIRECT_DEBIT_CHANGE">DIRECT DEBIT CHANGE</option>
             <option value="DOCUMENT_VIEW">DOCUMENT VIEWED</option>
             <option value="DOCUMENT_DOWNLOAD">DOCUMENT DOWNLOADED</option>
             <option value="DOCUMENT_CHANGE">DOCUMENT ATTACH / REMOVE</option>
+            <option value="REPORT_VIEW">REPORT VIEWED</option>
+            <option value="REPORT_EXPORT">REPORT / EXCEL EXPORTED</option>
             <option value="LOGIN">LOGIN</option>
             <option value="LOGOUT">LOGOUT</option>
             <option value="LOGIN_FAILED">LOGIN FAILED</option>

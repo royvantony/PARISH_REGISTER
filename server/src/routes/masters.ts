@@ -100,6 +100,71 @@ mastersRouter.patch('/units/:id', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/masters/users/preferences - Fetch parish-wide user directory preferences
+mastersRouter.get('/users/preferences', async (req: Request, res: Response) => {
+  try {
+    const parishId = req.activeParishId || 1;
+    if (req.user) {
+      const canView = await checkUserPermission(req.user.userId, req.user.role, parishId, 'USERS', 'canView');
+      if (!canView) {
+        return res.status(403).json({ error: 'You do not have permission to view users.' });
+      }
+    }
+
+    const parish = await prisma.parish.findUnique({
+      where: { id: parishId },
+      select: { hideInactiveUsers: true },
+    });
+
+    return res.json({
+      hideInactiveUsers: Boolean(parish?.hideInactiveUsers),
+    });
+  } catch (err: any) {
+    console.error('Failed to fetch user preferences:', err);
+    return res.status(500).json({ error: 'Failed to fetch user directory preferences.' });
+  }
+});
+
+// PATCH /api/masters/users/preferences - Update parish-wide user directory preferences
+mastersRouter.patch('/users/preferences', async (req: Request, res: Response) => {
+  try {
+    const parishId = req.activeParishId || 1;
+    if (req.user) {
+      const canView = await checkUserPermission(req.user.userId, req.user.role, parishId, 'USERS', 'canView');
+      if (!canView) {
+        return res.status(403).json({ error: 'You do not have permission to update user directory preferences.' });
+      }
+    }
+
+    const { hideInactiveUsers } = req.body;
+    if (typeof hideInactiveUsers !== 'boolean') {
+      return res.status(400).json({ error: 'hideInactiveUsers must be a boolean.' });
+    }
+
+    const updated = await prisma.parish.update({
+      where: { id: parishId },
+      data: { hideInactiveUsers },
+      select: { hideInactiveUsers: true },
+    });
+
+    await logSystemActivity({
+      parishId,
+      actionType: 'SETTINGS_CHANGE',
+      category: 'GOVERNANCE',
+      description: `${req.user?.fullName || 'User'} ${updated.hideInactiveUsers ? 'enabled' : 'disabled'} "Hide inactive users" for the parish directory.`,
+      details: { hideInactiveUsers: updated.hideInactiveUsers },
+      req,
+    });
+
+    return res.json({
+      hideInactiveUsers: updated.hideInactiveUsers,
+    });
+  } catch (err: any) {
+    console.error('Failed to update user preferences:', err);
+    return res.status(500).json({ error: 'Failed to save user directory preferences.' });
+  }
+});
+
 // GET /api/masters/users - List users for active parish or all if Diocesan Admin
 mastersRouter.get('/users', async (req: Request, res: Response) => {
   try {
@@ -128,7 +193,6 @@ mastersRouter.get('/users', async (req: Request, res: Response) => {
           UserRole.PARISH_PRIEST,
           UserRole.PARISH_ADMIN,
           UserRole.PARISH_USER,
-          UserRole.WARD_USER,
         ],
       };
     }
@@ -137,7 +201,6 @@ mastersRouter.get('/users', async (req: Request, res: Response) => {
       where: whereClause,
       include: {
         parish: { select: { id: true, parishName: true, parishCode: true } },
-        unit: { select: { id: true, unitName: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -159,8 +222,6 @@ mastersRouter.get('/users', async (req: Request, res: Response) => {
           parishId: u.parishId,
           parishName: u.parish?.parishName || (uIsGlobal ? 'All Parishes' : 'Unassigned'),
           parishCode: u.parish?.parishCode || '',
-          assignedUnitId: u.assignedUnitId,
-          unitName: u.unit?.unitName || null,
           createdAt: u.createdAt,
         };
       })
@@ -180,7 +241,7 @@ mastersRouter.post('/users', async (req: Request, res: Response) => {
         return res.status(403).json({ error: 'You do not have permission to create users.' });
       }
     }
-    const { fullName, username, email, password, role, assignedUnitId } = req.body;
+    const { fullName, username, email, password, role } = req.body;
 
     if (!fullName || !email || !password || !role) {
       return res.status(400).json({ error: 'Full name, email, temporary password, and role are required.' });
@@ -206,7 +267,6 @@ mastersRouter.post('/users', async (req: Request, res: Response) => {
       UserRole.PARISH_PRIEST,
       UserRole.PARISH_ADMIN,
       UserRole.PARISH_USER,
-      UserRole.WARD_USER,
     ];
     if (!allowedInviteRoles.includes(role as UserRole)) {
       return res.status(400).json({ error: 'Only Parish roles can be invited.' });
@@ -234,13 +294,11 @@ mastersRouter.post('/users', async (req: Request, res: Response) => {
         passwordHash,
         role: role as UserRole,
         parishId: targetParishId,
-        assignedUnitId: assignedUnitId ? parseInt(assignedUnitId, 10) : null,
         isActive: true,
         mustChangePassword: true,
       },
       include: {
         parish: { select: { parishName: true } },
-        unit: { select: { unitName: true } },
       },
     });
 
@@ -252,7 +310,6 @@ mastersRouter.post('/users', async (req: Request, res: Response) => {
       role: newUser.role,
       isActive: newUser.isActive,
       parishName: newUser.parish?.parishName || 'All Parishes',
-      unitName: newUser.unit?.unitName || null,
     });
   } catch (err: any) {
     console.error('Create user error:', err);
@@ -271,7 +328,7 @@ mastersRouter.patch('/users/:id', async (req: Request, res: Response) => {
         return res.status(403).json({ error: 'You do not have permission to modify users.' });
       }
     }
-    const { fullName, username, role, assignedUnitId, newPassword } = req.body;
+    const { fullName, username, role, newPassword } = req.body;
     const callerRole = req.user?.role;
     const callerId = req.user?.userId;
 
@@ -350,13 +407,6 @@ mastersRouter.patch('/users/:id', async (req: Request, res: Response) => {
 
     if (role) {
       updateData.role = role as UserRole;
-      if (role === UserRole.WARD_USER) {
-        updateData.assignedUnitId = assignedUnitId ? parseInt(assignedUnitId, 10) : null;
-      } else {
-        updateData.assignedUnitId = null;
-      }
-    } else if (assignedUnitId !== undefined) {
-      updateData.assignedUnitId = assignedUnitId ? parseInt(assignedUnitId, 10) : null;
     }
 
     if (newPassword && newPassword.trim()) {
@@ -369,7 +419,6 @@ mastersRouter.patch('/users/:id', async (req: Request, res: Response) => {
       data: updateData,
       include: {
         parish: { select: { id: true, parishName: true, parishCode: true } },
-        unit: { select: { id: true, unitName: true } },
       },
     });
 
@@ -383,8 +432,6 @@ mastersRouter.patch('/users/:id', async (req: Request, res: Response) => {
       parishId: updated.parishId,
       parishName: updated.parish?.parishName || 'All Parishes',
       parishCode: updated.parish?.parishCode || '',
-      assignedUnitId: updated.assignedUnitId,
-      unitName: updated.unit?.unitName || null,
       createdAt: updated.createdAt,
     });
   } catch (err: any) {
@@ -420,7 +467,7 @@ mastersRouter.patch('/users/:id/toggle-status', async (req: Request, res: Respon
       return res.status(403).json({ error: 'Only the Platform Super Admin can modify a Parish Priest account.' });
     }
 
-    // 3. Parish Priest has supreme authority to block Parish Admins (Trustees), Parish Users, and Ward Users.
+    // 3. Parish Priest has authority to block Parish Admins (Trustees) and Parish Users.
     // Lower roles cannot deactivate a Parish Admin or Parish Priest.
     if (
       targetUser.role === UserRole.PARISH_ADMIN &&

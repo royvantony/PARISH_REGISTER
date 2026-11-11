@@ -68,7 +68,7 @@ export const SYSTEM_FEATURES: FeatureDefinition[] = [
 
   // 2. Dashboard Sub-Items
   {
-    key: 'DASH_KPI_CARDS',
+    key: 'DASH_SUMMARY_CARDS',
     name: 'Demographic Summary Cards',
     category: 'DASHBOARD',
     description: 'Active families, student singles, and member metrics',
@@ -294,14 +294,42 @@ export async function getParishFeatures(parishId: number): Promise<SystemFeature
     }
   }
 
-  // Ensure all standard system features exist in items
-  const existingKeys = new Set(items.map((i) => i.key));
+  // Ensure all standard system features exist and keep metadata synced
+  const defMap = new Map(SYSTEM_FEATURES.map((d, idx) => [d.key, { def: d, id: idx + 1 }]));
+  const byKey = new Map<string, SystemFeatureItem>();
   let hasMissing = false;
+
+  for (const item of items) {
+    const existing = byKey.get(item.key);
+    const matched = defMap.get(item.key);
+    if (existing) hasMissing = true;
+    const syncedName = matched ? matched.def.name : item.name;
+    const syncedCategory = matched ? matched.def.category : item.category;
+    const syncedDescription = matched ? (matched.def.description || null) : item.description;
+    const syncedRoute = matched ? (matched.def.route || null) : item.route;
+    if (
+      item.name !== syncedName ||
+      item.category !== syncedCategory ||
+      item.description !== syncedDescription ||
+      item.route !== syncedRoute
+    ) {
+      hasMissing = true;
+    }
+    byKey.set(item.key, {
+      id: matched ? matched.id : item.id,
+      key: item.key,
+      name: syncedName,
+      category: syncedCategory,
+      description: syncedDescription,
+      route: syncedRoute,
+      isEnabled: Boolean(existing?.isEnabled || item.isEnabled),
+    });
+  }
 
   for (let idx = 0; idx < SYSTEM_FEATURES.length; idx++) {
     const def = SYSTEM_FEATURES[idx];
-    if (!existingKeys.has(def.key)) {
-      items.push({
+    if (!byKey.has(def.key)) {
+      byKey.set(def.key, {
         id: idx + 1,
         key: def.key,
         name: def.name,
@@ -315,6 +343,8 @@ export async function getParishFeatures(parishId: number): Promise<SystemFeature
       hasMissing = true;
     }
   }
+
+  items = Array.from(byKey.values());
 
   // Sort by category & id
   items.sort((a, b) => a.category.localeCompare(b.category) || a.id - b.id);

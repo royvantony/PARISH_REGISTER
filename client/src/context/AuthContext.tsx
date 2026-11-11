@@ -7,8 +7,7 @@ export type UserRole =
   | 'DIOCESAN_USER'
   | 'PARISH_PRIEST'
   | 'PARISH_ADMIN'
-  | 'PARISH_USER'
-  | 'WARD_USER';
+  | 'PARISH_USER';
 
 export interface User {
   id: number;

@@ -363,7 +363,7 @@ export const ImportRegistrationsPage: React.FC = () => {
         </div>
       )}
 
-      {/* 2. Processed Summary / KPI Bar (When records are loaded) */}
+      {/* 2. Processed Summary Bar (When records are loaded) */}
       {records.length > 0 && (
         <div className="space-y-4">
           {/* Active File Bar */}

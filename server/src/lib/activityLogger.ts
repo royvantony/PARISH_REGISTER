@@ -10,12 +10,15 @@ export type ActivityActionType =
   | 'USER_CHANGE'
   | 'WARD_CHANGE'
   | 'SECURITY_ALERT'
+  | 'FAMILY_VIEW'
   | 'FAMILY_UPDATE'
   | 'FAMILY_APPROVE'
   | 'DIRECT_DEBIT_CHANGE'
   | 'DOCUMENT_CHANGE'
   | 'DOCUMENT_VIEW'
-  | 'DOCUMENT_DOWNLOAD';
+  | 'DOCUMENT_DOWNLOAD'
+  | 'REPORT_VIEW'
+  | 'REPORT_EXPORT';
 
 export type ActivityCategory =
   | 'AUTH'
@@ -41,12 +44,63 @@ export interface LogActivityParams {
 }
 
 /**
+ * Returns true if the acting user is the Developer (SUPER_ADMIN), who is opted out of all logging.
+ */
+export function isDeveloperUser(role?: string | null): boolean {
+  return role === 'SUPER_ADMIN';
+}
+
+export interface FamilyAuditNoteParams {
+  familyId: number;
+  noteContent: string;
+  recordedBy?: string | null;
+  userRole?: string | null;
+  tx?: any;
+}
+
+/**
+ * Records an entry in FamilyNote (Household Record History & Audit Trail),
+ * automatically opting out Developer (SUPER_ADMIN) accounts from all logging.
+ */
+export async function recordFamilyAuditNote(params: FamilyAuditNoteParams): Promise<void> {
+  if (isDeveloperUser(params.userRole)) {
+    return;
+  }
+  const client = params.tx || prisma;
+  await client.familyNote.create({
+    data: {
+      familyId: params.familyId,
+      noteDate: new Date(),
+      noteContent: params.noteContent,
+      recordedBy: params.recordedBy || 'System',
+    },
+  });
+}
+
+/**
  * Global System Activity Logger
  * Logs authentication, navigation, and settings modifications.
- * Respects the global parish-level activityLoggingEnabled toggle.
+ * Respects the global parish-level activityLoggingEnabled toggle and opts out Developer (SUPER_ADMIN).
  */
 export async function logSystemActivity(params: LogActivityParams): Promise<void> {
   try {
+    // Extract user info if not explicitly passed
+    let resolvedUserId = params.userId ?? null;
+    let resolvedUserName = params.userName || '';
+    let resolvedUserRole = params.userRole || null;
+
+    if (params.req && (params.req as any).user) {
+      const u = (params.req as any).user;
+      if (!resolvedUserId) resolvedUserId = u.userId || u.id || null;
+      if (!resolvedUserName) resolvedUserName = u.fullName || u.username || u.email || 'User';
+      if (!resolvedUserRole) resolvedUserRole = u.role || null;
+    }
+
+    // Opt out Developer (SUPER_ADMIN) from all system activity logging
+    if (isDeveloperUser(resolvedUserRole)) {
+      return;
+    }
+
     const targetParishId = params.parishId || (params.req as any)?.activeParishId || (params.req as any)?.user?.parishId || 1;
 
     // Check if logging is enabled for this parish
@@ -58,18 +112,6 @@ export async function logSystemActivity(params: LogActivityParams): Promise<void
     if (parish && parish.activityLoggingEnabled === false) {
       // Global logging is switched OFF by developer/admin
       return;
-    }
-
-    // Extract user info if not explicitly passed
-    let resolvedUserId = params.userId ?? null;
-    let resolvedUserName = params.userName || '';
-    let resolvedUserRole = params.userRole || null;
-
-    if (params.req && (params.req as any).user) {
-      const u = (params.req as any).user;
-      if (!resolvedUserId) resolvedUserId = u.userId || u.id || null;
-      if (!resolvedUserName) resolvedUserName = u.fullName || u.username || u.email || 'User';
-      if (!resolvedUserRole) resolvedUserRole = u.role || null;
     }
 
     if (!resolvedUserName) {

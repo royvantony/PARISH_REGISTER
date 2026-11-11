@@ -5,7 +5,7 @@ import { FamilyStatus, RegistrationType, MemberRole, UserRole, Prisma } from '@p
 import { canUserApproveRegistration, getUserDirectDebitPermissions, canUserExportModule, checkUserPermission } from './permissions.js';
 import { normalizeAustralianState } from '../lib/address.js';
 import { generateFamilyAuditDiff } from '../lib/familyAuditDiff.js';
-import { logSystemActivity } from '../lib/activityLogger.js';
+import { logSystemActivity, recordFamilyAuditNote } from '../lib/activityLogger.js';
 import { documentsRouter } from './documents.js';
 import ExcelJS from 'exceljs';
 
@@ -23,7 +23,7 @@ familiesRouter.use('/:familyId/documents', documentsRouter);
 export function buildFamilyQuery(
   parishId: number,
   query: Record<string, any>,
-  user: any
+  _user?: any
 ): { isBlocked: boolean; where: Prisma.FamilyWhereInput; orderBy: any; searchStr: string } {
   const {
     search,
@@ -37,13 +37,7 @@ export function buildFamilyQuery(
 
   const andConditions: Prisma.FamilyWhereInput[] = [];
 
-  // Ward isolation: Ward Users can only see families in their assigned ward
-  if (user && user.role === UserRole.WARD_USER) {
-    if (!user.assignedUnitId) {
-      return { isBlocked: true, where: { id: -1 }, orderBy: {}, searchStr: '' };
-    }
-    andConditions.push({ unitId: user.assignedUnitId });
-  } else if (unitId) {
+  if (unitId) {
     const uStr = (unitId as string).trim().toUpperCase();
     if (uStr === 'UNASSIGNED' || uStr === 'NONE' || uStr === 'NULL' || uStr === 'BLANK') {
       andConditions.push({ unitId: null });
@@ -117,11 +111,30 @@ export function buildFamilyQuery(
       {
         members: {
           some: {
-            fullName: { contains: q, mode: 'insensitive' },
+            OR: [
+              { fullName: { contains: q, mode: 'insensitive' } },
+              { phone: { contains: q, mode: 'insensitive' } },
+              { email: { contains: q, mode: 'insensitive' } },
+            ],
           },
         },
       },
     ];
+
+    const compactPhone = q.replace(/[\s\-()]/g, '');
+    if (/^\+?\d{4,}$/.test(compactPhone) && compactPhone !== q) {
+      searchOr.push(
+        { primaryPhone: { contains: compactPhone, mode: 'insensitive' } },
+        { members: { some: { phone: { contains: compactPhone, mode: 'insensitive' } } } }
+      );
+    }
+    if (/^04\d{8}$/.test(compactPhone)) {
+      const spacedMobile = `${compactPhone.slice(0, 4)} ${compactPhone.slice(4, 7)} ${compactPhone.slice(7)}`;
+      searchOr.push(
+        { primaryPhone: { contains: spacedMobile, mode: 'insensitive' } },
+        { members: { some: { phone: { contains: spacedMobile, mode: 'insensitive' } } } }
+      );
+    }
 
     if (cleanedRef && cleanedRef !== q) {
       searchOr.push({ familyCode: { contains: cleanedRef, mode: 'insensitive' } });
@@ -304,6 +317,34 @@ familiesRouter.get('/meta/pending-count', async (req: Request, res: Response) =>
   }
 });
 
+// Helper to summarize active filter scope for audit logs
+function formatExportFilterScope(
+  query: Record<string, any>,
+  families: Array<{ unit?: { unitName: string } | null }>
+): string {
+  const parts: string[] = [];
+  const statusStr = query.status ? String(query.status) : 'ALL';
+  parts.push(`Status: ${statusStr}`);
+
+  if (query.unitId) {
+    if (query.unitId === 'UNASSIGNED') {
+      parts.push('Ward: Unassigned');
+    } else {
+      const matchedUnitName = families.find((f) => f.unit?.unitName)?.unit?.unitName;
+      parts.push(`Ward: ${matchedUnitName || `Unit #${query.unitId}`}`);
+    }
+  } else {
+    parts.push('Ward: All Wards');
+  }
+
+  if (query.type) parts.push(`Type: ${query.type}`);
+  if (query.directDebit) parts.push(`Direct Debit: ${query.directDebit}`);
+  if (query.search && String(query.search).trim()) {
+    parts.push(`Search: "${String(query.search).trim()}"`);
+  }
+  return parts.join(', ');
+}
+
 // GET /api/families/export/data - Unpaginated filtered families list for print preview
 familiesRouter.get('/export/data', async (req: Request, res: Response) => {
   try {
@@ -352,6 +393,35 @@ familiesRouter.get('/export/data', async (req: Request, res: Response) => {
         select: { parishCode: true, parishName: true, city: true, state: true, contactPhone: true, contactEmail: true },
       }),
     ]);
+
+    // Log report view when opened from Parish Register Report Modal
+    if (req.query.auditReport) {
+      const memberCount = families.reduce((sum, f) => sum + f.members.length, 0);
+      const scopeSummary = formatExportFilterScope(req.query, families);
+      await logSystemActivity({
+        parishId,
+        userId: req.user?.userId,
+        userName: req.user?.fullName,
+        userRole: req.user?.role,
+        actionType: 'REPORT_VIEW',
+        category: 'REGISTER',
+        description: `Opened Parish Register Directory Report (PDF Preview): ${families.length} household(s), ${memberCount} member(s) [${scopeSummary}].`,
+        details: {
+          reportFormat: 'PDF_DIRECTORY_REPORT',
+          householdCount: families.length,
+          memberCount,
+          filters: {
+            status: req.query.status || 'ALL',
+            unitId: req.query.unitId || 'ALL',
+            type: req.query.type || 'ALL',
+            directDebit: req.query.directDebit || 'ALL',
+            search: req.query.search || null,
+          },
+        },
+        path: `${req.baseUrl}${req.path}`,
+        req,
+      });
+    }
 
     return res.json({
       parish,
@@ -679,6 +749,35 @@ familiesRouter.get('/export/excel', async (req: Request, res: Response) => {
 
     const safeParishCode = parish?.parishCode || 'PARISH';
     const filename = `${safeParishCode}_Register_${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+    // Audit Excel report download
+    const memberCount = families.reduce((sum, f) => sum + f.members.length, 0);
+    const scopeSummary = formatExportFilterScope(req.query, families);
+    await logSystemActivity({
+      parishId,
+      userId: req.user?.userId,
+      userName: req.user?.fullName,
+      userRole: req.user?.role,
+      actionType: 'REPORT_EXPORT',
+      category: 'REGISTER',
+      description: `Downloaded Parish Register Excel Report (${filename}): ${families.length} household(s), ${memberCount} member(s) [${scopeSummary}].`,
+      details: {
+        reportFormat: 'EXCEL_WORKBOOK',
+        filename,
+        householdCount: families.length,
+        memberCount,
+        filters: {
+          status: req.query.status || 'ALL',
+          unitId: req.query.unitId || 'ALL',
+          type: req.query.type || 'ALL',
+          directDebit: req.query.directDebit || 'ALL',
+          search: req.query.search || null,
+        },
+      },
+      path: `${req.baseUrl}${req.path}`,
+      req,
+    });
+
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 
@@ -733,13 +832,6 @@ familiesRouter.get('/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Family record not found.' });
     }
 
-    // Ward isolation: Ward Users can only see families in their assigned ward
-    if (req.user && req.user.role === UserRole.WARD_USER) {
-      if (!family.unitId || family.unitId !== req.user.assignedUnitId) {
-        return res.status(403).json({ error: 'Access denied: You can only view families in your assigned ward.' });
-      }
-    }
-
     // Direct Debit privacy: Check role & custom overrides via getUserDirectDebitPermissions
     const ddPerms = req.user
       ? await getUserDirectDebitPermissions(req.user.userId, req.user.role, parishId)
@@ -749,16 +841,38 @@ familiesRouter.get('/:id', async (req: Request, res: Response) => {
       (family as any).directDebits = [];
     }
 
-    // Audit Trail visibility & confidentiality:
-    // Standard users (PARISH_USER, WARD_USER) cannot view the Record History & Audit Trail
-    const isStandardUser = req.user && (req.user.role === UserRole.PARISH_USER || req.user.role === UserRole.WARD_USER);
-    if (isStandardUser) {
+    // Audit Trail visibility & confidentiality: governed strictly by matrix approval permissions
+    const canViewAuditTrail = req.user
+      ? await canUserApproveRegistration(req.user.userId, req.user.role, parishId, 'REGISTER_NEW')
+      : false;
+    if (!canViewAuditTrail) {
       (family as any).notes = [];
     } else if (!ddPerms.canView && (family as any).notes) {
       // If user can view audit notes but cannot view Direct Debit, filter out any confidential Direct Debit audit notes
       (family as any).notes = (family as any).notes.filter(
         (n: any) => !n.noteContent.toLowerCase().includes('direct debit')
       );
+    }
+
+    // Tightened Audit Log: Record explicit access to an individual family/member record via Drawer or Edit Window
+    const auditView = typeof req.query.auditView === 'string' ? req.query.auditView : null;
+    if (auditView === 'drawer' || auditView === 'edit') {
+      const headMember = (family.members || []).find((m: any) => m.role === 'HEAD') || (family.members || [])[0];
+      const memberLabel = headMember?.fullName ? `${headMember.fullName} — ` : '';
+      const codeTag = family.familyCode || `#${family.id}`;
+      const surfaceLabel = auditView === 'edit' ? 'Edit Window' : 'Directory Drawer';
+
+      await logSystemActivity({
+        parishId: parishId || family.parishId,
+        userId: req.user?.userId,
+        userName: req.user?.fullName,
+        userRole: req.user?.role,
+        actionType: 'FAMILY_VIEW',
+        category: 'REGISTER',
+        description: `Viewed family details in ${surfaceLabel}: ${memberLabel}${family.houseName} (${codeTag}).`,
+        path: auditView === 'edit' ? `/register/${family.id}/edit` : `/register (${codeTag} Drawer)`,
+        req,
+      });
     }
 
     return res.json({
@@ -788,13 +902,6 @@ familiesRouter.patch('/:id', async (req: Request, res: Response) => {
 
     if (!existing) {
       return res.status(404).json({ error: 'Family record not found.' });
-    }
-
-    // Ward User permission check: Ward Users can only update their own ward's families
-    if (req.user && req.user.role === UserRole.WARD_USER) {
-      if (!existing.unitId || existing.unitId !== req.user.assignedUnitId) {
-        return res.status(403).json({ error: 'Access denied: You can only edit families in your assigned ward.' });
-      }
     }
 
     const {
@@ -880,13 +987,11 @@ familiesRouter.patch('/:id', async (req: Request, res: Response) => {
     try {
       const auditNote = generateFamilyAuditDiff(existing, req.body, undefined, req.user?.fullName);
       if (!auditNote.includes('(no changes recorded)')) {
-        await prisma.familyNote.create({
-          data: {
-            familyId,
-            noteDate: new Date(),
-            noteContent: auditNote,
-            recordedBy: req.user?.fullName || 'System',
-          },
+        await recordFamilyAuditNote({
+          familyId,
+          noteContent: auditNote,
+          recordedBy: req.user?.fullName || 'System',
+          userRole: req.user?.role,
         });
 
         // Also record to System & Security ActivityLog
@@ -1047,15 +1152,14 @@ familiesRouter.post('/', async (req: Request, res: Response) => {
       }
 
       // 4. Record audit note
-      await tx.familyNote.create({
-        data: {
-          familyId: createdFamily.id,
-          noteDate: new Date(),
-          noteContent: isApprovedImmediately
-            ? `Registration created and immediately approved by ${user?.fullName || 'Administrator'}.`
-            : `New registration submitted by ${user?.fullName || 'User'}, pending verification and approval by Parish Authority.`,
-          recordedBy: user?.fullName || 'System',
-        },
+      await recordFamilyAuditNote({
+        familyId: createdFamily.id,
+        noteContent: isApprovedImmediately
+          ? `Registration created and immediately approved by ${user?.fullName || 'Administrator'}.`
+          : `New registration submitted by ${user?.fullName || 'User'}, pending verification and approval by Parish Authority.`,
+        recordedBy: user?.fullName || 'System',
+        userRole: user?.role,
+        tx,
       });
 
       return createdFamily;
@@ -1086,13 +1190,6 @@ familiesRouter.put('/:id', async (req: Request, res: Response) => {
 
     if (!existing) {
       return res.status(404).json({ error: 'Family record not found.' });
-    }
-
-    // Ward isolation check for WARD_USER
-    if (user && user.role === UserRole.WARD_USER) {
-      if (!existing.unitId || existing.unitId !== user.assignedUnitId) {
-        return res.status(403).json({ error: 'Access denied: You can only edit families in your assigned ward.' });
-      }
     }
 
     const canApprove = user ? await canUserApproveRegistration(user.userId, user.role, parishId, 'REGISTER_NEW') : false;
@@ -1232,13 +1329,12 @@ familiesRouter.put('/:id', async (req: Request, res: Response) => {
       }
 
       // 3. Log audit note
-      await tx.familyNote.create({
-        data: {
-          familyId,
-          noteDate: new Date(),
-          noteContent: auditNoteContent,
-          recordedBy: user?.fullName || 'System',
-        },
+      await recordFamilyAuditNote({
+        familyId,
+        noteContent: auditNoteContent,
+        recordedBy: user?.fullName || 'System',
+        userRole: user?.role,
+        tx,
       });
 
       // 4. Log to System & Security ActivityLog
@@ -1413,13 +1509,12 @@ familiesRouter.post('/:id/approve', async (req: Request, res: Response) => {
         }
 
         // 3. Log combined audit note
-        await tx.familyNote.create({
-          data: {
-            familyId,
-            noteDate: new Date(),
-            noteContent: `Registration details updated, officially approved, and activated by ${user.fullName} (${user.role}). Family code allocated: ${familyCode}.`,
-            recordedBy: user.fullName,
-          },
+        await recordFamilyAuditNote({
+          familyId,
+          noteContent: `Registration details updated, officially approved, and activated by ${user.fullName} (${user.role}). Family code allocated: ${familyCode}.`,
+          recordedBy: user.fullName,
+          userRole: user.role,
+          tx,
         });
       } else {
         // Standard approval without data modifications
@@ -1431,13 +1526,12 @@ familiesRouter.post('/:id/approve', async (req: Request, res: Response) => {
           },
         });
 
-        await tx.familyNote.create({
-          data: {
-            familyId,
-            noteDate: new Date(),
-            noteContent: `Registration officially approved and activated by ${user.fullName} (${user.role}). Family code allocated: ${familyCode}.`,
-            recordedBy: user.fullName,
-          },
+        await recordFamilyAuditNote({
+          familyId,
+          noteContent: `Registration officially approved and activated by ${user.fullName} (${user.role}). Family code allocated: ${familyCode}.`,
+          recordedBy: user.fullName,
+          userRole: user.role,
+          tx,
         });
       }
     });
@@ -1472,13 +1566,12 @@ familiesRouter.post('/:id/reject', async (req: Request, res: Response) => {
         },
       });
 
-      await tx.familyNote.create({
-        data: {
-          familyId,
-          noteDate: new Date(),
-          noteContent: `Registration rejected by ${user.fullName}: ${reason || 'Criteria not met or duplicate record.'}`,
-          recordedBy: user.fullName,
-        },
+      await recordFamilyAuditNote({
+        familyId,
+        noteContent: `Registration rejected by ${user.fullName}: ${reason || 'Criteria not met or duplicate record.'}`,
+        recordedBy: user.fullName,
+        userRole: user.role,
+        tx,
       });
     });
 
@@ -1548,13 +1641,12 @@ familiesRouter.post('/:id/inactivate', async (req: Request, res: Response) => {
       }
 
       // 3. Log comprehensive audit note
-      await tx.familyNote.create({
-        data: {
-          familyId,
-          noteDate: new Date(),
-          noteContent: `Household transitioned from ${family.status} to INACTIVE by ${user.fullName} (${user.role}). Reason: ${selectedReason}.${detailNotes}${ddNote}`,
-          recordedBy: user.fullName,
-        },
+      await recordFamilyAuditNote({
+        familyId,
+        noteContent: `Household transitioned from ${family.status} to INACTIVE by ${user.fullName} (${user.role}). Reason: ${selectedReason}.${detailNotes}${ddNote}`,
+        recordedBy: user.fullName,
+        userRole: user.role,
+        tx,
       });
     });
 
@@ -1606,13 +1698,12 @@ familiesRouter.post('/:id/reactivate', async (req: Request, res: Response) => {
 
       // 2. Log audit note
       const comment = note ? ` Note: ${note.trim()}` : '';
-      await tx.familyNote.create({
-        data: {
-          familyId,
-          noteDate: new Date(),
-          noteContent: `Household restored from ${family.status} to ACTIVE status by ${user.fullName} (${user.role}).${comment}`,
-          recordedBy: user.fullName,
-        },
+      await recordFamilyAuditNote({
+        familyId,
+        noteContent: `Household restored from ${family.status} to ACTIVE status by ${user.fullName} (${user.role}).${comment}`,
+        recordedBy: user.fullName,
+        userRole: user.role,
+        tx,
       });
     });
 
@@ -1673,13 +1764,12 @@ familiesRouter.post('/:id/direct-debits', async (req: Request, res: Response) =>
 
       const auditMsg = `Direct Debit added by ${user.fullName} (${user.role}): $${parsedAmount ? parsedAmount.toFixed(2) : '0.00'} AUD (${frequency})${cleanRef ? ` [Reference: ${cleanRef}]` : ''}${!active ? ' (Status: Inactive)' : ''}${cleanComments ? ` • ${cleanComments}` : ''}.`;
 
-      await tx.familyNote.create({
-        data: {
-          familyId,
-          noteDate: new Date(),
-          noteContent: auditMsg,
-          recordedBy: user.fullName,
-        },
+      await recordFamilyAuditNote({
+        familyId,
+        noteContent: auditMsg,
+        recordedBy: user.fullName,
+        userRole: user.role,
+        tx,
       });
 
       // System activity audit
@@ -1777,13 +1867,12 @@ familiesRouter.put('/:id/direct-debits/:ddId', async (req: Request, res: Respons
       });
 
       if (changes.length > 0) {
-        await tx.familyNote.create({
-          data: {
-            familyId,
-            noteDate: new Date(),
-            noteContent: auditMessage,
-            recordedBy: user.fullName,
-          },
+        await recordFamilyAuditNote({
+          familyId,
+          noteContent: auditMessage,
+          recordedBy: user.fullName,
+          userRole: user.role,
+          tx,
         });
 
         // System activity audit
@@ -1843,13 +1932,12 @@ familiesRouter.delete('/:id/direct-debits/:ddId', async (req: Request, res: Resp
 
       const auditMsg = `Direct Debit schedule [${existing.reference || `#${ddId}`}] ($${existing.amount ? parseFloat(existing.amount.toString()).toFixed(2) : '0.00'} ${existing.frequency || 'Monthly'}) was removed by ${user.fullName} (${user.role}).`;
 
-      await tx.familyNote.create({
-        data: {
-          familyId,
-          noteDate: new Date(),
-          noteContent: auditMsg,
-          recordedBy: user.fullName,
-        },
+      await recordFamilyAuditNote({
+        familyId,
+        noteContent: auditMsg,
+        recordedBy: user.fullName,
+        userRole: user.role,
+        tx,
       });
     });
 
@@ -1920,13 +2008,12 @@ familiesRouter.put('/:id/direct-debit', async (req: Request, res: Response) => {
         });
       }
 
-      await tx.familyNote.create({
-        data: {
-          familyId,
-          noteDate: new Date(),
-          noteContent: `Direct Debit ${existing ? 'updated' : 'established'} by ${user.fullName} (${user.role}): $${parsedAmount ? parsedAmount.toFixed(2) : '0.00'} AUD (${frequency})${cleanRef ? ` [Reference: ${cleanRef}]` : ''}.`,
-          recordedBy: user.fullName,
-        },
+      await recordFamilyAuditNote({
+        familyId,
+        noteContent: `Direct Debit ${existing ? 'updated' : 'established'} by ${user.fullName} (${user.role}): $${parsedAmount ? parsedAmount.toFixed(2) : '0.00'} AUD (${frequency})${cleanRef ? ` [Reference: ${cleanRef}]` : ''}.`,
+        recordedBy: user.fullName,
+        userRole: user.role,
+        tx,
       });
 
       return dd;
@@ -2004,13 +2091,12 @@ familiesRouter.post('/merge', async (req: Request, res: Response) => {
       });
 
       // 5. Add note to both records
-      await tx.familyNote.create({
-        data: {
-          familyId: primary.id,
-          noteDate: new Date(),
-          noteContent: `Merged with ${secondary.houseName} (${secondary.familyCode || secondary.id}) upon marriage.`,
-          recordedBy: req.user?.fullName || 'Admin',
-        },
+      await recordFamilyAuditNote({
+        familyId: primary.id,
+        noteContent: `Merged with ${secondary.houseName} (${secondary.familyCode || secondary.id}) upon marriage.`,
+        recordedBy: req.user?.fullName || 'Admin',
+        userRole: req.user?.role,
+        tx,
       });
     });
 

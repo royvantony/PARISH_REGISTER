@@ -353,8 +353,8 @@ export const DashboardPage: React.FC = () => {
         <div className="absolute right-0 top-0 bottom-0 w-80 bg-gradient-to-l from-emerald-100/30 to-transparent pointer-events-none hidden md:block" />
       </div>
 
-      {/* 2. Top Metric Cards (5 Vibrant Cards: Community & People Only, No Finance) */}
-      {isFeatureEnabled('DASH_KPI_CARDS') && (
+      {/* 2. Top Summary Cards (5 Vibrant Cards: Community & People Only, No Finance) */}
+      {isFeatureEnabled('DASH_SUMMARY_CARDS') && (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
           {/* Metric 1: Registered Families */}
           <div

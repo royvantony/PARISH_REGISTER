@@ -122,6 +122,43 @@ activityRouter.post('/page-view', async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /api/activity/report-event
+ * Log report viewing, dossier previewing, and PDF/print generation events
+ */
+activityRouter.post('/report-event', async (req: Request, res: Response) => {
+  try {
+    const parishId = req.activeParishId || req.user?.parishId || 1;
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized.' });
+
+    const { actionType, description, details, path } = req.body;
+    const allowedAction: ActivityActionType = actionType === 'REPORT_EXPORT' ? 'REPORT_EXPORT' : 'REPORT_VIEW';
+
+    if (!description || typeof description !== 'string') {
+      return res.status(400).json({ error: 'Report description is required.' });
+    }
+
+    await logSystemActivity({
+      parishId,
+      userId: user.userId,
+      userName: user.fullName || user.username || user.email,
+      userRole: user.role,
+      actionType: allowedAction,
+      category: 'REGISTER',
+      description: description.trim().slice(0, 500),
+      details: details || null,
+      path: typeof path === 'string' ? path : '/register',
+      req,
+    });
+
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('Report event logging error:', err);
+    return res.status(500).json({ error: 'Failed to record report activity.' });
+  }
+});
+
+/**
  * GET /api/activity/logs
  * Retrieve paginated system activity logs with search & filters
  */
@@ -192,7 +229,7 @@ activityRouter.get('/logs', async (req: Request, res: Response) => {
       prisma.systemActivityLog.count({ where }),
     ]);
 
-    // Summary metrics for KPI banner
+    // Summary counts for top cards
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { calculateMonthlyEquivalent } from '../lib/utils';
@@ -264,14 +264,14 @@ export const EditFamilyPage: React.FC = () => {
   ]);
 
   // Load family data
-  const loadFamilyData = async () => {
+  const loadFamilyData = async (isInitialAccess = false) => {
     if (!id) return;
     try {
       setIsLoading(true);
       setErrorMessage(null);
 
       const [familyRes, unitsRes, diocesesRes, approveRes] = await Promise.all([
-        api.get<any>(`/families/${id}`),
+        api.get<any>(`/families/${id}`, isInitialAccess ? { params: { auditView: 'edit' } } : undefined),
         api.get<UnitOption[]>('/masters/units'),
         api.get<DioceseOption[]>('/masters/dioceses').catch(() => ({ data: [] })),
         api.get<{ canApprove: boolean }>('/permissions/can-approve?module=REGISTER_NEW').catch(() => ({ data: { canApprove: false } })),
@@ -357,9 +357,15 @@ export const EditFamilyPage: React.FC = () => {
     }
   };
 
+  const lastLoggedEditIdRef = useRef<string | null>(null);
   useEffect(() => {
-    loadFamilyData();
-  }, [id]);
+    const isDevUser = user?.role === 'SUPER_ADMIN';
+    const shouldAudit = !isDevUser && Boolean(id) && lastLoggedEditIdRef.current !== id;
+    if (shouldAudit && id) {
+      lastLoggedEditIdRef.current = id;
+    }
+    loadFamilyData(shouldAudit);
+  }, [id, user?.role]);
 
   // Lightweight background refresh so viewing/downloading/attaching docs updates Audit Trail without resetting unsaved form fields
   const refreshAuditNotesAndDocs = async () => {

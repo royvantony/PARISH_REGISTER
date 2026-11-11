@@ -430,7 +430,7 @@ export const RegisterFamilyPage: React.FC = () => {
                 ))}
               </select>
               <span className="text-[11px] text-parish-text-muted mt-0.5 block">
-                Can be kept unassigned and allocated to a ward coordinator later.
+                Can be kept unassigned and allocated to a parish ward later.
               </span>
             </div>
           </div>

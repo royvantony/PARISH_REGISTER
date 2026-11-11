@@ -10,7 +10,7 @@ import {
   deleteDocumentFile,
 } from '../lib/storage.js';
 import { isFeatureEnabled } from './features.js';
-import { logSystemActivity } from '../lib/activityLogger.js';
+import { logSystemActivity, recordFamilyAuditNote } from '../lib/activityLogger.js';
 import fs from 'fs';
 
 export const documentsRouter = Router({ mergeParams: true });
@@ -88,7 +88,6 @@ documentsRouter.get('/', async (req: Request, res: Response) => {
   try {
     const familyId = parseInt(req.params.familyId as string, 10);
     const parishId = req.activeParishId;
-    const user = req.user;
 
     if (isNaN(familyId)) {
       return res.status(400).json({ error: 'Invalid family ID.' });
@@ -102,15 +101,10 @@ documentsRouter.get('/', async (req: Request, res: Response) => {
     // Verify family belongs to active parish
     const family = await prisma.family.findFirst({
       where: { id: familyId, parishId },
-      select: { id: true, unitId: true },
+      select: { id: true },
     });
     if (!family) {
       return res.status(404).json({ error: 'Family record not found.' });
-    }
-
-    // Ward isolation for Ward Users
-    if (user?.role === UserRole.WARD_USER && family.unitId !== user.assignedUnitId) {
-      return res.status(403).json({ error: 'Access denied: Family is outside your assigned ward.' });
     }
 
     const docs = await prisma.familyDocument.findMany({
@@ -186,13 +180,11 @@ documentsRouter.post('/', upload.single('file'), async (req: Request, res: Respo
     });
 
     // Log in Parish Register history note
-    await prisma.familyNote.create({
-      data: {
-        familyId,
-        noteDate: new Date(),
-        noteContent: `Document attached by ${user.fullName} (${user.role}): "${saved.fileName}" [${documentType}].`,
-        recordedBy: user.fullName,
-      },
+    await recordFamilyAuditNote({
+      familyId,
+      noteContent: `Document attached by ${user.fullName} (${user.role}): "${saved.fileName}" [${documentType}].`,
+      recordedBy: user.fullName,
+      userRole: user.role,
     });
 
     // Log to System & Security ActivityLog
@@ -272,13 +264,11 @@ documentsRouter.post('/url', async (req: Request, res: Response) => {
     });
 
     // Log note
-    await prisma.familyNote.create({
-      data: {
-        familyId,
-        noteDate: new Date(),
-        noteContent: `Document ingested from web URL by ${user.fullName} (${user.role}): "${saved.fileName}" [${documentType}].`,
-        recordedBy: user.fullName,
-      },
+    await recordFamilyAuditNote({
+      familyId,
+      noteContent: `Document ingested from web URL by ${user.fullName} (${user.role}): "${saved.fileName}" [${documentType}].`,
+      recordedBy: user.fullName,
+      userRole: user.role,
     });
 
     // Log to System & Security ActivityLog
@@ -338,13 +328,11 @@ documentsRouter.get('/:docId/view', async (req: Request, res: Response) => {
 
     // Log separate Document Viewed entry in Household Record History & Audit Trail
     if (req.user) {
-      await prisma.familyNote.create({
-        data: {
-          familyId,
-          noteDate: new Date(),
-          noteContent: `Document viewed in viewer by ${req.user.fullName} (${req.user.role}): "${doc.fileName}" [${doc.documentType}].`,
-          recordedBy: req.user.fullName,
-        },
+      await recordFamilyAuditNote({
+        familyId,
+        noteContent: `Document viewed in viewer by ${req.user.fullName} (${req.user.role}): "${doc.fileName}" [${doc.documentType}].`,
+        recordedBy: req.user.fullName,
+        userRole: req.user.role,
       }).catch((e) => console.warn('Non-blocking: Failed to create view audit note:', e));
     }
 
@@ -411,13 +399,11 @@ documentsRouter.get('/:docId/download', async (req: Request, res: Response) => {
 
     // Log separate Document Downloaded entry in Household Record History & Audit Trail
     if (user) {
-      await prisma.familyNote.create({
-        data: {
-          familyId,
-          noteDate: new Date(),
-          noteContent: `Document downloaded by ${user.fullName} (${user.role}): "${doc.fileName}" [${doc.documentType}].`,
-          recordedBy: user.fullName,
-        },
+      await recordFamilyAuditNote({
+        familyId,
+        noteContent: `Document downloaded by ${user.fullName} (${user.role}): "${doc.fileName}" [${doc.documentType}].`,
+        recordedBy: user.fullName,
+        userRole: user.role,
       }).catch((e) => console.warn('Non-blocking: Failed to create download audit note:', e));
     }
 
@@ -486,13 +472,11 @@ documentsRouter.delete('/:docId', async (req: Request, res: Response) => {
     });
 
     // Log in Parish Register history note
-    await prisma.familyNote.create({
-      data: {
-        familyId,
-        noteDate: new Date(),
-        noteContent: `Document removed by ${user.fullName} (${user.role}): "${doc.fileName}" [${doc.documentType}].`,
-        recordedBy: user.fullName,
-      },
+    await recordFamilyAuditNote({
+      familyId,
+      noteContent: `Document removed by ${user.fullName} (${user.role}): "${doc.fileName}" [${doc.documentType}].`,
+      recordedBy: user.fullName,
+      userRole: user.role,
     });
 
     // Log to System & Security ActivityLog

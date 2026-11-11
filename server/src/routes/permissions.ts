@@ -121,18 +121,6 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, {
     SETTINGS: { canView: false, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: false, canApprove: false },
     AUDIT_LOGS: { canView: false, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: false, canApprove: false },
   },
-  [UserRole.WARD_USER]: { // Ward Coordinator / Unit Representative (Strictly assigned ward only)
-    REGISTER: { canView: true, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: false, canApprove: false },
-    REGISTER_NEW: { canView: false, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: false, canApprove: false },
-    IMPORT_REGISTRATIONS: { canView: false, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: false, canApprove: false },
-    DOCUMENTS: { canView: false, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: false, canApprove: false },
-    DIRECT_DEBIT: { canView: false, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: false, canApprove: false },
-    WARDS: { canView: true, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: false, canApprove: false },
-    USERS: { canView: false, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: false, canApprove: false },
-    DASHBOARD_ACTIVITY: { canView: false, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: false, canApprove: false },
-    SETTINGS: { canView: false, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: false, canApprove: false },
-    AUDIT_LOGS: { canView: false, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: false, canApprove: false },
-  },
 };
 
 // Helper to seed defaults for a specific parish (used during parish initialization or for Parish 1)
@@ -367,7 +355,6 @@ permissionsRouter.get('/users/:userId', async (req: Request, res: Response) => {
     const user = await prisma.parishUser.findUnique({
       where: { id: userId },
       include: {
-        unit: { select: { id: true, unitName: true } },
         overrides: true,
       },
     });
@@ -435,8 +422,6 @@ permissionsRouter.get('/users/:userId', async (req: Request, res: Response) => {
         fullName: user.fullName,
         email: user.email,
         role: user.role,
-        assignedUnitId: user.assignedUnitId,
-        unitName: user.unit?.unitName || null,
       },
       effective,
       rawOverrides: user.overrides,

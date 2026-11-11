@@ -49,8 +49,6 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
         return 'Parish Admin';
       case 'PARISH_USER':
         return 'Parish User';
-      case 'WARD_USER':
-        return 'Ward User';
       case 'SUPER_ADMIN':
         return 'Platform Developer';
       case 'DIOCESAN_ADMIN':
