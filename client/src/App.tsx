@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { FeatureProvider } from './context/FeatureContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -6,6 +7,8 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { PermissionRoute } from './components/auth/PermissionRoute';
 import { AppLayout } from './components/layout/AppLayout';
 import { NotFoundScreen } from './components/ui/NotFoundScreen';
+import { NoConnectionScreen } from './components/ui/NoConnectionScreen';
+import { getIsOffline, subscribeConnectionStatus } from './lib/connectionState';
 import { LoginPage } from './pages/Login';
 import { DashboardPage } from './pages/Dashboard';
 import { ParishRegisterPage } from './pages/ParishRegister';
@@ -17,11 +20,20 @@ import { SettingsPage } from './pages/Settings';
 import { ImportRegistrationsPage } from './pages/ImportRegistrations';
 
 export function App() {
+  const [isOffline, setIsOffline] = useState<boolean>(getIsOffline);
+
+  useEffect(() => {
+    return subscribeConnectionStatus(setIsOffline);
+  }, []);
+
   return (
     <AuthProvider>
       <FeatureProvider>
         <ThemeProvider>
-          <BrowserRouter>
+          {isOffline ? (
+            <NoConnectionScreen />
+          ) : (
+            <BrowserRouter>
             <Routes>
               {/* Public Route */}
               <Route path="/login" element={<LoginPage />} />
@@ -100,7 +112,8 @@ export function App() {
               {/* Global Catch-all: Stealth 404 */}
               <Route path="*" element={<NotFoundScreen />} />
             </Routes>
-          </BrowserRouter>
+            </BrowserRouter>
+          )}
         </ThemeProvider>
       </FeatureProvider>
     </AuthProvider>

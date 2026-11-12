@@ -5,6 +5,133 @@ import { authenticateJWT } from '../middleware/auth.js';
 import { UserRole, FamilyStatus } from '@prisma/client';
 import { checkUserPermission } from './permissions.js';
 import { logSystemActivity, diffFieldsWithCaptions } from '../lib/activityLogger.js';
+import { sendParishEmail } from '../lib/email.js';
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatRoleDisplay(role: UserRole): string {
+  switch (role) {
+    case UserRole.PARISH_PRIEST:
+      return 'Parish Priest';
+    case UserRole.PARISH_ADMIN:
+      return 'Parish Admin (Trustee / Executive)';
+    case UserRole.PARISH_USER:
+      return 'Parish User (Secretary / Office)';
+    default:
+      return role;
+  }
+}
+
+async function sendUserCredentialsEmail(params: {
+  variant: 'created' | 'reset';
+  parishId: number;
+  parishName: string;
+  user: { fullName: string; username: string | null; email: string; role: UserRole };
+  temporaryPassword: string;
+  portalUrl?: unknown;
+  originHeader?: unknown;
+}): Promise<{ sent: boolean; skipped?: boolean; message?: string }> {
+  const { variant, parishId, parishName, user, temporaryPassword, portalUrl, originHeader } = params;
+  const rawOrigin =
+    (typeof portalUrl === 'string' && /^https?:\/\//i.test(portalUrl.trim()) ? portalUrl.trim() : '') ||
+    (typeof originHeader === 'string' && /^https?:\/\//i.test(originHeader) ? originHeader : '');
+  const loginUrl = rawOrigin ? `${rawOrigin.replace(/\/+$/, '')}/login` : '';
+  const loginIdText = user.username ? `@${user.username} (or ${user.email})` : user.email;
+  const isReset = variant === 'reset';
+
+  const badgeText = isReset ? 'Temporary Password Reset' : 'Parish Register Account Created';
+  const introText = isReset
+    ? `An administrator has reset the password for your <strong>${escapeHtml(parishName)}</strong> Parish Register Portal account. Use the temporary password below to sign in:`
+    : `Your account for the <strong>${escapeHtml(parishName)}</strong> Parish Register Portal is now active. Use the temporary credentials below to sign in:`;
+
+  const emailHtml = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
+      <div style="text-align: center; margin-bottom: 22px;">
+        <h2 style="color: #1b4332; margin: 0 0 6px 0; font-size: 20px; font-weight: 800;">${escapeHtml(parishName)}</h2>
+        <span style="background-color: #ecfdf5; color: #047857; font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 9999px; border: 1px solid #a7f3d0;">
+          ${badgeText}
+        </span>
+      </div>
+
+      <p style="color: #334155; font-size: 14px; line-height: 1.6; margin-bottom: 12px;">
+        Hello <strong>${escapeHtml(user.fullName)}</strong>,
+      </p>
+      <p style="color: #334155; font-size: 14px; line-height: 1.6; margin-bottom: 18px;">
+        ${introText}
+      </p>
+
+      <table style="width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; color: #334155; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px;">
+        ${!isReset ? `
+        <tr style="border-bottom: 1px solid #e2e8f0;">
+          <td style="padding: 10px 14px; font-weight: 600; color: #64748b;">Role</td>
+          <td style="padding: 10px 14px; font-weight: 700;">${escapeHtml(formatRoleDisplay(user.role))}</td>
+        </tr>` : ''}
+        ${user.username ? `
+        <tr style="border-bottom: 1px solid #e2e8f0;">
+          <td style="padding: 10px 14px; font-weight: 600; color: #64748b;">Username</td>
+          <td style="padding: 10px 14px; font-family: monospace; font-weight: 700;">${escapeHtml(user.username)}</td>
+        </tr>` : ''}
+        <tr style="border-bottom: 1px solid #e2e8f0;">
+          <td style="padding: 10px 14px; font-weight: 600; color: #64748b;">Login Email</td>
+          <td style="padding: 10px 14px; font-family: monospace;">${escapeHtml(user.email)}</td>
+        </tr>
+        <tr>
+          <td style="padding: 10px 14px; font-weight: 600; color: #64748b;">Temporary Password</td>
+          <td style="padding: 10px 14px; font-family: monospace; font-weight: 700; color: #b45309;">${escapeHtml(temporaryPassword)}</td>
+        </tr>
+      </table>
+
+      ${loginUrl ? `
+      <div style="text-align: center; margin: 22px 0;">
+        <a href="${escapeHtml(loginUrl)}" style="display: inline-block; background-color: #1b4332; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 13px; padding: 11px 22px; border-radius: 10px;">
+          Open Parish Register Login
+        </a>
+      </div>` : ''}
+
+      <p style="color: #475569; font-size: 12px; line-height: 1.6; margin-top: 16px;">
+        For your security, you will be prompted to set a permanent private password immediately after signing in.
+      </p>
+    </div>
+  `;
+
+  const textLines = [
+    `Hello ${user.fullName},`,
+    '',
+    isReset
+      ? `Your password for ${parishName} Parish Register Portal has been reset.`
+      : `Your account for ${parishName} Parish Register Portal is now active.`,
+    ...(!isReset ? [`Role: ${formatRoleDisplay(user.role)}`] : []),
+    `Login ID: ${loginIdText}`,
+    `Temporary Password: ${temporaryPassword}`,
+    ...(loginUrl ? [`Portal Link: ${loginUrl}`] : []),
+    '',
+    'You will be prompted to set your own permanent password upon signing in.',
+  ];
+
+  const result = await sendParishEmail(parishId, {
+    to: user.email,
+    subject: isReset
+      ? `[${parishName}] Your Parish Register Temporary Password`
+      : `[${parishName}] Your Parish Register Login Details`,
+    html: emailHtml,
+    text: textLines.join('\n'),
+  });
+
+  return {
+    sent: Boolean(result.success),
+    skipped: Boolean(result.skipped),
+    message: result.success
+      ? `Temporary password emailed to ${user.email}.`
+      : result.message || result.error || 'Failed to send email.',
+  };
+}
 
 export const mastersRouter = Router();
 
@@ -241,7 +368,7 @@ mastersRouter.post('/users', async (req: Request, res: Response) => {
         return res.status(403).json({ error: 'You do not have permission to create users.' });
       }
     }
-    const { fullName, username, email, password, role } = req.body;
+    const { fullName, username, email, password, role, sendEmail, portalUrl } = req.body;
 
     if (!fullName || !email || !password || !role) {
       return res.status(400).json({ error: 'Full name, email, temporary password, and role are required.' });
@@ -302,6 +429,24 @@ mastersRouter.post('/users', async (req: Request, res: Response) => {
       },
     });
 
+    let emailStatus: { sent: boolean; skipped?: boolean; message?: string } | undefined;
+    if (sendEmail) {
+      emailStatus = await sendUserCredentialsEmail({
+        variant: 'created',
+        parishId: targetParishId,
+        parishName: newUser.parish?.parishName || 'Parish Register',
+        user: {
+          fullName: newUser.fullName,
+          username: newUser.username,
+          email: newUser.email,
+          role: newUser.role,
+        },
+        temporaryPassword: password,
+        portalUrl,
+        originHeader: req.headers.origin,
+      });
+    }
+
     return res.status(201).json({
       id: newUser.id,
       fullName: newUser.fullName,
@@ -310,6 +455,7 @@ mastersRouter.post('/users', async (req: Request, res: Response) => {
       role: newUser.role,
       isActive: newUser.isActive,
       parishName: newUser.parish?.parishName || 'All Parishes',
+      ...(emailStatus ? { emailStatus } : {}),
     });
   } catch (err: any) {
     console.error('Create user error:', err);
@@ -328,7 +474,7 @@ mastersRouter.patch('/users/:id', async (req: Request, res: Response) => {
         return res.status(403).json({ error: 'You do not have permission to modify users.' });
       }
     }
-    const { fullName, username, role, newPassword } = req.body;
+    const { fullName, username, role } = req.body;
     const callerRole = req.user?.role;
     const callerId = req.user?.userId;
 
@@ -409,11 +555,6 @@ mastersRouter.patch('/users/:id', async (req: Request, res: Response) => {
       updateData.role = role as UserRole;
     }
 
-    if (newPassword && newPassword.trim()) {
-      updateData.passwordHash = await bcrypt.hash(newPassword.trim(), 10);
-      updateData.mustChangePassword = true;
-    }
-
     const updated = await prisma.parishUser.update({
       where: { id: targetUserId },
       data: updateData,
@@ -437,6 +578,99 @@ mastersRouter.patch('/users/:id', async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error('Update user error:', err);
     return res.status(500).json({ error: 'Failed to update user.' });
+  }
+});
+
+// POST /api/masters/users/:id/reset-password - Reset another user's temporary password and optionally email it
+mastersRouter.post('/users/:id/reset-password', async (req: Request, res: Response) => {
+  try {
+    const targetUserId = parseInt(req.params.id as string, 10);
+    const parishId = req.activeParishId || 1;
+    if (req.user) {
+      const canEdit = await checkUserPermission(req.user.userId, req.user.role, parishId, 'USERS', 'canEdit');
+      if (!canEdit) {
+        return res.status(403).json({ error: 'You do not have permission to reset user passwords.' });
+      }
+    }
+
+    const callerId = req.user?.userId;
+    const callerRole = req.user?.role;
+    if (callerId === targetUserId) {
+      return res.status(400).json({ error: 'Use Change Password in your profile to update your own password.' });
+    }
+
+    const { newPassword, sendEmail, portalUrl } = req.body;
+    const cleanPassword = typeof newPassword === 'string' ? newPassword.trim() : '';
+    if (cleanPassword.length < 6) {
+      return res.status(400).json({ error: 'Temporary password must be at least 6 characters.' });
+    }
+
+    const targetUser = await prisma.parishUser.findUnique({
+      where: { id: targetUserId },
+      include: {
+        parish: { select: { parishName: true } },
+      },
+    });
+
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    if (targetUser.role === UserRole.SUPER_ADMIN && callerRole !== UserRole.SUPER_ADMIN) {
+      return res.status(403).json({ error: 'Only Platform Super Admin can reset this password.' });
+    }
+
+    if (targetUser.role === UserRole.PARISH_PRIEST && callerRole !== UserRole.SUPER_ADMIN) {
+      return res.status(403).json({ error: 'Only Platform Super Admin can reset a Parish Priest password.' });
+    }
+
+    if (callerRole === UserRole.PARISH_ADMIN && targetUser.role !== UserRole.PARISH_USER) {
+      return res.status(403).json({ error: 'Parish Admins can only reset Parish User passwords.' });
+    }
+
+    const passwordHash = await bcrypt.hash(cleanPassword, 10);
+    await prisma.parishUser.update({
+      where: { id: targetUserId },
+      data: {
+        passwordHash,
+        mustChangePassword: true,
+      },
+    });
+
+    await logSystemActivity({
+      parishId: targetUser.parishId || parishId,
+      actionType: 'USER_CHANGE',
+      category: 'GOVERNANCE',
+      description: `${req.user?.fullName || 'Administrator'} reset temporary password for ${targetUser.fullName} (${targetUser.email}).`,
+      details: { targetUserId, emailEmailed: Boolean(sendEmail) },
+      req,
+    });
+
+    let emailStatus: { sent: boolean; skipped?: boolean; message?: string } | undefined;
+    if (sendEmail) {
+      emailStatus = await sendUserCredentialsEmail({
+        variant: 'reset',
+        parishId: targetUser.parishId || parishId,
+        parishName: targetUser.parish?.parishName || 'Parish Register',
+        user: {
+          fullName: targetUser.fullName,
+          username: targetUser.username,
+          email: targetUser.email,
+          role: targetUser.role,
+        },
+        temporaryPassword: cleanPassword,
+        portalUrl,
+        originHeader: req.headers.origin,
+      });
+    }
+
+    return res.json({
+      message: 'Temporary password reset successfully.',
+      ...(emailStatus ? { emailStatus } : {}),
+    });
+  } catch (err: any) {
+    console.error('Reset user password error:', err);
+    return res.status(500).json({ error: 'Failed to reset user password.' });
   }
 });
 

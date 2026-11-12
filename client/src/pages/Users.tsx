@@ -178,6 +178,7 @@ export const UsersPage: React.FC = () => {
   const [inviteEmail, setInviteEmail] = useState('');
   const [invitePassword, setInvitePassword] = useState('Parish2026!');
   const [inviteRole, setInviteRole] = useState<UserRole>('PARISH_USER');
+  const [inviteSendEmail, setInviteSendEmail] = useState(true);
   const [inviteSubmitting, setInviteSubmitting] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [createdSuccessData, setCreatedSuccessData] = useState<{
@@ -186,6 +187,11 @@ export const UsersPage: React.FC = () => {
     email: string;
     role: string;
     password: string;
+    emailStatus?: {
+      sent: boolean;
+      skipped?: boolean;
+      message?: string;
+    };
   } | null>(null);
   const [copiedInvite, setCopiedInvite] = useState(false);
 
@@ -195,9 +201,28 @@ export const UsersPage: React.FC = () => {
   const [editFullName, setEditFullName] = useState('');
   const [editUsername, setEditUsername] = useState('');
   const [editRole, setEditRole] = useState<UserRole>('PARISH_USER');
-  const [editPassword, setEditPassword] = useState('');
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+
+  // Reset Password Modal State
+  const [isResetPwdOpen, setIsResetPwdOpen] = useState(false);
+  const [resetPwdUser, setResetPwdUser] = useState<ParishUserItem | null>(null);
+  const [resetNewPassword, setResetNewPassword] = useState('');
+  const [resetSendEmail, setResetSendEmail] = useState(true);
+  const [resetSubmitting, setResetSubmitting] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetSuccessData, setResetSuccessData] = useState<{
+    fullName: string;
+    username?: string;
+    email: string;
+    password: string;
+    emailStatus?: {
+      sent: boolean;
+      skipped?: boolean;
+      message?: string;
+    };
+  } | null>(null);
+  const [copiedReset, setCopiedReset] = useState(false);
 
   // Status Toggle Confirm Dialog
   const [confirmUser, setConfirmUser] = useState<ParishUserItem | null>(null);
@@ -334,6 +359,7 @@ export const UsersPage: React.FC = () => {
     setInviteEmail('');
     setInvitePassword('Parish2026!');
     setInviteRole('PARISH_USER');
+    setInviteSendEmail(true);
     setInviteError(null);
     setCreatedSuccessData(null);
     setCopiedInvite(false);
@@ -385,12 +411,14 @@ export const UsersPage: React.FC = () => {
     try {
       setInviteSubmitting(true);
       setInviteError(null);
-      await api.post('/masters/users', {
+      const res = await api.post('/masters/users', {
         fullName: inviteFullName.trim(),
         username: inviteUsername.trim() || undefined,
         email: inviteEmail.trim().toLowerCase(),
         password: invitePassword,
         role: inviteRole,
+        sendEmail: inviteSendEmail,
+        portalUrl: window.location.origin,
       });
 
       setCreatedSuccessData({
@@ -399,6 +427,7 @@ export const UsersPage: React.FC = () => {
         email: inviteEmail.trim().toLowerCase(),
         role: inviteRole,
         password: invitePassword,
+        emailStatus: res.data?.emailStatus,
       });
       fetchData();
     } catch (err: any) {
@@ -408,21 +437,53 @@ export const UsersPage: React.FC = () => {
     }
   };
 
+  const buildCredentialsClipboardText = (params: {
+    variant: 'created' | 'reset';
+    fullName: string;
+    username?: string;
+    email: string;
+    password: string;
+    role?: string;
+  }) => {
+    const parishTitle = activeParish?.parishName || 'Parish Register';
+    const headerLine =
+      params.variant === 'reset'
+        ? `⛪ ${parishTitle} - Password Reset\nHello ${params.fullName}, your temporary password has been reset:`
+        : `⛪ ${parishTitle} - Official Login\nHello ${params.fullName}, your account has been provisioned:`;
+
+    const lines = [
+      headerLine,
+      ...(params.variant === 'created' && params.role ? [`• Role: ${formatRoleLabel(params.role)}`] : []),
+      `• Username: ${params.username || params.email}`,
+      `• Login Email: ${params.email}`,
+      `• Temporary Password: ${params.password}`,
+      `• Portal Link: ${window.location.origin}/login`,
+      '',
+      'Upon logging in, you will be prompted to set your own permanent password.',
+    ];
+    return lines.join('\n');
+  };
+
   const handleCopyCredentials = () => {
     if (!createdSuccessData) return;
-    const text = `⛪ St. Alphonsa Parish Register - Official Login
-Hello ${createdSuccessData.fullName}, your account has been provisioned:
-• Role: ${formatRoleLabel(createdSuccessData.role)}
-• Username: ${createdSuccessData.username || createdSuccessData.email}
-• Login Email: ${createdSuccessData.email}
-• Temporary Password: ${createdSuccessData.password}
-• Portal Link: ${window.location.origin}/login
-
-Upon logging in, you will be prompted to set your own permanent password.`;
-
+    const text = buildCredentialsClipboardText({
+      variant: 'created',
+      ...createdSuccessData,
+    });
     navigator.clipboard.writeText(text);
     setCopiedInvite(true);
     setTimeout(() => setCopiedInvite(false), 3000);
+  };
+
+  const handleCopyResetCredentials = () => {
+    if (!resetSuccessData) return;
+    const text = buildCredentialsClipboardText({
+      variant: 'reset',
+      ...resetSuccessData,
+    });
+    navigator.clipboard.writeText(text);
+    setCopiedReset(true);
+    setTimeout(() => setCopiedReset(false), 3000);
   };
 
   const handleToggleStatus = async () => {
@@ -466,9 +527,61 @@ Upon logging in, you will be prompted to set your own permanent password.`;
     setEditFullName(user.fullName);
     setEditUsername(user.username || '');
     setEditRole(user.role);
-    setEditPassword('');
     setEditError(null);
     setIsEditOpen(true);
+  };
+
+  const handleOpenResetPassword = (user: ParishUserItem) => {
+    setIsEditOpen(false);
+    setResetPwdUser(user);
+    setResetNewPassword('');
+    setResetSendEmail(true);
+    setResetError(null);
+    setResetSuccessData(null);
+    setCopiedReset(false);
+    setIsResetPwdOpen(true);
+  };
+
+  const handleGenerateTempPassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$';
+    let generated = '';
+    for (let i = 0; i < 10; i++) {
+      generated += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setResetNewPassword(generated);
+    setResetError(null);
+  };
+
+  const handleResetPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetPwdUser) return;
+    const cleanPassword = resetNewPassword.trim();
+    if (cleanPassword.length < 6) {
+      setResetError('Temporary password must be at least 6 characters.');
+      return;
+    }
+
+    try {
+      setResetSubmitting(true);
+      setResetError(null);
+      const res = await api.post(`/masters/users/${resetPwdUser.id}/reset-password`, {
+        newPassword: cleanPassword,
+        sendEmail: resetSendEmail,
+        portalUrl: window.location.origin,
+      });
+
+      setResetSuccessData({
+        fullName: resetPwdUser.fullName,
+        username: resetPwdUser.username || undefined,
+        email: resetPwdUser.email,
+        password: cleanPassword,
+        emailStatus: res.data?.emailStatus,
+      });
+    } catch (err: any) {
+      setResetError(err.response?.data?.error || 'Failed to reset user password.');
+    } finally {
+      setResetSubmitting(false);
+    }
   };
 
   const validateEditUser = (): boolean => {
@@ -493,10 +606,6 @@ Upon logging in, you will be prompted to set your own permanent password.`;
         username: editUsername.trim() || null,
         role: editRole,
       };
-
-      if (editPassword.trim()) {
-        payload.newPassword = editPassword.trim();
-      }
 
       const res = await api.patch(`/masters/users/${editingUser.id}`, payload);
 
@@ -1787,6 +1896,22 @@ Upon logging in, you will be prompted to set your own permanent password.`;
               <p className="text-[11px] text-emerald-800 leading-relaxed">
                 🔒 The user can log in using either their <strong>Username</strong> or <strong>Email address</strong>, and will set a permanent password upon first login.
               </p>
+
+              {createdSuccessData.emailStatus && (
+                createdSuccessData.emailStatus.sent ? (
+                  <div className="p-2.5 rounded-xl bg-white border border-emerald-200 text-emerald-800 text-[11px] flex items-center gap-2 font-medium">
+                    <Mail className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>{createdSuccessData.emailStatus.message || `Login details emailed to ${createdSuccessData.email}.`}</span>
+                  </div>
+                ) : (
+                  <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] flex items-center gap-2 font-medium">
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    <span>
+                      Email not sent ({createdSuccessData.emailStatus.message || 'SMTP not enabled'}). Use <strong>Copy Details</strong> below to share credentials manually.
+                    </span>
+                  </div>
+                )
+              )}
             </div>
 
             <div className="pt-2 flex items-center justify-between gap-2.5">
@@ -1954,6 +2079,24 @@ Upon logging in, you will be prompted to set your own permanent password.`;
                 The user can use this password to log in immediately and will be prompted to set their private password.
               </p>
             </div>
+
+            <label className="flex items-start gap-2.5 p-3 rounded-xl bg-parish-surface-subtle border border-parish-border cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={inviteSendEmail}
+                onChange={(e) => setInviteSendEmail(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded border-parish-border text-parish-primary focus:ring-parish-primary accent-parish-primary cursor-pointer"
+              />
+              <div className="text-xs">
+                <div className="font-semibold text-parish-text flex items-center gap-1.5">
+                  <Mail className="w-3.5 h-3.5 text-parish-primary" />
+                  <span>Send login details via email</span>
+                </div>
+                <p className="text-[11px] text-parish-text-muted mt-0.5">
+                  Emails the login link and temporary password to this user using the parish&apos;s Email/SMTP settings (you can still copy details afterward).
+                </p>
+              </div>
+            </label>
 
             <div className="pt-3 border-t border-parish-border flex items-center justify-end gap-2.5">
               <Button type="button" variant="outline" size="sm" onClick={() => setIsInviteOpen(false)}>
@@ -2129,23 +2272,27 @@ Upon logging in, you will be prompted to set your own permanent password.`;
               </p>
             </div>
 
-            {/* Optional Field: Reset Password */}
-            <div className="pt-2 border-t border-parish-border">
-              <label className="block text-xs font-semibold text-parish-text mb-1">
-                Reset Password (Optional)
-              </label>
-              <Input
-                type="text"
-                value={editPassword}
-                onChange={(e) => setEditPassword(e.target.value)}
-                placeholder="Leave blank to keep existing password"
-                icon={<KeyRound className="w-4 h-4 text-parish-text-muted" />}
-                className="w-full"
-              />
-              <p className="text-[11px] text-parish-text-muted mt-1">
-                Leave empty to keep existing password. If entered, user must change password upon next login.
-              </p>
-            </div>
+            {/* Password Reset Trigger (Only for other users; self uses Profile Change Password) */}
+            {editingUser.id !== currentUser?.id && (
+              <div className="pt-3 border-t border-parish-border flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs font-semibold text-parish-text">Account Password</div>
+                  <p className="text-[11px] text-parish-text-muted">
+                    Set a temporary password and optionally email it to {editingUser.fullName}.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleOpenResetPassword(editingUser)}
+                  icon={<KeyRound className="w-3.5 h-3.5" />}
+                  className="shrink-0"
+                >
+                  Reset Password
+                </Button>
+              </div>
+            )}
 
             <div className="pt-3 border-t border-parish-border flex items-center justify-end gap-2.5">
               <Button type="button" variant="outline" size="sm" onClick={() => setIsEditOpen(false)}>
@@ -2164,6 +2311,172 @@ Upon logging in, you will be prompted to set your own permanent password.`;
               </ConfirmButton>
             </div>
           </form>
+        )}
+      </Modal>
+
+      {/* Modal: Reset User Password */}
+      <Modal
+        isOpen={isResetPwdOpen}
+        onClose={() => setIsResetPwdOpen(false)}
+        title={resetSuccessData ? 'Temporary Password Set!' : 'Reset User Password'}
+        description={
+          resetSuccessData
+            ? 'The temporary password is active. Copy or confirm delivery below.'
+            : 'Assign a new temporary password and optionally email it directly to the user.'
+        }
+        maxWidth="md"
+      >
+        {resetPwdUser && (
+          resetSuccessData ? (
+            <div className="space-y-4">
+              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 space-y-3">
+                <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>Temporary Password Ready</span>
+                </div>
+
+                <div className="bg-white rounded-xl p-3 border border-emerald-200/60 font-mono text-xs space-y-1.5 text-parish-text">
+                  <div className="flex justify-between">
+                    <span className="text-parish-text-muted">Full Name:</span>
+                    <span className="font-bold">{resetSuccessData.fullName}</span>
+                  </div>
+                  {resetSuccessData.username && (
+                    <div className="flex justify-between">
+                      <span className="text-parish-text-muted">Username:</span>
+                      <span className="font-bold text-parish-primary">@{resetSuccessData.username}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-parish-text-muted">Email:</span>
+                    <span className="font-bold">{resetSuccessData.email}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-parish-text-muted">Temp Password:</span>
+                    <span className="font-bold text-amber-700">{resetSuccessData.password}</span>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-emerald-800 leading-relaxed">
+                  🔒 The user will be prompted to choose a new permanent password right after signing in with this temporary password.
+                </p>
+
+                {resetSuccessData.emailStatus && (
+                  resetSuccessData.emailStatus.sent ? (
+                    <div className="p-2.5 rounded-xl bg-white border border-emerald-200 text-emerald-800 text-[11px] flex items-center gap-2 font-medium">
+                      <Mail className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>{resetSuccessData.emailStatus.message || `Temporary password emailed to ${resetSuccessData.email}.`}</span>
+                    </div>
+                  ) : (
+                    <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] flex items-center gap-2 font-medium">
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      <span>
+                        Email not sent ({resetSuccessData.emailStatus.message || 'SMTP not enabled'}). Use <strong>Copy Details</strong> below to share manually.
+                      </span>
+                    </div>
+                  )
+                )}
+              </div>
+
+              <div className="pt-2 flex items-center justify-between gap-2.5">
+                <Button
+                  type="button"
+                  variant={copiedReset ? 'primary' : 'secondary'}
+                  size="sm"
+                  onClick={handleCopyResetCredentials}
+                  icon={copiedReset ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  className="flex-1 justify-center"
+                >
+                  {copiedReset ? 'Copied to Clipboard!' : 'Copy Details (WhatsApp / SMS)'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  onClick={() => setIsResetPwdOpen(false)}
+                >
+                  Done
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleResetPasswordSubmit} className="space-y-4">
+              {resetError && (
+                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{resetError}</span>
+                </div>
+              )}
+
+              <div className="p-3 rounded-xl bg-parish-surface-subtle border border-parish-border text-xs space-y-0.5">
+                <div className="font-bold text-parish-text">{resetPwdUser.fullName}</div>
+                <div className="text-[11px] text-parish-text-muted font-mono">
+                  {resetPwdUser.username ? `@${resetPwdUser.username} · ` : ''}
+                  {resetPwdUser.email}
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-parish-text">
+                    Temporary Password <span className="text-red-500">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleGenerateTempPassword}
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-parish-primary hover:underline cursor-pointer"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    <span>Generate Random</span>
+                  </button>
+                </div>
+                <Input
+                  type="text"
+                  value={resetNewPassword}
+                  onChange={(e) => setResetNewPassword(e.target.value)}
+                  placeholder="Enter new temporary password (min 6 characters)"
+                  required
+                  icon={<KeyRound className="w-4 h-4" />}
+                  className="w-full font-mono text-xs"
+                />
+                <p className="text-[11px] text-parish-text-muted mt-1">
+                  The user will be required to change this temporary password upon next sign-in.
+                </p>
+              </div>
+
+              <label className="flex items-start gap-2.5 p-3 rounded-xl bg-parish-surface-subtle border border-parish-border cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={resetSendEmail}
+                  onChange={(e) => setResetSendEmail(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded border-parish-border text-parish-primary focus:ring-parish-primary accent-parish-primary cursor-pointer"
+                />
+                <div className="text-xs">
+                  <div className="font-semibold text-parish-text flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-parish-primary" />
+                    <span>Send temporary password via email</span>
+                  </div>
+                  <p className="text-[11px] text-parish-text-muted mt-0.5">
+                    Emails the new temporary password and login link to {resetPwdUser.email} using parish SMTP settings.
+                  </p>
+                </div>
+              </label>
+
+              <div className="pt-3 border-t border-parish-border flex items-center justify-end gap-2.5">
+                <Button type="button" variant="outline" size="sm" onClick={() => setIsResetPwdOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="sm"
+                  isLoading={resetSubmitting}
+                  icon={<KeyRound className="w-3.5 h-3.5" />}
+                >
+                  Reset Password
+                </Button>
+              </div>
+            </form>
+          )
         )}
       </Modal>
 

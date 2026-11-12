@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { markServerOnline, verifyServerConnection } from './connectionState';
 
 export const api = axios.create({
   baseURL: '/api',
@@ -25,10 +26,28 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor: handle 401 unauthenticated
+// Response interceptor: handle server/network connectivity failures and 401 unauthenticated
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    markServerOnline();
+    return response;
+  },
   (error) => {
+    const isCanceled = axios.isCancel(error) || error.code === 'ERR_CANCELED';
+    if (!isCanceled) {
+      const status = error.response?.status;
+      const isConnectivityFailure =
+        !error.response ||
+        status === 502 ||
+        status === 503 ||
+        status === 504 ||
+        (status === 500 && !error.response?.data?.error);
+
+      if (isConnectivityFailure) {
+        void verifyServerConnection();
+      }
+    }
+
     if (error.response?.status === 401) {
       // Don't auto-redirect if we are already on /login or checking /api/auth/login
       const isLoginRequest = error.config?.url?.includes('/auth/login');

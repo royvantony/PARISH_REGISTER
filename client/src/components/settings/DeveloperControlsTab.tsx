@@ -8,11 +8,13 @@ import { CryptoWorkbenchCard } from './CryptoWorkbenchCard';
 import {
   CheckCircle2,
   AlertCircle,
-  FileText,
   LayoutDashboard,
   Settings as SettingsIcon,
   Users as UsersIcon,
   BookOpen,
+  UserPlus,
+  Upload,
+  MapPin,
   Palette,
   RotateCcw,
   Ban,
@@ -21,6 +23,52 @@ import {
   Eye,
   EyeOff,
 } from 'lucide-react';
+
+interface FeatureToggleSwitchProps {
+  enabled: boolean;
+  busy: boolean;
+  label: string;
+  title: string;
+  onToggle: () => void;
+}
+
+const FeatureToggleSwitch: React.FC<FeatureToggleSwitchProps> = ({
+  enabled,
+  busy,
+  label,
+  title,
+  onToggle,
+}) => (
+  <button
+    type="button"
+    disabled={busy}
+    onClick={onToggle}
+    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-parish-primary focus:ring-offset-2 ${
+      enabled ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-700'
+    } ${busy ? 'opacity-50 cursor-wait' : ''}`}
+    title={title}
+    aria-pressed={enabled}
+  >
+    <span className="sr-only">Toggle {label}</span>
+    <span
+      aria-hidden="true"
+      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+        enabled ? 'translate-x-5' : 'translate-x-0'
+      }`}
+    />
+  </button>
+);
+
+interface ScreenSectionConfig {
+  id: string;
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+  pageKey?: string;
+  routeBadge?: string;
+  subCategory?: string;
+  alwaysActiveScreen?: boolean;
+}
 
 export const DeveloperControlsTab: React.FC = () => {
   const {
@@ -38,16 +86,16 @@ export const DeveloperControlsTab: React.FC = () => {
   const [isBatchUpdating, setIsBatchUpdating] = useState(false);
   const [updatingGroup, setUpdatingGroup] = useState<string | null>(null);
 
-  const handleToggleGroup = async (catId: string, enable: boolean) => {
-    const catFeatures = features.filter((f) => f.category === catId);
-    if (catFeatures.length === 0) return;
+  const handleToggleSubFeatures = async (sectionId: string, subCategory: string, enable: boolean) => {
+    const subFeatures = features.filter((f) => f.category === subCategory);
+    if (subFeatures.length === 0) return;
 
     try {
-      setUpdatingGroup(catId);
-      const updates = catFeatures.map((f) => ({ key: f.key, isEnabled: enable }));
+      setUpdatingGroup(sectionId);
+      const updates = subFeatures.map((f) => ({ key: f.key, isEnabled: enable }));
       const res = await batchUpdateFeatures(updates, activeParish?.id);
       if (!res.success) {
-        setFeedbackMsg({ type: 'error', text: res.error || 'Failed to update group.' });
+        setFeedbackMsg({ type: 'error', text: res.error || 'Failed to update sub-features.' });
         setTimeout(() => setFeedbackMsg(null), 4000);
       }
     } finally {
@@ -100,42 +148,67 @@ export const DeveloperControlsTab: React.FC = () => {
     }
   };
 
-  const categories = [
+  const screenSections: ScreenSectionConfig[] = [
     {
-      id: 'PAGE',
-      title: 'Main Screens & Pages',
-      icon: <FileText className="w-4 h-4 text-parish-primary" />,
-      description: 'Hiding a page removes it from navigation and automatically hides all buttons pointing to it. Typing its URL renders 404 Resource Not Found.',
-    },
-    {
-      id: 'DASHBOARD',
-      title: 'Dashboard Individual Sub-Items & Charts',
+      id: 'screen-dashboard',
+      title: 'Dashboard',
+      routeBadge: '/dashboard',
+      alwaysActiveScreen: true,
       icon: <LayoutDashboard className="w-4 h-4 text-emerald-600" />,
-      description: 'The Dashboard home screen stays active, but you can turn off any individual charts, demographic cards, or pastoral feeds.',
+      description: 'The Dashboard home screen remains active for all users. Configure individual charts, demographic cards, and pastoral feeds below.',
+      subCategory: 'DASHBOARD',
     },
     {
-      id: 'SETTINGS',
-      title: 'Settings Screen Sections & Boxes',
-      icon: <SettingsIcon className="w-4 h-4 text-blue-600" />,
-      description: 'Hide specific boxes or master data tabs inside this Settings screen.',
-    },
-    {
-      id: 'USERS',
-      title: 'Users & Roles Tabs',
-      icon: <UsersIcon className="w-4 h-4 text-purple-600" />,
-      description: 'Enable or disable specific tabs in the Users management screen.',
-    },
-    {
-      id: 'REGISTER',
-      title: 'Parish Register Sub-Features',
+      id: 'screen-register',
+      title: 'Parish Register Directory',
+      pageKey: 'PAGE_REGISTER',
       icon: <BookOpen className="w-4 h-4 text-amber-600" />,
-      description: 'Control granular capabilities inside Parish Register dossiers, listings, and household screens.',
+      description: 'Control access to the main Parish Register screen and its household dossier capabilities.',
+      subCategory: 'REGISTER',
     },
     {
-      id: 'GENERAL',
-      title: 'Visual Theme Switcher',
+      id: 'screen-register-new',
+      title: 'Register New Family',
+      pageKey: 'PAGE_REGISTER_NEW',
+      icon: <UserPlus className="w-4 h-4 text-parish-primary" />,
+      description: 'Control access to the family onboarding and registration intake screen.',
+    },
+    {
+      id: 'screen-register-import',
+      title: 'Import Registrations (CSV)',
+      pageKey: 'PAGE_REGISTER_IMPORT',
+      icon: <Upload className="w-4 h-4 text-indigo-600" />,
+      description: 'Control access to bulk CSV family registration import and onboarding queue.',
+    },
+    {
+      id: 'screen-units',
+      title: 'Family Units / Wards',
+      pageKey: 'PAGE_UNITS',
+      icon: <MapPin className="w-4 h-4 text-teal-600" />,
+      description: 'Control access to parish territorial wards, prayer unit grouping, and ward coordinator masters.',
+    },
+    {
+      id: 'screen-users',
+      title: 'Users & Roles Management',
+      pageKey: 'PAGE_USERS',
+      icon: <UsersIcon className="w-4 h-4 text-purple-600" />,
+      description: 'Control access to Users & Access Control screen and choose which management tabs are available.',
+      subCategory: 'USERS',
+    },
+    {
+      id: 'screen-settings',
+      title: 'System Settings & Masters',
+      pageKey: 'PAGE_SETTINGS',
+      icon: <SettingsIcon className="w-4 h-4 text-blue-600" />,
+      description: 'Control access to System Settings and manage individual configuration sections and master tabs.',
+      subCategory: 'SETTINGS',
+    },
+    {
+      id: 'screen-appearance',
+      title: 'Global Appearance & Branding',
       icon: <Palette className="w-4 h-4 text-rose-600" />,
-      description: 'Control theme customization buttons. When disabled, Cathedral Burgundy is forced as system default.',
+      description: 'Control theme customization across the application. When disabled, Cathedral Burgundy is enforced as system default.',
+      subCategory: 'GENERAL',
     },
   ];
 
@@ -231,132 +304,212 @@ export const DeveloperControlsTab: React.FC = () => {
       {/* Database Cryptographic Workbench */}
       <CryptoWorkbenchCard />
 
-      {/* Feature Sections */}
-      <div className="space-y-6">
-        {categories.map((cat) => {
-          const catFeatures = features.filter((f) => f.category === cat.id);
-          if (catFeatures.length === 0) return null;
+      {/* Feature Sections (Screen-by-Screen) */}
+      <div className="space-y-4">
+        {screenSections.map((section) => {
+          const pageFeature = section.pageKey
+            ? features.find((f) => f.key === section.pageKey)
+            : undefined;
+          const subFeatures = section.subCategory
+            ? features.filter((f) => f.category === section.subCategory)
+            : [];
 
-          const activeCount = catFeatures.filter((f) => getStoredFlag(f.key)).length;
-          const isAllActive = activeCount === catFeatures.length;
-          const isAllOff = activeCount === 0;
-          const isGroupBusy = updatingGroup === cat.id;
+          if (!pageFeature && subFeatures.length === 0) return null;
+
+          const isScreenEnabled = pageFeature ? getStoredFlag(pageFeature.key) : true;
+          const isScreenBusy = pageFeature ? updatingKey === pageFeature.key : false;
+          const routeLabel = pageFeature?.route || section.routeBadge;
+
+          const hasSubFeatures = subFeatures.length > 0;
+          const activeSubCount = subFeatures.filter((f) => getStoredFlag(f.key)).length;
+          const isAllSubActive = hasSubFeatures && activeSubCount === subFeatures.length;
+          const isAllSubOff = hasSubFeatures && activeSubCount === 0;
+          const isGroupBusy = updatingGroup === section.id;
 
           return (
             <div
-              key={cat.id}
-              className="bg-parish-surface border border-parish-border rounded-2xl p-5 shadow-xs space-y-4"
+              key={section.id}
+              className={`bg-parish-surface border rounded-2xl p-5 shadow-xs transition-all ${
+                hasSubFeatures ? 'space-y-4' : ''
+              } ${
+                pageFeature && !isScreenEnabled
+                  ? 'border-dashed border-slate-300 dark:border-slate-700'
+                  : 'border-parish-border'
+              }`}
             >
-              <div className="border-b border-parish-border pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
+              <div
+                className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                  hasSubFeatures ? 'border-b border-parish-border pb-3' : ''
+                }`}
+              >
+                <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    {cat.icon}
+                    {section.icon}
                     <h4 className="font-extrabold text-sm text-parish-text tracking-tight">
-                      {cat.title}
+                      {section.title}
                     </h4>
-                    <Badge
-                      variant={isAllActive ? 'success' : isAllOff ? 'subtle' : 'warning'}
-                      size="sm"
-                      className="font-mono text-[10px]"
-                    >
-                      {activeCount} / {catFeatures.length} Active
-                    </Badge>
+                    {routeLabel && (
+                      <code className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-parish-bg border border-parish-border text-parish-text-muted">
+                        {routeLabel}
+                      </code>
+                    )}
+                    {section.alwaysActiveScreen && (
+                      <Badge variant="success" size="sm">
+                        Always Active
+                      </Badge>
+                    )}
+                    {pageFeature && (
+                      <Badge variant={isScreenEnabled ? 'success' : 'subtle'} size="sm">
+                        {isScreenEnabled ? 'Screen Active' : 'Screen Hidden'}
+                      </Badge>
+                    )}
+                    {hasSubFeatures && (
+                      <Badge
+                        variant={isAllSubActive ? 'success' : isAllSubOff ? 'subtle' : 'warning'}
+                        size="sm"
+                        className="font-mono text-[10px]"
+                      >
+                        {activeSubCount} / {subFeatures.length} Active
+                      </Badge>
+                    )}
                   </div>
                   <p className="text-xs text-parish-text-muted mt-0.5">
-                    {cat.description}
+                    {pageFeature && !hasSubFeatures ? pageFeature.description : section.description}
                   </p>
                 </div>
 
-                {/* Per-Group On / Off Action Buttons */}
-                <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
-                  <button
-                    type="button"
-                    disabled={isGroupBusy || isBatchUpdating}
-                    onClick={() => handleToggleGroup(cat.id, true)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer border ${
-                      isAllActive
-                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                        : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800'
-                    } disabled:opacity-50`}
-                    title={`Turn ON all features in ${cat.title}`}
-                  >
-                    <Check className="w-3.5 h-3.5" />
-                    <span>All On</span>
-                  </button>
+                {/* Header Controls: Sub-Feature Bulk Buttons + Screen On/Off Switch */}
+                <div className="flex items-center gap-3 shrink-0 self-end sm:self-center flex-wrap">
+                  {subFeatures.length > 1 && section.subCategory && (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        disabled={isGroupBusy || isBatchUpdating}
+                        onClick={() => handleToggleSubFeatures(section.id, section.subCategory!, true)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer border ${
+                          isAllSubActive
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                            : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800'
+                        } disabled:opacity-50`}
+                        title={
+                          pageFeature
+                            ? `Turn ON all sub-features in ${section.title} (keeps main Screen toggle as-is)`
+                            : `Turn ON all sub-features in ${section.title}`
+                        }
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>All On</span>
+                      </button>
 
-                  <button
-                    type="button"
-                    disabled={isGroupBusy || isBatchUpdating}
-                    onClick={() => handleToggleGroup(cat.id, false)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer border ${
-                      isAllOff
-                        ? 'bg-slate-700 text-white border-slate-700 shadow-xs'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
-                    } disabled:opacity-50`}
-                    title={`Turn OFF all features in ${cat.title}`}
-                  >
-                    <Ban className="w-3.5 h-3.5" />
-                    <span>All Off</span>
-                  </button>
+                      <button
+                        type="button"
+                        disabled={isGroupBusy || isBatchUpdating}
+                        onClick={() => handleToggleSubFeatures(section.id, section.subCategory!, false)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer border ${
+                          isAllSubOff
+                            ? 'bg-slate-700 text-white border-slate-700 shadow-xs'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
+                        } disabled:opacity-50`}
+                        title={
+                          pageFeature
+                            ? `Turn OFF all sub-features in ${section.title} (keeps main Screen toggle as-is)`
+                            : `Turn OFF all sub-features in ${section.title}`
+                        }
+                      >
+                        <Ban className="w-3.5 h-3.5" />
+                        <span>All Off</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {pageFeature && (
+                    <div
+                      className={`flex items-center gap-2 ${
+                        subFeatures.length > 1 ? 'pl-3 border-l border-parish-border' : ''
+                      }`}
+                    >
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-parish-text-muted">
+                        Screen
+                      </span>
+                      <FeatureToggleSwitch
+                        enabled={isScreenEnabled}
+                        busy={isScreenBusy}
+                        label={`${section.title} screen`}
+                        title={
+                          isScreenEnabled
+                            ? `Click to Disable / Hide ${section.title} for ${activeParish?.parishName || 'Parish'}`
+                            : `Click to Enable ${section.title} for ${activeParish?.parishName || 'Parish'}`
+                        }
+                        onToggle={() => handleToggle(pageFeature.key, isScreenEnabled)}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {catFeatures.map((feat) => {
-                  const enabledForUsers = getStoredFlag(feat.key);
-                  const isBusy = updatingKey === feat.key;
+              {pageFeature && hasSubFeatures && !isScreenEnabled && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-100/80 dark:bg-slate-900/50 border border-dashed border-slate-300 dark:border-slate-700 text-[11px] text-parish-text-muted">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0 text-amber-600" />
+                  <span>
+                    The <strong>{section.title}</strong> screen is currently <strong>OFF</strong> for client users. Saved sub-feature settings below are preserved and take effect when the screen is enabled.
+                  </span>
+                </div>
+              )}
 
-                  return (
-                    <div
-                      key={feat.key}
-                      className={`p-3.5 rounded-xl border transition-all flex items-start justify-between gap-3 ${
-                        enabledForUsers
-                          ? 'bg-parish-surface-subtle border-parish-border'
-                          : 'bg-slate-100/60 dark:bg-slate-900/40 border-dashed border-slate-300 dark:border-slate-800 opacity-75'
-                      }`}
-                    >
-                      <div className="space-y-1 min-w-0 pr-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-xs text-parish-text">
-                            {feat.name}
-                          </span>
-                          {feat.route && (
-                            <code className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-parish-bg border border-parish-border text-parish-text-muted">
-                              {feat.route}
-                            </code>
-                          )}
-                          <Badge variant={enabledForUsers ? 'success' : 'subtle'} size="sm">
-                            {enabledForUsers ? 'Active for Users' : 'Hidden for Users'}
-                          </Badge>
-                        </div>
-                        <p className="text-[11px] text-parish-text-muted leading-relaxed line-clamp-2">
-                          {feat.description}
-                        </p>
-                      </div>
+              {hasSubFeatures && (
+                <div
+                  className={`grid grid-cols-1 md:grid-cols-2 gap-3 transition-opacity ${
+                    pageFeature && !isScreenEnabled ? 'opacity-65' : ''
+                  }`}
+                >
+                  {subFeatures.map((feat) => {
+                    const enabledForUsers = getStoredFlag(feat.key);
+                    const isBusy = updatingKey === feat.key;
 
-                      {/* Toggle Switch */}
-                      <button
-                        type="button"
-                        disabled={isBusy}
-                        onClick={() => handleToggle(feat.key, enabledForUsers)}
-                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-parish-primary focus:ring-offset-2 ${
-                          enabledForUsers ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-700'
-                        } ${isBusy ? 'opacity-50 cursor-wait' : ''}`}
-                        title={enabledForUsers ? `Click to Disable / Hide for ${activeParish?.parishName || 'Parish'}` : `Click to Enable for ${activeParish?.parishName || 'Parish'}`}
-                        aria-pressed={enabledForUsers}
+                    return (
+                      <div
+                        key={feat.key}
+                        className={`p-3.5 rounded-xl border transition-all flex items-start justify-between gap-3 ${
+                          enabledForUsers
+                            ? 'bg-parish-surface-subtle border-parish-border'
+                            : 'bg-slate-100/60 dark:bg-slate-900/40 border-dashed border-slate-300 dark:border-slate-800 opacity-75'
+                        }`}
                       >
-                        <span className="sr-only">Toggle {feat.name}</span>
-                        <span
-                          aria-hidden="true"
-                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                            enabledForUsers ? 'translate-x-5' : 'translate-x-0'
-                          }`}
+                        <div className="space-y-1 min-w-0 pr-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-xs text-parish-text">
+                              {feat.name}
+                            </span>
+                            {feat.route && (
+                              <code className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-parish-bg border border-parish-border text-parish-text-muted">
+                                {feat.route}
+                              </code>
+                            )}
+                            <Badge variant={enabledForUsers ? 'success' : 'subtle'} size="sm">
+                              {enabledForUsers ? 'Active for Users' : 'Hidden for Users'}
+                            </Badge>
+                          </div>
+                          <p className="text-[11px] text-parish-text-muted leading-relaxed line-clamp-2">
+                            {feat.description}
+                          </p>
+                        </div>
+
+                        <FeatureToggleSwitch
+                          enabled={enabledForUsers}
+                          busy={isBusy}
+                          label={feat.name}
+                          title={
+                            enabledForUsers
+                              ? `Click to Disable / Hide for ${activeParish?.parishName || 'Parish'}`
+                              : `Click to Enable for ${activeParish?.parishName || 'Parish'}`
+                          }
+                          onToggle={() => handleToggle(feat.key, enabledForUsers)}
                         />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           );
         })}

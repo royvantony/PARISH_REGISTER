@@ -7,6 +7,7 @@ export default defineConfig({
   server: {
     host: true, // Listen on all network addresses (0.0.0.0) so other devices on Wi-Fi can access
     port: 5173,
+    allowedHosts: true, // Allow HTTPS tunnels (e.g. Cloudflare Tunnel / ngrok) for mobile PWA testing
     proxy: {
       '/api': {
         target: 'http://localhost:5000',
