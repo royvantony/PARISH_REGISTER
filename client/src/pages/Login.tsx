@@ -25,36 +25,34 @@ interface DevShortcutAccount {
   dashed?: boolean;
 }
 
-// Vite replaces import.meta.env.DEV with `false` in production builds, leaving this [] and tree-shaking dev accounts out of dist/.
-const DEV_SHORTCUT_ACCOUNTS: DevShortcutAccount[] = import.meta.env.DEV
-  ? [
-      {
-        label: '⛪ Parish Priest',
-        roleHint: '(PARISH_PRIEST)',
-        email: 'royvadakumpadan@gmail.com',
-        badgeVariant: 'default',
-      },
-      {
-        label: '🛡️ Parish Admin',
-        roleHint: '(Trustee)',
-        email: 'royantonyvadakumpadan@gmail.com',
-        badgeVariant: 'subtle',
-      },
-      {
-        label: '📋 Parish User',
-        roleHint: '(Secretary)',
-        email: 'royantonyvadamumpadan@gmail.com',
-        badgeVariant: 'subtle',
-      },
-      {
-        label: '🛠️ Platform Super Admin',
-        roleHint: '(Developer)',
-        email: 'royvantony@gmail.com',
-        badgeVariant: 'subtle',
-        dashed: true,
-      },
-    ]
-  : [];
+// Fast access accounts (shown only if APP_ENV is Dev/Demo or ALLOW_DEV_LOGIN="true", triggered via Ctrl+Shift+D, and validated against the database)
+const DEV_SHORTCUT_ACCOUNTS: DevShortcutAccount[] = [
+  {
+    label: '⛪ Parish Priest',
+    roleHint: '(PARISH_PRIEST)',
+    email: 'royvadakumpadan@gmail.com',
+    badgeVariant: 'default',
+  },
+  {
+    label: '🛡️ Parish Admin',
+    roleHint: '(Trustee)',
+    email: 'royantonyvadakumpadan@gmail.com',
+    badgeVariant: 'subtle',
+  },
+  {
+    label: '📋 Parish User',
+    roleHint: '(Secretary)',
+    email: 'royantonyvadamumpadan@gmail.com',
+    badgeVariant: 'subtle',
+  },
+  {
+    label: '🛠️ Platform Super Admin',
+    roleHint: '(Developer)',
+    email: 'royvantony@gmail.com',
+    badgeVariant: 'subtle',
+    dashed: true,
+  },
+];
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -94,7 +92,7 @@ export const LoginPage: React.FC = () => {
 
   // Check which dev shortcut emails actually exist (and are active) when shortcut is triggered
   useEffect(() => {
-    if (!import.meta.env.DEV || !isDevRevealed || DEV_SHORTCUT_ACCOUNTS.length === 0) return;
+    if (!isDevRevealed || DEV_SHORTCUT_ACCOUNTS.length === 0) return;
 
     let cancelled = false;
     api
@@ -122,12 +120,11 @@ export const LoginPage: React.FC = () => {
     };
   }, [isDevRevealed]);
 
-  const visibleDevAccounts =
-    import.meta.env.DEV && availableDevEmails
-      ? DEV_SHORTCUT_ACCOUNTS.filter((acct) =>
-          availableDevEmails.includes(acct.email.toLowerCase())
-        )
-      : [];
+  const visibleDevAccounts = availableDevEmails
+    ? DEV_SHORTCUT_ACCOUNTS.filter((acct) =>
+        availableDevEmails.includes(acct.email.toLowerCase())
+      )
+    : [];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -346,8 +343,8 @@ export const LoginPage: React.FC = () => {
               </div>
             </form>
 
-            {/* Developer Fast Access (Vite dev mode only + Ctrl/Cmd + Shift + D + DB existence check) */}
-            {import.meta.env.DEV && isDevRevealed && visibleDevAccounts.length > 0 && (
+            {/* Developer Fast Access (Ctrl/Cmd + Shift + D + Server Allowed check + DB existence check) */}
+            {isDevRevealed && visibleDevAccounts.length > 0 && (
               <div className="pt-4 border-t border-parish-border animate-in fade-in slide-in-from-top-2 duration-200">
                 <div className="grid grid-cols-1 gap-2">
                   {visibleDevAccounts.map((acct) => (

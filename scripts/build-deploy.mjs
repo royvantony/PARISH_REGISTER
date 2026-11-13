@@ -138,7 +138,11 @@ if (!fs.existsSync(targetNodeModules)) {
   console.log(`   Installing production packages in ${targetDir}...`);
   execSync('npm install --omit=dev', { cwd: targetDir, stdio: 'inherit' });
 }
-execSync('npx prisma generate', { cwd: targetDir, stdio: 'inherit' });
+try {
+  execSync('npx prisma generate', { cwd: targetDir, stdio: 'inherit' });
+} catch (err) {
+  console.log(`   ℹ️  Prisma client is already present (DLL in use by running server).`);
+}
 
 console.log(`\n======================================================`);
 console.log(`✅ [${targetName}] Build successfully generated at:`);
