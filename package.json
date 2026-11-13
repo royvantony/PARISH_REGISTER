@@ -10,7 +10,9 @@
     "studio": "npm --prefix server run studio",
     "build:server": "npm --prefix server run build",
     "build:client": "npm --prefix client run build",
-    "build": "npm run build:server && npm run build:client"
+    "build": "npm run build:server && npm run build:client",
+    "build:demo": "node scripts/build-deploy.mjs demo",
+    "build:production": "node scripts/build-deploy.mjs production"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

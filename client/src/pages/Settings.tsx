@@ -614,6 +614,42 @@ export const SettingsPage: React.FC = () => {
     return 'subtle';
   };
 
+  // Determine which sub-tabs are visible
+  const showGoverning = isDev || isFeatureEnabled('SETTING_DIOCESE_BOX') || isFeatureEnabled('SETTING_PARISH_BOX');
+  const showDioceses = isDev || isFeatureEnabled('SETTING_NATIVE_DIOCESES');
+  const showEmail = isDev || isFeatureEnabled('SETTING_SMTP');
+  const showGeneral = isDev || isFeatureEnabled('SETTING_SYSTEM_HEALTH');
+  const showLogs = isDev || (isFeatureEnabled('SETTING_ACTIVITY_LOGS') && hasPermission('AUDIT_LOGS', 'canView'));
+  const showBackup = isDev || isFeatureEnabled('SETTING_BACKUP_EXPORT') || isFeatureEnabled('SETTING_BACKUP_IMPORT');
+  const showDeveloper = isDeveloper || user?.role === 'SUPER_ADMIN';
+
+  const hasAnyActiveTab =
+    showGoverning || showDioceses || showEmail || showGeneral || showLogs || showBackup || showDeveloper;
+
+  // Auto-switch away from hidden activeSubTab to first available tab
+  useEffect(() => {
+    const tabs: Array<{ id: typeof activeSubTab; visible: boolean }> = [
+      { id: 'governing', visible: showGoverning },
+      { id: 'dioceses', visible: showDioceses },
+      { id: 'email', visible: showEmail },
+      { id: 'general', visible: showGeneral },
+      { id: 'logs', visible: showLogs },
+      { id: 'backup', visible: showBackup },
+      { id: 'developer', visible: showDeveloper },
+    ];
+    const currentTabValid = tabs.find(t => t.id === activeSubTab)?.visible;
+    if (!currentTabValid) {
+      const firstValid = tabs.find(t => t.visible);
+      if (firstValid) {
+        setActiveSubTab(firstValid.id);
+      }
+    }
+  }, [showGoverning, showDioceses, showEmail, showGeneral, showLogs, showBackup, showDeveloper, activeSubTab]);
+
+  if (!hasAnyActiveTab) {
+    return null;
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -625,114 +661,119 @@ export const SettingsPage: React.FC = () => {
 
       {/* Settings Sub-Navigation Tabs - Responsive Wrapping without Scrollbar */}
       <div className="flex flex-wrap items-center gap-1.5 p-1.5 bg-parish-surface border border-parish-border rounded-2xl shadow-2xs">
-        <button
-          onClick={() => setActiveSubTab('governing')}
-          className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'governing'
-            ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
-            : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
-            }`}
-        >
-          <Church className="w-3.5 h-3.5" />
-          <span>Diocese & Parish</span>
-        </button>
-
-        {(isDev || isFeatureEnabled('SETTING_NATIVE_DIOCESES')) && (
-          <button
-            onClick={() => setActiveSubTab('dioceses')}
-            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'dioceses'
-              ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
-              : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
-              }`}
-          >
-            <MapPin className="w-3.5 h-3.5" />
-            <span>Origin Dioceses</span>
-            <span className="text-[10px] bg-parish-primary/10 text-parish-primary px-1.5 py-0.5 rounded-full font-mono font-semibold">
-              {dioceses.length}
-            </span>
-            {isDev && !getStoredFlag('SETTING_NATIVE_DIOCESES') && (
-              <span className="text-[9px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1 py-0.2 rounded font-mono">Hidden</span>
+            {showGoverning && (
+              <button
+                onClick={() => setActiveSubTab('governing')}
+                className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'governing'
+                  ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
+                  : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
+                  }`}
+              >
+                <Church className="w-3.5 h-3.5" />
+                <span>Diocese & Parish</span>
+                {isDev && !getStoredFlag('SETTING_DIOCESE_BOX') && !getStoredFlag('SETTING_PARISH_BOX') && (
+                  <span className="text-[9px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1 py-0.2 rounded font-mono">Hidden</span>
+                )}
+              </button>
             )}
-          </button>
-        )}
 
-        {(isDev || isFeatureEnabled('SETTING_SMTP')) && (
-          <button
-            onClick={() => setActiveSubTab('email')}
-            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'email'
-              ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
-              : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
-              }`}
-          >
-            <Mail className="w-3.5 h-3.5" />
-            <span>Email & SMTP</span>
-            {isDev && !getStoredFlag('SETTING_SMTP') && (
-              <span className="text-[9px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1 py-0.2 rounded font-mono">Hidden</span>
+            {showDioceses && (
+              <button
+                onClick={() => setActiveSubTab('dioceses')}
+                className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'dioceses'
+                  ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
+                  : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
+                  }`}
+              >
+                <MapPin className="w-3.5 h-3.5" />
+                <span>Origin Dioceses</span>
+                <span className="text-[10px] bg-parish-primary/10 text-parish-primary px-1.5 py-0.5 rounded-full font-mono font-semibold">
+                  {dioceses.length}
+                </span>
+                {isDev && !getStoredFlag('SETTING_NATIVE_DIOCESES') && (
+                  <span className="text-[9px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1 py-0.2 rounded font-mono">Hidden</span>
+                )}
+              </button>
             )}
-          </button>
-        )}
 
-        {(isDev || isFeatureEnabled('SETTING_SYSTEM_HEALTH')) && (
-          <button
-            onClick={() => setActiveSubTab('general')}
-            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'general'
-              ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
-              : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
-              }`}
-          >
-            <Sliders className="w-3.5 h-3.5" />
-            <span>System Health</span>
-            {isDev && !getStoredFlag('SETTING_SYSTEM_HEALTH') && (
-              <span className="text-[9px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1 py-0.2 rounded font-mono">Hidden</span>
+            {showEmail && (
+              <button
+                onClick={() => setActiveSubTab('email')}
+                className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'email'
+                  ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
+                  : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
+                  }`}
+              >
+                <Mail className="w-3.5 h-3.5" />
+                <span>Email & SMTP</span>
+                {isDev && !getStoredFlag('SETTING_SMTP') && (
+                  <span className="text-[9px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1 py-0.2 rounded font-mono">Hidden</span>
+                )}
+              </button>
             )}
-          </button>
-        )}
 
-        {(isDev || (isFeatureEnabled('SETTING_ACTIVITY_LOGS') && hasPermission('AUDIT_LOGS', 'canView'))) && (
-          <button
-            onClick={() => setActiveSubTab('logs')}
-            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'logs'
-              ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
-              : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
-              }`}
-          >
-            <Shield className="w-3.5 h-3.5" />
-            <span>Activity Logs</span>
-            {isDev && !getStoredFlag('SETTING_ACTIVITY_LOGS') && (
-              <span className="text-[9px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1 py-0.2 rounded font-mono">Hidden</span>
+            {showGeneral && (
+              <button
+                onClick={() => setActiveSubTab('general')}
+                className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'general'
+                  ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
+                  : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
+                  }`}
+              >
+                <Sliders className="w-3.5 h-3.5" />
+                <span>System Health</span>
+                {isDev && !getStoredFlag('SETTING_SYSTEM_HEALTH') && (
+                  <span className="text-[9px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1 py-0.2 rounded font-mono">Hidden</span>
+                )}
+              </button>
             )}
-          </button>
-        )}
 
-        {(isDev || isFeatureEnabled('SETTING_BACKUP_EXPORT') || isFeatureEnabled('SETTING_BACKUP_IMPORT')) && (
-          <button
-            onClick={() => setActiveSubTab('backup')}
-            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'backup'
-              ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
-              : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
-              }`}
-          >
-            <Archive className="w-3.5 h-3.5" />
-            <span>Backup & Migration</span>
-            {isDev && !getStoredFlag('SETTING_BACKUP_EXPORT') && !getStoredFlag('SETTING_BACKUP_IMPORT') && (
-              <span className="text-[9px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1 py-0.2 rounded font-mono">Hidden</span>
+            {showLogs && (
+              <button
+                onClick={() => setActiveSubTab('logs')}
+                className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'logs'
+                  ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
+                  : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
+                  }`}
+              >
+                <Shield className="w-3.5 h-3.5" />
+                <span>Activity Logs</span>
+                {isDev && !getStoredFlag('SETTING_ACTIVITY_LOGS') && (
+                  <span className="text-[9px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1 py-0.2 rounded font-mono">Hidden</span>
+                )}
+              </button>
             )}
-          </button>
-        )}
 
-        {(isDeveloper || user?.role === 'SUPER_ADMIN') && (
-          <button
-            onClick={() => setActiveSubTab('developer')}
-            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'developer'
-              ? 'bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-400 shadow-xs border border-amber-300/80 font-extrabold'
-              : 'text-amber-700 dark:text-amber-400 hover:bg-amber-50/60'
-              }`}
-          >
-            <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
-            <span>Developer</span>
-            <span className="text-[10px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded font-mono font-bold">DEV</span>
-          </button>
-        )}
-      </div>
+            {showBackup && (
+              <button
+                onClick={() => setActiveSubTab('backup')}
+                className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'backup'
+                  ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
+                  : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
+                  }`}
+              >
+                <Archive className="w-3.5 h-3.5" />
+                <span>Backup & Migration</span>
+                {isDev && !getStoredFlag('SETTING_BACKUP_EXPORT') && !getStoredFlag('SETTING_BACKUP_IMPORT') && (
+                  <span className="text-[9px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1 py-0.2 rounded font-mono">Hidden</span>
+                )}
+              </button>
+            )}
+
+            {showDeveloper && (
+              <button
+                onClick={() => setActiveSubTab('developer')}
+                className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'developer'
+                  ? 'bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-400 shadow-xs border border-amber-300/80 font-extrabold'
+                  : 'text-amber-700 dark:text-amber-400 hover:bg-amber-50/60'
+                  }`}
+              >
+                <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
+                <span>Developer</span>
+                <span className="text-[10px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded font-mono font-bold">DEV</span>
+              </button>
+            )}
+          </div>
 
 
       {activeSubTab === 'governing' && (
@@ -964,13 +1005,6 @@ export const SettingsPage: React.FC = () => {
             </div>
           )}
         </div>
-
-        {!isDev && !isFeatureEnabled('SETTING_DIOCESE_BOX') && !isFeatureEnabled('SETTING_PARISH_BOX') && (
-          <div className="p-8 rounded-2xl bg-parish-surface border border-parish-border text-center text-parish-text-muted text-xs space-y-1">
-            <p className="font-semibold text-parish-text">No active configuration panels</p>
-            <p>Profile settings are currently disabled by the administrator.</p>
-          </div>
-        )}
 
           {/* Modal 1: Diocesan Settings Modal */}
           <Modal

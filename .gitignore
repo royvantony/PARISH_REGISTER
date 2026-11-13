@@ -14,11 +14,12 @@ postgres_data/
 # Uploaded documents and media
 uploads/
 
-# Build artifacts
+# Deploy build artifacts
 dist/
 build/
 .next/
 out/
+deploy/
 
 # Logs
 npm-debug.log*

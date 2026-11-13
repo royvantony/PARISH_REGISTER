@@ -13,6 +13,7 @@ export function getActiveDatabaseUrl(): string {
   if (lower === 'demo') {
     return (
       process.env.DATABASE_URL_DEMO ||
+      process.env.DATABASE_URL ||
       'postgresql://postgres:demopassword123@127.0.0.1:5433/parish_demo?schema=public'
     );
   }

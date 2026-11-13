@@ -1,3 +1,4 @@
+import fs from 'fs';
 import path from 'path';
 import 'dotenv/config';
 import express from 'express';
@@ -87,10 +88,15 @@ app.use('/api/backup', backupRouter);
 
 // ---------------------------------------------------------------------------
 // Single-Server Frontend Delivery:
-// - Always active in Production & Demo (serves compiled client/dist)
-// - Also active in Dev as fallback if client/dist exists
+// - Standalone deployments: ./public
+// - Monorepo development: ../client/dist or ./client/dist
 // ---------------------------------------------------------------------------
-const clientDistPath = path.resolve(process.cwd(), '../client/dist');
+const candidateDistPaths = [
+  path.resolve(process.cwd(), 'public'),
+  path.resolve(process.cwd(), '../client/dist'),
+  path.resolve(process.cwd(), 'client/dist'),
+];
+const clientDistPath = candidateDistPaths.find((p) => fs.existsSync(p)) || candidateDistPaths[0];
 app.use(express.static(clientDistPath));
 
 app.get('*', (req, res, next) => {
