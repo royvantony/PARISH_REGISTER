@@ -1,13 +1,52 @@
 import crypto from 'crypto';
 
+const LEGACY_DEV_SECRET = 'st_alphonsa_parish_brisbane_secret_jwt_key_2026';
+
+export const JWT_EXPIRES_IN = '1d';
+
+function isProductionEnv(): boolean {
+  return process.env.NODE_ENV === 'production';
+}
+
+export function getJwtSecret(): string {
+  const configured = process.env.JWT_SECRET?.trim();
+  if (isProductionEnv()) {
+    if (!configured || configured === LEGACY_DEV_SECRET) {
+      throw new Error(
+        'Security configuration error: JWT_SECRET must be set to a unique random secret when NODE_ENV=production.'
+      );
+    }
+    return configured;
+  }
+  return configured || LEGACY_DEV_SECRET;
+}
+
+function getVaultSecret(): string {
+  const vaultKey = process.env.FEATURE_VAULT_KEY?.trim();
+  if (isProductionEnv()) {
+    if (!vaultKey || vaultKey === LEGACY_DEV_SECRET) {
+      throw new Error(
+        'Security configuration error: FEATURE_VAULT_KEY must be set to a unique random secret when NODE_ENV=production.'
+      );
+    }
+    return vaultKey;
+  }
+  return vaultKey || process.env.JWT_SECRET?.trim() || LEGACY_DEV_SECRET;
+}
+
+/**
+ * Validates required production secrets on server startup so misconfigured deployments fail fast.
+ */
+export function assertProductionSecretsConfigured(): void {
+  if (!isProductionEnv()) return;
+  getJwtSecret();
+  getVaultSecret();
+}
+
 // Secret key for encrypting sensitive vaults in the database
 const getEncryptionKey = (): Buffer => {
-  const secret =
-    process.env.FEATURE_VAULT_KEY ||
-    process.env.JWT_SECRET ||
-    'st_alphonsa_parish_brisbane_secret_jwt_key_2026';
   // Derive a deterministic 32-byte key using SHA-256
-  return crypto.createHash('sha256').update(secret).digest();
+  return crypto.createHash('sha256').update(getVaultSecret()).digest();
 };
 
 export interface EncryptedPayload {

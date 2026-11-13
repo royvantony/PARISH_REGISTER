@@ -9,13 +9,52 @@ import {
   User,
   ArrowRight,
   ShieldAlert,
-  Sparkles,
   MapPin,
   CheckCircle2,
   Clock,
   Church,
 } from 'lucide-react';
 import { ForgotPasswordModal } from '../components/auth/ForgotPasswordModal';
+import { api } from '../lib/api';
+
+interface DevShortcutAccount {
+  label: string;
+  roleHint: string;
+  email: string;
+  badgeVariant: 'default' | 'subtle';
+  dashed?: boolean;
+}
+
+// Vite replaces import.meta.env.DEV with `false` in production builds, leaving this [] and tree-shaking dev accounts out of dist/.
+const DEV_SHORTCUT_ACCOUNTS: DevShortcutAccount[] = import.meta.env.DEV
+  ? [
+      {
+        label: '⛪ Parish Priest',
+        roleHint: '(PARISH_PRIEST)',
+        email: 'royvadakumpadan@gmail.com',
+        badgeVariant: 'default',
+      },
+      {
+        label: '🛡️ Parish Admin',
+        roleHint: '(Trustee)',
+        email: 'royantonyvadakumpadan@gmail.com',
+        badgeVariant: 'subtle',
+      },
+      {
+        label: '📋 Parish User',
+        roleHint: '(Secretary)',
+        email: 'royantonyvadamumpadan@gmail.com',
+        badgeVariant: 'subtle',
+      },
+      {
+        label: '🛠️ Platform Super Admin',
+        roleHint: '(Developer)',
+        email: 'royvantony@gmail.com',
+        badgeVariant: 'subtle',
+        dashed: true,
+      },
+    ]
+  : [];
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -30,6 +69,7 @@ export const LoginPage: React.FC = () => {
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
   const [isDevRevealed, setIsDevRevealed] = useState(false);
+  const [availableDevEmails, setAvailableDevEmails] = useState<string[] | null>(null);
 
   useEffect(() => {
     const notice = sessionStorage.getItem('inactivity_logout_notice');
@@ -39,8 +79,9 @@ export const LoginPage: React.FC = () => {
     }
   }, []);
 
-  // Stealth Shortcut Listener: Ctrl + Shift + D (or Cmd + Shift + D) toggles Developer Fast Access
+  // Stealth Shortcut Listener (Dev only): Ctrl + Shift + D (or Cmd + Shift + D) toggles Developer Fast Access
   useEffect(() => {
+    if (!import.meta.env.DEV) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'd' || e.key === 'D')) {
         e.preventDefault();
@@ -50,6 +91,43 @@ export const LoginPage: React.FC = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  // Check which dev shortcut emails actually exist (and are active) when shortcut is triggered
+  useEffect(() => {
+    if (!import.meta.env.DEV || !isDevRevealed || DEV_SHORTCUT_ACCOUNTS.length === 0) return;
+
+    let cancelled = false;
+    api
+      .post('/auth/dev-available', {
+        emails: DEV_SHORTCUT_ACCOUNTS.map((a) => a.email),
+      })
+      .then((res) => {
+        if (cancelled) return;
+        const emails: string[] = Array.isArray(res.data?.availableEmails)
+          ? res.data.availableEmails.map((e: string) => e.toLowerCase())
+          : [];
+        setAvailableDevEmails(emails);
+        if (emails.length === 0) {
+          setIsDevRevealed(false);
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setAvailableDevEmails([]);
+        setIsDevRevealed(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isDevRevealed]);
+
+  const visibleDevAccounts =
+    import.meta.env.DEV && availableDevEmails
+      ? DEV_SHORTCUT_ACCOUNTS.filter((acct) =>
+          availableDevEmails.includes(acct.email.toLowerCase())
+        )
+      : [];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,8 +148,9 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  // Developer Bypass Login: Logs in immediately without verifying password
+  // Developer Bypass Login (Dev only): Logs in immediately without verifying password
   const handleDevBypass = async (devEmail: string) => {
+    if (!import.meta.env.DEV) return;
     setErrorMessage('');
     setIsLoading(true);
 
@@ -267,91 +346,37 @@ export const LoginPage: React.FC = () => {
               </div>
             </form>
 
-            {/* Developer Fast Access (Revealed ONLY with Ctrl + Shift + D / Cmd + Shift + D) */}
-            {isDevRevealed && (
-              <div className="pt-4 border-t border-amber-500/30 space-y-2.5 animate-in fade-in slide-in-from-top-2 duration-200">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>Developer Fast Access (Password Bypass)</span>
-                  </div>
-                  <Badge variant="warning" size="sm">
-                    DEV / DEMO
-                  </Badge>
-                </div>
-
-                <p className="text-[11px] text-parish-text-muted">
-                  Click any role below to bypass password verification and start a normal authenticated session:
-                </p>
-
+            {/* Developer Fast Access (Vite dev mode only + Ctrl/Cmd + Shift + D + DB existence check) */}
+            {import.meta.env.DEV && isDevRevealed && visibleDevAccounts.length > 0 && (
+              <div className="pt-4 border-t border-parish-border animate-in fade-in slide-in-from-top-2 duration-200">
                 <div className="grid grid-cols-1 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleDevBypass('royvadakumpadan@gmail.com')}
-                    className="w-full text-left p-2.5 rounded-xl border border-amber-500/30 hover:border-parish-primary hover:bg-parish-surface-subtle transition-all flex items-center justify-between text-xs group cursor-pointer"
-                  >
-                    <div>
-                      <div className="font-bold text-parish-text flex items-center gap-1.5">
-                        <span>⛪ Parish Priest</span>
-                        <span className="text-[10px] text-parish-text-muted font-normal">(PARISH_PRIEST)</span>
+                  {visibleDevAccounts.map((acct) => (
+                    <button
+                      key={acct.email}
+                      type="button"
+                      onClick={() => handleDevBypass(acct.email)}
+                      className={`w-full text-left p-2.5 rounded-xl border hover:border-parish-primary hover:bg-parish-surface-subtle transition-all flex items-center justify-between text-xs group cursor-pointer ${
+                        acct.dashed
+                          ? 'border-dashed border-amber-500/40 opacity-85 hover:opacity-100'
+                          : 'border-amber-500/30'
+                      }`}
+                    >
+                      <div>
+                        <div className="font-bold text-parish-text flex items-center gap-1.5">
+                          <span>{acct.label}</span>
+                          <span className="text-[10px] text-parish-text-muted font-normal">{acct.roleHint}</span>
+                        </div>
+                        <div className="text-[11px] text-parish-text-muted">{acct.email}</div>
                       </div>
-                      <div className="text-[11px] text-parish-text-muted">royvadakumpadan@gmail.com</div>
-                    </div>
-                    <Badge variant="default" size="sm" className="group-hover:bg-parish-primary group-hover:text-white transition-colors">
-                      Fast Login
-                    </Badge>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleDevBypass('royvadakumpadan+trustee@gmail.com')}
-                    className="w-full text-left p-2.5 rounded-xl border border-amber-500/30 hover:border-parish-primary hover:bg-parish-surface-subtle transition-all flex items-center justify-between text-xs group cursor-pointer"
-                  >
-                    <div>
-                      <div className="font-bold text-parish-text flex items-center gap-1.5">
-                        <span>🛡️ Parish Admin</span>
-                        <span className="text-[10px] text-parish-text-muted font-normal">(Trustee)</span>
-                      </div>
-                      <div className="text-[11px] text-parish-text-muted">royvadakumpadan+trustee@gmail.com</div>
-                    </div>
-                    <Badge variant="subtle" size="sm" className="group-hover:bg-parish-primary group-hover:text-white transition-colors">
-                      Fast Login
-                    </Badge>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleDevBypass('royvadakumpadan+secretary@gmail.com')}
-                    className="w-full text-left p-2.5 rounded-xl border border-amber-500/30 hover:border-parish-primary hover:bg-parish-surface-subtle transition-all flex items-center justify-between text-xs group cursor-pointer"
-                  >
-                    <div>
-                      <div className="font-bold text-parish-text flex items-center gap-1.5">
-                        <span>📋 Parish User</span>
-                        <span className="text-[10px] text-parish-text-muted font-normal">(Secretary)</span>
-                      </div>
-                      <div className="text-[11px] text-parish-text-muted">royvadakumpadan+secretary@gmail.com</div>
-                    </div>
-                    <Badge variant="subtle" size="sm" className="group-hover:bg-parish-primary group-hover:text-white transition-colors">
-                      Fast Login
-                    </Badge>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleDevBypass('royvantony@gmail.com')}
-                    className="w-full text-left p-2.5 rounded-xl border border-dashed border-amber-500/40 hover:border-parish-primary hover:bg-parish-surface-subtle transition-all flex items-center justify-between text-xs group opacity-85 hover:opacity-100 cursor-pointer"
-                  >
-                    <div>
-                      <div className="font-bold text-parish-text flex items-center gap-1.5">
-                        <span>🛠️ Platform Super Admin</span>
-                        <span className="text-[10px] text-parish-text-muted font-normal">(Developer)</span>
-                      </div>
-                      <div className="text-[11px] text-parish-text-muted">royvantony@gmail.com</div>
-                    </div>
-                    <Badge variant="subtle" size="sm" className="group-hover:bg-parish-primary group-hover:text-white transition-colors">
-                      Fast Login
-                    </Badge>
-                  </button>
+                      <Badge
+                        variant={acct.badgeVariant}
+                        size="sm"
+                        className="group-hover:bg-parish-primary group-hover:text-white transition-colors"
+                      >
+                        Fast Login
+                      </Badge>
+                    </button>
+                  ))}
                 </div>
               </div>
             )}

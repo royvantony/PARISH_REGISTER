@@ -180,7 +180,7 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
                 type="text"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="e.g. fr.vicar or royvadakumpadan@gmail.com"
+                placeholder="e.g. fr.vicar or priest@parish.org"
                 required
                 autoFocus
                 icon={<Mail className="w-4 h-4" />}

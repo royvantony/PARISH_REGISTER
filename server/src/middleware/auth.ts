@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { UserRole } from '@prisma/client';
+import { getJwtSecret } from '../lib/crypto.js';
+import { prisma } from '../lib/prisma.js';
 
 export interface AuthenticatedUser {
   userId: number;
@@ -21,9 +23,7 @@ declare global {
   }
 }
 
-const getJwtSecret = () => process.env.JWT_SECRET || 'st_alphonsa_parish_brisbane_secret_jwt_key_2026';
-
-export function authenticateJWT(req: Request, res: Response, next: NextFunction) {
+export async function authenticateJWT(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -32,28 +32,49 @@ export function authenticateJWT(req: Request, res: Response, next: NextFunction)
 
   const token = authHeader.split(' ')[1];
 
+  let decoded: AuthenticatedUser;
   try {
-    const decoded = jwt.verify(token, getJwtSecret()) as AuthenticatedUser;
-    req.user = decoded;
+    decoded = jwt.verify(token, getJwtSecret()) as AuthenticatedUser;
+  } catch {
+    return res.status(401).json({ error: 'Invalid or expired authentication token.' });
+  }
+
+  try {
+    const dbUser = await prisma.parishUser.findUnique({
+      where: { id: decoded.userId },
+      select: { isActive: true, role: true, parishId: true },
+    });
+
+    if (!dbUser || !dbUser.isActive) {
+      return res.status(401).json({ error: 'User account is inactive or no longer exists.' });
+    }
+
+    const effectiveUser: AuthenticatedUser = {
+      ...decoded,
+      role: dbUser.role,
+      parishId: dbUser.parishId,
+    };
+    req.user = effectiveUser;
 
     // Resolve Active Parish Context:
     // 1. If Global Roles (SUPER_ADMIN, DIOCESAN_ADMIN, DIOCESAN_USER): Can switch active parish via 'x-parish-id' header or defaults to user's assigned parish (or 1)
     // 2. If Parish Staff: Strictly locked to their assigned parishId
     const isGlobalRole =
-      decoded.role === UserRole.SUPER_ADMIN ||
-      decoded.role === UserRole.DIOCESAN_ADMIN ||
-      decoded.role === UserRole.DIOCESAN_USER;
+      effectiveUser.role === UserRole.SUPER_ADMIN ||
+      effectiveUser.role === UserRole.DIOCESAN_ADMIN ||
+      effectiveUser.role === UserRole.DIOCESAN_USER;
 
     if (isGlobalRole) {
       const headerParish = req.headers['x-parish-id'];
-      req.activeParishId = headerParish ? parseInt(headerParish as string, 10) : (decoded.parishId || 1);
+      req.activeParishId = headerParish ? parseInt(headerParish as string, 10) : (effectiveUser.parishId || 1);
     } else {
-      req.activeParishId = decoded.parishId || 1;
+      req.activeParishId = effectiveUser.parishId || 1;
     }
 
     next();
   } catch (err) {
-    return res.status(403).json({ error: 'Invalid or expired authentication token.' });
+    console.error('Auth user lookup error:', err);
+    return res.status(500).json({ error: 'Failed to verify user session.' });
   }
 }
 

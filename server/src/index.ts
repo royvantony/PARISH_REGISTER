@@ -11,6 +11,9 @@ import { featuresRouter, ensureDefaultFeatures } from './routes/features.js';
 import { settingsRouter } from './routes/settings.js';
 import { activityRouter } from './routes/activity.js';
 import { prisma } from './lib/prisma.js';
+import { assertProductionSecretsConfigured } from './lib/crypto.js';
+
+assertProductionSecretsConfigured();
 
 // St. Alphonsa Syro-Malabar Parish Register Server
 const app = express();

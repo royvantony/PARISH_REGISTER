@@ -8,25 +8,23 @@ async function main() {
 
   // 0. Seed Governing Diocese (1-Row Master Table)
   try {
-    const existingDiocese: any[] = await prisma.$queryRawUnsafe(`SELECT * FROM "Diocese" LIMIT 1;`);
-    if (existingDiocese.length === 0) {
-      await prisma.$queryRawUnsafe(`
-        INSERT INTO "Diocese" ("dioceseName", rite, "bishopName", "chanceryAddress", city, state, "postalCode", "contactPhone", "contactEmail", website, "logoUrl", "updatedAt")
-        VALUES (
-          'Diocese of St. Thomas the Apostle, Melbourne',
-          'Syro-Malabar',
-          'Bishop John Panamthottathil',
-          '62 Moore Rd, Mill Park VIC 3082, Australia',
-          'Melbourne',
-          'VIC',
-          '3082',
-          '+61 3 9404 1533',
-          'chancery@syromalabar.org.au',
-          'https://syromalabar.org.au',
-          '/branding/logo.png',
-          CURRENT_TIMESTAMP
-        );
-      `);
+    const existingDiocese = await prisma.diocese.findFirst();
+    if (!existingDiocese) {
+      await prisma.diocese.create({
+        data: {
+          dioceseName: 'Diocese of St. Thomas the Apostle, Melbourne',
+          rite: 'Syro-Malabar',
+          bishopName: 'Bishop John Panamthottathil',
+          chanceryAddress: '62 Moore Rd, Mill Park VIC 3082, Australia',
+          city: 'Melbourne',
+          state: 'VIC',
+          postalCode: '3082',
+          contactPhone: '+61 3 9404 1533',
+          contactEmail: 'chancery@syromalabar.org.au',
+          website: 'https://syromalabar.org.au',
+          logoUrl: '/branding/logo.png',
+        },
+      });
       console.log('✅ Governing Diocese seeded: Diocese of St. Thomas the Apostle, Melbourne');
     }
   } catch (err) {
@@ -135,16 +133,14 @@ async function main() {
   }
   console.log(`✅ Seeded ${dioceses.length} Indian dioceses for ${parish.parishName}.`);
 
-  // 3. Seed Default Admin Users
-  const defaultPassword = await bcrypt.hash('parishAdmin2026!', 10);
-  const devPassword = await bcrypt.hash('DevSuperAdmin2026!', 10);
+  // 3. Seed Developer (Platform Super Admin) User Only
+  const devPassword = await bcrypt.hash(process.env.DEV_SEED_PASSWORD || 'DevSuperAdmin2026!', 10);
 
-  // Diocesan Super Admin (Developer)
   await prisma.parishUser.upsert({
     where: { email: 'royvantony@gmail.com' },
     update: {
       fullName: 'Super Admin',
-      role: UserRole.DIOCESAN_ADMIN,
+      role: UserRole.SUPER_ADMIN,
       parishId: null,
       isActive: true,
     },
@@ -159,58 +155,7 @@ async function main() {
     },
   });
 
-  // Parish Priest
-  await prisma.parishUser.upsert({
-    where: { email: 'priest@stalphonsabrisbane.org.au' },
-    update: {
-      role: UserRole.PARISH_PRIEST,
-    },
-    create: {
-      fullName: 'Fr. Parish Priest',
-      email: 'priest@stalphonsabrisbane.org.au',
-      passwordHash: defaultPassword,
-      role: UserRole.PARISH_PRIEST,
-      parishId: parish.id,
-      isActive: true,
-      mustChangePassword: false,
-    },
-  });
-
-  // Parish Admin (Trustee)
-  await prisma.parishUser.upsert({
-    where: { email: 'trustee@parish.org' },
-    update: {
-      role: UserRole.PARISH_ADMIN,
-    },
-    create: {
-      fullName: 'Mr. Trustee',
-      email: 'trustee@parish.org',
-      passwordHash: defaultPassword,
-      role: UserRole.PARISH_ADMIN,
-      parishId: parish.id,
-      isActive: true,
-      mustChangePassword: false,
-    },
-  });
-
-  // Parish User (Secretary)
-  await prisma.parishUser.upsert({
-    where: { email: 'secretary@stalphonsabrisbane.org.au' },
-    update: {
-      role: UserRole.PARISH_USER,
-    },
-    create: {
-      fullName: 'Parish Secretary',
-      email: 'secretary@stalphonsabrisbane.org.au',
-      passwordHash: defaultPassword,
-      role: UserRole.PARISH_USER,
-      parishId: parish.id,
-      isActive: true,
-      mustChangePassword: false,
-    },
-  });
-
-  console.log('✅ Seeded default Super Admin, Parish Super Admin, Parish Admin (Trustee), and Parish User.');
+  console.log('✅ Seeded Developer (SUPER_ADMIN) user.');
   console.log('🎉 Seeding completed successfully!');
 }
 

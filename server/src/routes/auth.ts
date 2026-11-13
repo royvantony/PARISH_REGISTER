@@ -6,10 +6,9 @@ import { authenticateJWT, optionalAuth, AuthenticatedUser } from '../middleware/
 import { UserRole } from '@prisma/client';
 import { sendParishEmail } from '../lib/email.js';
 import { logSystemActivity } from '../lib/activityLogger.js';
+import { getJwtSecret, JWT_EXPIRES_IN } from '../lib/crypto.js';
 
 export const authRouter = Router();
-
-const getJwtSecret = () => process.env.JWT_SECRET || 'st_alphonsa_parish_brisbane_secret_jwt_key_2026';
 
 // POST /api/auth/login
 authRouter.post('/login', async (req: Request, res: Response) => {
@@ -68,7 +67,7 @@ authRouter.post('/login', async (req: Request, res: Response) => {
       parishId: user.parishId,
     };
 
-    const token = jwt.sign(payload, getJwtSecret(), { expiresIn: '7d' });
+    const token = jwt.sign(payload, getJwtSecret(), { expiresIn: JWT_EXPIRES_IN });
 
     // Record successful login in system activity log
     await logSystemActivity({
@@ -154,11 +153,51 @@ authRouter.post('/login', async (req: Request, res: Response) => {
   }
 });
 
+const isDevLoginAllowed = () =>
+  process.env.NODE_ENV !== 'production' || process.env.ALLOW_DEV_LOGIN === 'true';
+
+// POST /api/auth/dev-available - Check which configured dev shortcut emails exist and are active
+authRouter.post('/dev-available', async (req: Request, res: Response) => {
+  try {
+    if (!isDevLoginAllowed()) {
+      return res.status(403).json({ availableEmails: [] });
+    }
+
+    const rawEmails: unknown[] = Array.isArray(req.body?.emails) ? req.body.emails : [];
+    const normalizedEmails = Array.from(
+      new Set<string>(
+        rawEmails
+          .filter((e): e is string => typeof e === 'string')
+          .map((e: string) => e.trim().toLowerCase())
+          .filter(Boolean)
+      )
+    ).slice(0, 20);
+
+    if (normalizedEmails.length === 0) {
+      return res.json({ availableEmails: [] });
+    }
+
+    const matchingUsers = await prisma.parishUser.findMany({
+      where: {
+        email: { in: normalizedEmails },
+        isActive: true,
+      },
+      select: { email: true },
+    });
+
+    return res.json({
+      availableEmails: matchingUsers.map((u) => u.email.toLowerCase()),
+    });
+  } catch (err: any) {
+    console.error('Dev available accounts error:', err);
+    return res.status(500).json({ availableEmails: [] });
+  }
+});
+
 // POST /api/auth/dev-login - Developer / Demo Passwordless Fast Access
 authRouter.post('/dev-login', async (req: Request, res: Response) => {
   try {
-    const isDevAllowed = process.env.NODE_ENV !== 'production' || process.env.ALLOW_DEV_LOGIN === 'true';
-    if (!isDevAllowed) {
+    if (!isDevLoginAllowed()) {
       return res.status(403).json({ error: 'Developer login bypass is disabled on this server.' });
     }
 
@@ -194,7 +233,7 @@ authRouter.post('/dev-login', async (req: Request, res: Response) => {
       parishId: user.parishId,
     };
 
-    const token = jwt.sign(payload, getJwtSecret(), { expiresIn: '7d' });
+    const token = jwt.sign(payload, getJwtSecret(), { expiresIn: JWT_EXPIRES_IN });
 
     // Record developer fast-login in activity log
     await logSystemActivity({
