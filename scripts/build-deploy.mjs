@@ -131,6 +131,15 @@ ALLOWED_ORIGINS="https://register.yourdomain.org"
   console.log(`   ℹ️  Existing .env preserved at ${envPath}`);
 }
 
+// 6. Ensure Standalone Production Dependencies & Prisma Client
+console.log(`\n📦 [6/6] Ensuring standalone runtime dependencies...`);
+const targetNodeModules = path.join(targetDir, 'node_modules');
+if (!fs.existsSync(targetNodeModules)) {
+  console.log(`   Installing production packages in ${targetDir}...`);
+  execSync('npm install --omit=dev', { cwd: targetDir, stdio: 'inherit' });
+}
+execSync('npx prisma generate', { cwd: targetDir, stdio: 'inherit' });
+
 console.log(`\n======================================================`);
 console.log(`✅ [${targetName}] Build successfully generated at:`);
 console.log(`   ${targetDir}`);
