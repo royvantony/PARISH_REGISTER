@@ -4,16 +4,17 @@ const LEGACY_DEV_SECRET = 'st_alphonsa_parish_brisbane_secret_jwt_key_2026';
 
 export const JWT_EXPIRES_IN = '1d';
 
-function isProductionEnv(): boolean {
-  return process.env.NODE_ENV === 'production';
+function isStrictProduction(): boolean {
+  const mode = (process.env.APP_ENV || process.env.NODE_ENV || 'development').trim().toLowerCase();
+  return mode === 'production';
 }
 
 export function getJwtSecret(): string {
   const configured = process.env.JWT_SECRET?.trim();
-  if (isProductionEnv()) {
+  if (isStrictProduction()) {
     if (!configured || configured === LEGACY_DEV_SECRET) {
       throw new Error(
-        'Security configuration error: JWT_SECRET must be set to a unique random secret when NODE_ENV=production.'
+        'Security configuration error: JWT_SECRET must be set to a unique random secret when APP_ENV=Production.'
       );
     }
     return configured;
@@ -23,10 +24,10 @@ export function getJwtSecret(): string {
 
 function getVaultSecret(): string {
   const vaultKey = process.env.FEATURE_VAULT_KEY?.trim();
-  if (isProductionEnv()) {
+  if (isStrictProduction()) {
     if (!vaultKey || vaultKey === LEGACY_DEV_SECRET) {
       throw new Error(
-        'Security configuration error: FEATURE_VAULT_KEY must be set to a unique random secret when NODE_ENV=production.'
+        'Security configuration error: FEATURE_VAULT_KEY must be set to a unique random secret when APP_ENV=Production.'
       );
     }
     return vaultKey;
@@ -38,7 +39,7 @@ function getVaultSecret(): string {
  * Validates required production secrets on server startup so misconfigured deployments fail fast.
  */
 export function assertProductionSecretsConfigured(): void {
-  if (!isProductionEnv()) return;
+  if (!isStrictProduction()) return;
   getJwtSecret();
   getVaultSecret();
 }

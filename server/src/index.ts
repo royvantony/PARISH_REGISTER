@@ -1,3 +1,4 @@
+import path from 'path';
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
@@ -10,39 +11,64 @@ import { importRouter } from './routes/import.js';
 import { featuresRouter, ensureDefaultFeatures } from './routes/features.js';
 import { settingsRouter } from './routes/settings.js';
 import { activityRouter } from './routes/activity.js';
-import { prisma } from './lib/prisma.js';
+import { backupRouter } from './routes/backup.js';
+import { prisma, getActiveDatabaseUrl } from './lib/prisma.js';
 import { assertProductionSecretsConfigured } from './lib/crypto.js';
+
+// ---------------------------------------------------------------------------
+// Environment Profile Resolution: 'Dev' | 'Demo' | 'Production'
+// ---------------------------------------------------------------------------
+const rawEnv = (process.env.APP_ENV || process.env.NODE_ENV || 'Dev').trim();
+const normalizedEnv = rawEnv.toLowerCase();
+
+export const APP_ENV =
+  normalizedEnv === 'production'
+    ? 'Production'
+    : normalizedEnv === 'demo'
+    ? 'Demo'
+    : 'Dev';
+
+const isProduction = APP_ENV === 'Production';
+const isDev = APP_ENV === 'Dev';
+const isDemo = APP_ENV === 'Demo';
 
 assertProductionSecretsConfigured();
 
 // St. Alphonsa Syro-Malabar Parish Register Server
 const app = express();
 const PORT = process.env.PORT || 5000;
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim().toLowerCase())
+  : [];
 
 // Middleware
 app.use(
   cors({
     origin: (origin, callback) => {
-      // In dev or local network: allow localhost, 127.0.0.1, and local private LAN IP addresses
-      if (
-        !origin ||
-        process.env.NODE_ENV !== 'production' ||
-        /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/.test(origin)
-      ) {
-        callback(null, true);
-      } else {
-        callback(null, true);
+      // In Dev or Demo (or local LAN access): allow all origins & LAN IP addresses
+      if (!isProduction) {
+        return callback(null, true);
       }
+
+      // In Production: allow requests with no origin (mobile app / curl) and same-origin
+      if (!origin) return callback(null, true);
+
+      // In Production: allow configured domain(s) (e.g. Cloudflare tunnel domain)
+      if (allowedOrigins.length > 0 && allowedOrigins.includes(origin.toLowerCase())) {
+        return callback(null, true);
+      }
+
+      callback(new Error('Cross-Origin Request Blocked by CORS policy in Production.'));
     },
     credentials: true,
   })
 );
 app.use(express.json());
 
-// Request logging in dev
-if (process.env.NODE_ENV !== 'production') {
+// Request logging in Dev / Demo
+if (!isProduction) {
   app.use((req, _res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    console.log(`[${new Date().toISOString()}] [${APP_ENV}] ${req.method} ${req.url}`);
     next();
   });
 }
@@ -57,6 +83,33 @@ app.use('/api/import', importRouter);
 app.use('/api/features', featuresRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/activity', activityRouter);
+app.use('/api/backup', backupRouter);
+
+// ---------------------------------------------------------------------------
+// Single-Server Frontend Delivery:
+// - Always active in Production & Demo (serves compiled client/dist)
+// - Also active in Dev as fallback if client/dist exists
+// ---------------------------------------------------------------------------
+const clientDistPath = path.resolve(process.cwd(), '../client/dist');
+app.use(express.static(clientDistPath));
+
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    return next();
+  }
+  res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
+    if (err) {
+      if (isDev) {
+        return res.status(200).send(
+          '<h3>Parish Register API Server (Dev Mode)</h3><p>API is active on port ' +
+            PORT +
+            '. In Dev mode, run <code>npm --prefix client run dev</code> to preview the frontend with hot-reload.</p>'
+        );
+      }
+      next(err);
+    }
+  });
+});
 
 
 // Health check endpoint with database ping
@@ -98,8 +151,16 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 });
 
 app.listen(Number(PORT), '0.0.0.0', () => {
-  console.log(`\n🚀 Parish Register API running on http://0.0.0.0:${PORT}`);
-  console.log(`📡 Health Check: http://localhost:${PORT}/api/health\n`);
+  const dbUrl = getActiveDatabaseUrl();
+  const dbHostPort = dbUrl.replace(/.*@([^/]+)\/([^?]+).*/, '$1/$2');
+
+  console.log(`\n======================================================`);
+  console.log(`⛪ Parish Register Server running in [${APP_ENV}] mode`);
+  console.log(`📡 URL: http://0.0.0.0:${PORT}`);
+  console.log(`🗄️  Active Database: ${dbHostPort}`);
+  console.log(`📡 Health Check: http://localhost:${PORT}/api/health`);
+  console.log(`======================================================\n`);
+
   // Warm up encrypted feature vault cache on startup for fast, instant lookups
   ensureDefaultFeatures().catch((err) => {
     console.warn('Feature cache warmup warning:', err);

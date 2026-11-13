@@ -43,7 +43,8 @@ import { useFeatures } from '../context/FeatureContext';
 import { DeveloperControlsTab } from '../components/settings/DeveloperControlsTab';
 import { EmailSmtpTab } from '../components/settings/EmailSmtpTab';
 import { ActivityLogsTab } from '../components/settings/ActivityLogsTab';
-import { ShieldAlert, Shield } from 'lucide-react';
+import { BackupRestoreTab } from '../components/settings/BackupRestoreTab';
+import { ShieldAlert, Shield, Archive } from 'lucide-react';
 
 interface SystemHealthResponse {
 
@@ -137,7 +138,7 @@ export const SettingsPage: React.FC = () => {
   } = useAuth();
   const { isFeatureEnabled, isDeveloper, getStoredFlag, isSimulatingClient } = useFeatures();
   const isDev = (isDeveloper || user?.role === 'SUPER_ADMIN') && !isSimulatingClient;
-  const [activeSubTab, setActiveSubTab] = useState<'governing' | 'dioceses' | 'email' | 'general' | 'logs' | 'developer'>('governing');
+  const [activeSubTab, setActiveSubTab] = useState<'governing' | 'dioceses' | 'email' | 'general' | 'logs' | 'backup' | 'developer'>('governing');
 
   // Sync tab from URL query params (e.g. /settings?tab=developer)
   useEffect(() => {
@@ -145,6 +146,8 @@ export const SettingsPage: React.FC = () => {
     const tabParam = params.get('tab');
     if (tabParam === 'developer' && (isDeveloper || user?.role === 'SUPER_ADMIN')) {
       setActiveSubTab('developer');
+    } else if (tabParam === 'backup') {
+      setActiveSubTab('backup');
     } else if (tabParam === 'email') {
       setActiveSubTab('email');
     } else if (tabParam === 'logs') {
@@ -652,16 +655,21 @@ export const SettingsPage: React.FC = () => {
           </button>
         )}
 
-        <button
-          onClick={() => setActiveSubTab('email')}
-          className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'email'
-            ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
-            : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
-            }`}
-        >
-          <Mail className="w-3.5 h-3.5" />
-          <span>Email & SMTP</span>
-        </button>
+        {(isDev || isFeatureEnabled('SETTING_SMTP')) && (
+          <button
+            onClick={() => setActiveSubTab('email')}
+            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'email'
+              ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
+              : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
+              }`}
+          >
+            <Mail className="w-3.5 h-3.5" />
+            <span>Email & SMTP</span>
+            {isDev && !getStoredFlag('SETTING_SMTP') && (
+              <span className="text-[9px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1 py-0.2 rounded font-mono">Hidden</span>
+            )}
+          </button>
+        )}
 
         {(isDev || isFeatureEnabled('SETTING_SYSTEM_HEALTH')) && (
           <button
@@ -690,6 +698,22 @@ export const SettingsPage: React.FC = () => {
             <Shield className="w-3.5 h-3.5" />
             <span>Activity Logs</span>
             {isDev && !getStoredFlag('SETTING_ACTIVITY_LOGS') && (
+              <span className="text-[9px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1 py-0.2 rounded font-mono">Hidden</span>
+            )}
+          </button>
+        )}
+
+        {(isDev || isFeatureEnabled('SETTING_BACKUP_EXPORT') || isFeatureEnabled('SETTING_BACKUP_IMPORT')) && (
+          <button
+            onClick={() => setActiveSubTab('backup')}
+            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'backup'
+              ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
+              : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
+              }`}
+          >
+            <Archive className="w-3.5 h-3.5" />
+            <span>Backup & Migration</span>
+            {isDev && !getStoredFlag('SETTING_BACKUP_EXPORT') && !getStoredFlag('SETTING_BACKUP_IMPORT') && (
               <span className="text-[9px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1 py-0.2 rounded font-mono">Hidden</span>
             )}
           </button>
@@ -800,7 +824,7 @@ export const SettingsPage: React.FC = () => {
 
                 <div className="pt-3 border-t border-parish-border/60 flex items-center justify-between">
                   <span className="text-xs text-parish-text-muted">
-                    {canEditDiocese ? 'Click to configure chancery details' : 'Click to view chancery details'}
+                    {canEditDiocese ? 'Click to configure diocese details' : 'Click to view diocese details'}
                   </span>
                   <span className="inline-flex items-center gap-1.5 text-xs font-bold text-parish-primary group-hover:translate-x-1 transition-transform">
                     {canEditDiocese ? (
@@ -944,17 +968,16 @@ export const SettingsPage: React.FC = () => {
         {!isDev && !isFeatureEnabled('SETTING_DIOCESE_BOX') && !isFeatureEnabled('SETTING_PARISH_BOX') && (
           <div className="p-8 rounded-2xl bg-parish-surface border border-parish-border text-center text-parish-text-muted text-xs space-y-1">
             <p className="font-semibold text-parish-text">No active configuration panels</p>
-            <p>Diocese and Parish profile settings are currently managed centrally by the chancery administration.</p>
+            <p>Profile settings are currently disabled by the administrator.</p>
           </div>
         )}
-
 
           {/* Modal 1: Diocesan Settings Modal */}
           <Modal
             isOpen={isDioceseModalOpen}
             onClose={() => setIsDioceseModalOpen(false)}
-            title="Governing Diocese / Eparchy Settings"
-            description="Official chancery headquarters and episcopal governance for Australia"
+            title="Governing Diocese Settings"
+            description="Official diocese contact and office details"
             maxWidth="3xl"
           >
             <div className="space-y-5 py-2">
@@ -1486,7 +1509,7 @@ export const SettingsPage: React.FC = () => {
                           className="text-xs"
                         />
                         <p className="text-[11px] text-parish-text-muted leading-relaxed">
-                          Leave blank to use the standard convention <code className="font-mono text-parish-primary bg-parish-surface px-1 py-0.5 rounded border border-parish-border">/branding/parishes/{parishFormData.parishCode?.toUpperCase() || 'CODE'}.png</code>. If no parish logo file is uploaded, the system automatically falls back to the Diocesan chancery seal.
+                          Leave blank to use the standard convention <code className="font-mono text-parish-primary bg-parish-surface px-1 py-0.5 rounded border border-parish-border">/branding/parishes/{parishFormData.parishCode?.toUpperCase() || 'CODE'}.png</code>. If no parish logo file is uploaded, the system automatically falls back to the diocese logo.
                         </p>
                       </div>
                     </div>
@@ -2154,6 +2177,10 @@ export const SettingsPage: React.FC = () => {
 
           {activeSubTab === 'logs' && (
             <ActivityLogsTab />
+          )}
+
+          {activeSubTab === 'backup' && (
+            <BackupRestoreTab />
           )}
 
           {activeSubTab === 'developer' && (isDeveloper || user?.role === 'SUPER_ADMIN') && (
