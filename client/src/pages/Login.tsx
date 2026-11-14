@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
@@ -77,18 +77,34 @@ export const LoginPage: React.FC = () => {
     }
   }, []);
 
-  // Stealth Shortcut Listener (Dev only): Ctrl + Shift + D (or Cmd + Shift + D) toggles Developer Fast Access
+  // Stealth Shortcut Listener: Ctrl+Shift+D, Ctrl+Alt+D, or Alt+Shift+D toggles Developer Fast Access
   useEffect(() => {
-    if (!import.meta.env.DEV) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'd' || e.key === 'D')) {
+      const isD = e.key === 'd' || e.key === 'D';
+      const isModifierCombo =
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && isD) ||
+        ((e.ctrlKey || e.metaKey) && e.altKey && isD) ||
+        (e.altKey && e.shiftKey && isD);
+
+      if (isModifierCombo) {
         e.preventDefault();
+        e.stopPropagation();
         setIsDevRevealed((prev) => !prev);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  // Triple-click logo trigger for fast access without keyboard shortcut collisions
+  const logoClicksRef = useRef(0);
+  const handleLogoClick = () => {
+    logoClicksRef.current += 1;
+    if (logoClicksRef.current >= 3) {
+      setIsDevRevealed((prev) => !prev);
+      logoClicksRef.current = 0;
+    }
+  };
 
   // Check which dev shortcut emails actually exist (and are active) when shortcut is triggered
   useEffect(() => {
@@ -174,9 +190,13 @@ export const LoginPage: React.FC = () => {
       </div>
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10 space-y-3 text-center">
-        {/* Neutral Diocesan Brand Icon & Heading */}
-        <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-white border border-parish-border shadow-soft mx-auto text-parish-primary">
-          <Church className="w-8 h-8 text-parish-primary" />
+        {/* Neutral Diocesan Brand Icon & Heading (Triple-click toggles Fast Access) */}
+        <div
+          onClick={handleLogoClick}
+          className="inline-flex items-center justify-center p-3 rounded-2xl bg-white border border-parish-border shadow-soft mx-auto text-parish-primary cursor-pointer select-none active:scale-95 transition-transform"
+          title="Parish Register"
+        >
+          <Church className="w-8 h-8 text-parish-primary pointer-events-none" />
         </div>
 
         <div>
