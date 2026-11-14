@@ -101,7 +101,7 @@ JWT_SECRET="parish-demo-jwt-secret-key-2026-secure-token-auth"
 JWT_EXPIRES_IN="24h"
 
 # Encrypted Master Backup/Export Key (AES-256-GCM)
-BACKUP_ENCRYPTION_KEY="parish-register-demo-archive-encryption-key-001"
+BACKUP_ENCRYPTION_KEY="parish_register_backup_secret_key_2026"
 
 # Allowed Origins (leave empty for open demo or list Cloudflare URL)
 ALLOWED_ORIGINS=""
