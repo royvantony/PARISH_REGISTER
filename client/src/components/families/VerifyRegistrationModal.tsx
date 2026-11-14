@@ -356,7 +356,7 @@ export const VerifyRegistrationModal: React.FC<VerifyRegistrationModalProps> = (
               <Input
                 value={headName}
                 onChange={(e) => setHeadName(e.target.value)}
-                placeholder="e.g. Thomas Joseph"
+                placeholder="e.g. Joseph Mathew"
                 required
               />
             </div>
@@ -492,7 +492,7 @@ export const VerifyRegistrationModal: React.FC<VerifyRegistrationModalProps> = (
                   <Input
                     value={spouseName}
                     onChange={(e) => setSpouseName(e.target.value)}
-                    placeholder="e.g. Mary Thomas"
+                    placeholder="e.g. Mary Antony"
                   />
                 </div>
 
@@ -622,7 +622,7 @@ export const VerifyRegistrationModal: React.FC<VerifyRegistrationModalProps> = (
               <Input
                 value={streetAddress}
                 onChange={(e) => setStreetAddress(e.target.value)}
-                placeholder="e.g. 12 Sunshine Parade"
+                placeholder="e.g. 49 Weston Street"
               />
             </div>
 

@@ -661,119 +661,119 @@ export const SettingsPage: React.FC = () => {
 
       {/* Settings Sub-Navigation Tabs - Responsive Wrapping without Scrollbar */}
       <div className="flex flex-wrap items-center gap-1.5 p-1.5 bg-parish-surface border border-parish-border rounded-2xl shadow-2xs">
-            {showGoverning && (
-              <button
-                onClick={() => setActiveSubTab('governing')}
-                className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'governing'
-                  ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
-                  : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
-                  }`}
-              >
-                <Church className="w-3.5 h-3.5" />
-                <span>Diocese & Parish</span>
-                {isDev && !getStoredFlag('SETTING_DIOCESE_BOX') && !getStoredFlag('SETTING_PARISH_BOX') && (
-                  <span className="text-[9px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1 py-0.2 rounded font-mono">Hidden</span>
-                )}
-              </button>
+        {showGoverning && (
+          <button
+            onClick={() => setActiveSubTab('governing')}
+            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'governing'
+              ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
+              : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
+              }`}
+          >
+            <Church className="w-3.5 h-3.5" />
+            <span>Diocese & Parish</span>
+            {isDev && !getStoredFlag('SETTING_DIOCESE_BOX') && !getStoredFlag('SETTING_PARISH_BOX') && (
+              <span className="text-[9px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1 py-0.2 rounded font-mono">Hidden</span>
             )}
+          </button>
+        )}
 
-            {showDioceses && (
-              <button
-                onClick={() => setActiveSubTab('dioceses')}
-                className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'dioceses'
-                  ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
-                  : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
-                  }`}
-              >
-                <MapPin className="w-3.5 h-3.5" />
-                <span>Origin Dioceses</span>
-                <span className="text-[10px] bg-parish-primary/10 text-parish-primary px-1.5 py-0.5 rounded-full font-mono font-semibold">
-                  {dioceses.length}
-                </span>
-                {isDev && !getStoredFlag('SETTING_NATIVE_DIOCESES') && (
-                  <span className="text-[9px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1 py-0.2 rounded font-mono">Hidden</span>
-                )}
-              </button>
+        {showDioceses && (
+          <button
+            onClick={() => setActiveSubTab('dioceses')}
+            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'dioceses'
+              ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
+              : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
+              }`}
+          >
+            <MapPin className="w-3.5 h-3.5" />
+            <span>Origin Dioceses</span>
+            <span className="text-[10px] bg-parish-primary/10 text-parish-primary px-1.5 py-0.5 rounded-full font-mono font-semibold">
+              {dioceses.length}
+            </span>
+            {isDev && !getStoredFlag('SETTING_NATIVE_DIOCESES') && (
+              <span className="text-[9px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1 py-0.2 rounded font-mono">Hidden</span>
             )}
+          </button>
+        )}
 
-            {showEmail && (
-              <button
-                onClick={() => setActiveSubTab('email')}
-                className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'email'
-                  ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
-                  : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
-                  }`}
-              >
-                <Mail className="w-3.5 h-3.5" />
-                <span>Email & SMTP</span>
-                {isDev && !getStoredFlag('SETTING_SMTP') && (
-                  <span className="text-[9px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1 py-0.2 rounded font-mono">Hidden</span>
-                )}
-              </button>
+        {showEmail && (
+          <button
+            onClick={() => setActiveSubTab('email')}
+            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'email'
+              ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
+              : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
+              }`}
+          >
+            <Mail className="w-3.5 h-3.5" />
+            <span>Email & SMTP</span>
+            {isDev && !getStoredFlag('SETTING_SMTP') && (
+              <span className="text-[9px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1 py-0.2 rounded font-mono">Hidden</span>
             )}
+          </button>
+        )}
 
-            {showGeneral && (
-              <button
-                onClick={() => setActiveSubTab('general')}
-                className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'general'
-                  ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
-                  : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
-                  }`}
-              >
-                <Sliders className="w-3.5 h-3.5" />
-                <span>System Health</span>
-                {isDev && !getStoredFlag('SETTING_SYSTEM_HEALTH') && (
-                  <span className="text-[9px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1 py-0.2 rounded font-mono">Hidden</span>
-                )}
-              </button>
+        {showGeneral && (
+          <button
+            onClick={() => setActiveSubTab('general')}
+            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'general'
+              ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
+              : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
+              }`}
+          >
+            <Sliders className="w-3.5 h-3.5" />
+            <span>System Health</span>
+            {isDev && !getStoredFlag('SETTING_SYSTEM_HEALTH') && (
+              <span className="text-[9px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1 py-0.2 rounded font-mono">Hidden</span>
             )}
+          </button>
+        )}
 
-            {showLogs && (
-              <button
-                onClick={() => setActiveSubTab('logs')}
-                className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'logs'
-                  ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
-                  : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
-                  }`}
-              >
-                <Shield className="w-3.5 h-3.5" />
-                <span>Activity Logs</span>
-                {isDev && !getStoredFlag('SETTING_ACTIVITY_LOGS') && (
-                  <span className="text-[9px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1 py-0.2 rounded font-mono">Hidden</span>
-                )}
-              </button>
+        {showLogs && (
+          <button
+            onClick={() => setActiveSubTab('logs')}
+            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'logs'
+              ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
+              : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
+              }`}
+          >
+            <Shield className="w-3.5 h-3.5" />
+            <span>Activity Logs</span>
+            {isDev && !getStoredFlag('SETTING_ACTIVITY_LOGS') && (
+              <span className="text-[9px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1 py-0.2 rounded font-mono">Hidden</span>
             )}
+          </button>
+        )}
 
-            {showBackup && (
-              <button
-                onClick={() => setActiveSubTab('backup')}
-                className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'backup'
-                  ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
-                  : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
-                  }`}
-              >
-                <Archive className="w-3.5 h-3.5" />
-                <span>Backup & Migration</span>
-                {isDev && !getStoredFlag('SETTING_BACKUP_EXPORT') && !getStoredFlag('SETTING_BACKUP_IMPORT') && (
-                  <span className="text-[9px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1 py-0.2 rounded font-mono">Hidden</span>
-                )}
-              </button>
+        {showBackup && (
+          <button
+            onClick={() => setActiveSubTab('backup')}
+            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'backup'
+              ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
+              : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
+              }`}
+          >
+            <Archive className="w-3.5 h-3.5" />
+            <span>Backup & Migration</span>
+            {isDev && !getStoredFlag('SETTING_BACKUP_EXPORT') && !getStoredFlag('SETTING_BACKUP_IMPORT') && (
+              <span className="text-[9px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1 py-0.2 rounded font-mono">Hidden</span>
             )}
+          </button>
+        )}
 
-            {showDeveloper && (
-              <button
-                onClick={() => setActiveSubTab('developer')}
-                className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'developer'
-                  ? 'bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-400 shadow-xs border border-amber-300/80 font-extrabold'
-                  : 'text-amber-700 dark:text-amber-400 hover:bg-amber-50/60'
-                  }`}
-              >
-                <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
-                <span>Developer</span>
-                <span className="text-[10px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded font-mono font-bold">DEV</span>
-              </button>
-            )}
-          </div>
+        {showDeveloper && (
+          <button
+            onClick={() => setActiveSubTab('developer')}
+            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'developer'
+              ? 'bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-400 shadow-xs border border-amber-300/80 font-extrabold'
+              : 'text-amber-700 dark:text-amber-400 hover:bg-amber-50/60'
+              }`}
+          >
+            <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
+            <span>Developer</span>
+            <span className="text-[10px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded font-mono font-bold">DEV</span>
+          </button>
+        )}
+      </div>
 
 
       {activeSubTab === 'governing' && (
@@ -799,11 +799,10 @@ export const SettingsPage: React.FC = () => {
             {(isDev || isFeatureEnabled('SETTING_DIOCESE_BOX')) && (
               <div
                 onClick={() => setIsDioceseModalOpen(true)}
-                className={`group relative bg-parish-surface border hover:border-parish-primary/50 rounded-2xl p-6 shadow-soft hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between ${
-                  isDev && !getStoredFlag('SETTING_DIOCESE_BOX')
-                    ? 'border-dashed border-amber-300 dark:border-amber-700/60'
-                    : 'border-parish-border'
-                }`}
+                className={`group relative bg-parish-surface border hover:border-parish-primary/50 rounded-2xl p-6 shadow-soft hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between ${isDev && !getStoredFlag('SETTING_DIOCESE_BOX')
+                  ? 'border-dashed border-amber-300 dark:border-amber-700/60'
+                  : 'border-parish-border'
+                  }`}
               >
                 <div>
                   <div className="flex items-start justify-between gap-3 mb-4">
@@ -889,122 +888,121 @@ export const SettingsPage: React.FC = () => {
             {(isDev || isFeatureEnabled('SETTING_PARISH_BOX')) && (
               <div
                 onClick={() => setIsParishModalOpen(true)}
-                className={`group relative bg-parish-surface border hover:border-parish-primary/50 rounded-2xl p-6 shadow-soft hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between ${
-                  isDev && !getStoredFlag('SETTING_PARISH_BOX')
-                    ? 'border-dashed border-amber-300 dark:border-amber-700/60'
-                    : 'border-parish-border'
-                }`}
+                className={`group relative bg-parish-surface border hover:border-parish-primary/50 rounded-2xl p-6 shadow-soft hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between ${isDev && !getStoredFlag('SETTING_PARISH_BOX')
+                  ? 'border-dashed border-amber-300 dark:border-amber-700/60'
+                  : 'border-parish-border'
+                  }`}
               >
 
-              <div>
-                <div className="flex items-start justify-between gap-3 mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-200/60 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800/60 shadow-xs group-hover:scale-105 transition-transform">
-                      <Building2 className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-base font-bold text-parish-text group-hover:text-parish-primary transition-colors">
-                          Parish Settings
-                        </h3>
-                        {isDev && !getStoredFlag('SETTING_PARISH_BOX') && (
-                          <Badge variant="warning" size="sm">Hidden from Users</Badge>
-                        )}
+                <div>
+                  <div className="flex items-start justify-between gap-3 mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-200/60 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800/60 shadow-xs group-hover:scale-105 transition-transform">
+                        <Building2 className="w-6 h-6" />
                       </div>
-                      <p className="text-xs text-parish-text-muted">
-                        Active Parish Profile &amp; Numbering Rules
-                      </p>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-bold text-parish-text group-hover:text-parish-primary transition-colors">
+                            Parish Settings
+                          </h3>
+                          {isDev && !getStoredFlag('SETTING_PARISH_BOX') && (
+                            <Badge variant="warning" size="sm">Hidden from Users</Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-parish-text-muted">
+                          Active Parish Profile &amp; Numbering Rules
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Badge variant="success" size="sm">{parishFormData.parishCode}</Badge>
+                      {canEditParish ? (
+                        <Badge variant="outline" size="sm">Admin</Badge>
+                      ) : (
+                        <Badge variant="subtle" size="sm">Read-only</Badge>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <Badge variant="success" size="sm">{parishFormData.parishCode}</Badge>
-                    {canEditParish ? (
-                      <Badge variant="outline" size="sm">Admin</Badge>
-                    ) : (
-                      <Badge variant="subtle" size="sm">Read-only</Badge>
-                    )}
+
+                  {/* Session Parish Indicator (No Switcher - Locked to Login Choice) */}
+                  <div className="mb-3 px-3 py-2 bg-parish-surface-subtle border border-parish-border rounded-xl text-xs flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-md border border-parish-border bg-white flex items-center justify-center p-0.5 shrink-0 overflow-hidden">
+                        <img
+                          src={parishFormData.logoUrl?.trim() || `/branding/parishes/${(parishFormData.parishCode || 'SABN').toUpperCase()}.png`}
+                          alt="Parish Seal"
+                          className="w-full h-full object-contain"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = '/branding/logo.png';
+                          }}
+                        />
+                      </div>
+                      <div className="flex items-center gap-1.5 text-parish-text-muted">
+                        <Lock className="w-3 h-3" />
+                        <span className="text-[11px] font-semibold uppercase tracking-wider">Active Parish:</span>
+                      </div>
+                    </div>
+                    <span className="font-bold text-parish-primary truncate max-w-[200px]" title={parishFormData.parishName}>
+                      {parishFormData.parishName} ({parishFormData.parishCode})
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 bg-parish-surface-subtle p-3.5 rounded-xl border border-parish-border text-xs mb-4">
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="text-parish-text-muted font-medium">Parish Priest:</span>
+                      <span className="font-semibold text-parish-text truncate max-w-[200px]">
+                        {parishFormData.priestName || 'Not assigned'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="text-parish-text-muted font-medium">Priest Contact:</span>
+                      <span className="font-medium text-parish-text truncate max-w-[200px]">
+                        {parishFormData.priestPhone || parishFormData.priestEmail || 'Not specified'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="text-parish-text-muted font-medium">Location:</span>
+                      <span className="font-medium text-parish-text">
+                        {parishFormData.city}, {parishFormData.state} {parishFormData.postalCode}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="text-parish-text-muted font-medium">ID Prefix &amp; Next #:</span>
+                      <span className="font-mono font-bold text-parish-primary">
+                        {parishFormData.idPrefix}-{parishFormData.nextFamilyNumber}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="text-parish-text-muted font-medium">Office Email:</span>
+                      <span className="font-medium text-parish-text truncate max-w-[200px]">
+                        {parishFormData.contactEmail || 'No office email set'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Session Parish Indicator (No Switcher - Locked to Login Choice) */}
-                <div className="mb-3 px-3 py-2 bg-parish-surface-subtle border border-parish-border rounded-xl text-xs flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-md border border-parish-border bg-white flex items-center justify-center p-0.5 shrink-0 overflow-hidden">
-                      <img
-                        src={parishFormData.logoUrl?.trim() || `/branding/parishes/${(parishFormData.parishCode || 'SABN').toUpperCase()}.png`}
-                        alt="Parish Seal"
-                        className="w-full h-full object-contain"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = '/branding/logo.png';
-                        }}
-                      />
-                    </div>
-                    <div className="flex items-center gap-1.5 text-parish-text-muted">
-                      <Lock className="w-3 h-3" />
-                      <span className="text-[11px] font-semibold uppercase tracking-wider">Active Parish:</span>
-                    </div>
-                  </div>
-                  <span className="font-bold text-parish-primary truncate max-w-[200px]" title={parishFormData.parishName}>
-                    {parishFormData.parishName} ({parishFormData.parishCode})
+                <div className="pt-3 border-t border-parish-border/60 flex items-center justify-between">
+                  <span className="text-xs text-parish-text-muted">
+                    {canEditParish ? 'Click to configure parish settings' : 'Click to view parish profile'}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-parish-primary group-hover:translate-x-1 transition-transform">
+                    {canEditParish ? (
+                      <>
+                        <Edit2 className="w-3.5 h-3.5" />
+                        <span>Edit Parish</span>
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>View Parish</span>
+                      </>
+                    )}
+                    <ArrowRight className="w-3.5 h-3.5" />
                   </span>
                 </div>
-
-                <div className="space-y-2 bg-parish-surface-subtle p-3.5 rounded-xl border border-parish-border text-xs mb-4">
-                  <div className="flex justify-between items-center gap-2">
-                    <span className="text-parish-text-muted font-medium">Parish Priest:</span>
-                    <span className="font-semibold text-parish-text truncate max-w-[200px]">
-                      {parishFormData.priestName || 'Not assigned'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center gap-2">
-                    <span className="text-parish-text-muted font-medium">Priest Contact:</span>
-                    <span className="font-medium text-parish-text truncate max-w-[200px]">
-                      {parishFormData.priestPhone || parishFormData.priestEmail || 'Not specified'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center gap-2">
-                    <span className="text-parish-text-muted font-medium">Location:</span>
-                    <span className="font-medium text-parish-text">
-                      {parishFormData.city}, {parishFormData.state} {parishFormData.postalCode}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center gap-2">
-                    <span className="text-parish-text-muted font-medium">ID Prefix &amp; Next #:</span>
-                    <span className="font-mono font-bold text-parish-primary">
-                      {parishFormData.idPrefix}-{parishFormData.nextFamilyNumber}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center gap-2">
-                    <span className="text-parish-text-muted font-medium">Office Email:</span>
-                    <span className="font-medium text-parish-text truncate max-w-[200px]">
-                      {parishFormData.contactEmail || 'No office email set'}
-                    </span>
-                  </div>
-                </div>
               </div>
-
-              <div className="pt-3 border-t border-parish-border/60 flex items-center justify-between">
-                <span className="text-xs text-parish-text-muted">
-                  {canEditParish ? 'Click to configure parish settings' : 'Click to view parish profile'}
-                </span>
-                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-parish-primary group-hover:translate-x-1 transition-transform">
-                  {canEditParish ? (
-                    <>
-                      <Edit2 className="w-3.5 h-3.5" />
-                      <span>Edit Parish</span>
-                    </>
-                  ) : (
-                    <>
-                      <Eye className="w-3.5 h-3.5" />
-                      <span>View Parish</span>
-                    </>
-                  )}
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
 
           {/* Modal 1: Diocesan Settings Modal */}
           <Modal
@@ -1383,7 +1381,7 @@ export const SettingsPage: React.FC = () => {
                           value={parishFormData.priestEmail}
                           onChange={(e) => setParishFormData({ ...parishFormData, priestEmail: e.target.value })}
                           disabled={!canEditParish || isParishSaving}
-                          placeholder="e.g. priest@stalphonsabrisbane.org.au"
+                          placeholder="e.g. priest@stalphonsa.org.au"
                           className="text-xs"
                         />
                       </div>
@@ -1505,7 +1503,7 @@ export const SettingsPage: React.FC = () => {
                         value={parishFormData.contactEmail}
                         onChange={(e) => setParishFormData({ ...parishFormData, contactEmail: e.target.value })}
                         disabled={!canEditParish || isParishSaving}
-                        placeholder="e.g. office@alphonsabrisbane.org.au"
+                        placeholder="e.g. office@alphonsa.org.au"
                         className="text-xs"
                       />
                     </div>
@@ -1606,621 +1604,621 @@ export const SettingsPage: React.FC = () => {
         </div>
       )}
 
-          {activeSubTab === 'dioceses' && (
-            <div className="bg-parish-surface border border-parish-border rounded-2xl p-6 shadow-soft space-y-5">
-              {/* Header Bar */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-parish-border">
-                <div>
-                  <div className="text-sm font-bold text-parish-text flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-parish-primary" />
-                    <span>Origin Dioceses in India</span>
-                  </div>
-                </div>
+      {activeSubTab === 'dioceses' && (
+        <div className="bg-parish-surface border border-parish-border rounded-2xl p-6 shadow-soft space-y-5">
+          {/* Header Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-parish-border">
+            <div>
+              <div className="text-sm font-bold text-parish-text flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-parish-primary" />
+                <span>Origin Dioceses in India</span>
+              </div>
+            </div>
 
-                <Button
-                  variant="primary"
-                  size="sm"
-                  icon={<Plus className="w-4 h-4" />}
-                  onClick={handleOpenAddModal}
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<Plus className="w-4 h-4" />}
+              onClick={handleOpenAddModal}
+            >
+              Add Diocese
+            </Button>
+          </div>
+
+          {/* Search & Filter Toolbar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+            {/* Search Input */}
+            <div className="relative flex-1 max-w-sm">
+              <Input
+                placeholder="Search diocese, state, or rite..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                icon={<Search className="w-4 h-4" />}
+                className="text-xs h-9"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-parish-text-muted hover:text-parish-text"
                 >
-                  Add Diocese
-                </Button>
-              </div>
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
 
-              {/* Search & Filter Toolbar */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-                {/* Search Input */}
-                <div className="relative flex-1 max-w-sm">
-                  <Input
-                    placeholder="Search diocese, state, or rite..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    icon={<Search className="w-4 h-4" />}
-                    className="text-xs h-9"
-                  />
-                  {searchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setSearchQuery('')}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-parish-text-muted hover:text-parish-text"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-
-                {/* Filter Dropdowns (Rite & State) */}
-                <div className="flex flex-wrap items-center gap-2">
-                  {/* Ecclesiastical Rite Dropdown Filter */}
-                  <div className="flex items-center gap-1.5">
-                    <select
-                      value={selectedRiteFilter}
-                      onChange={(e) => setSelectedRiteFilter(e.target.value)}
-                      className="h-9 px-3 py-1 text-xs font-semibold rounded-xl bg-parish-surface-subtle border border-parish-border text-parish-text focus:outline-none focus:ring-2 focus:ring-parish-primary transition-all cursor-pointer shadow-2xs hover:bg-[#eae3d5]"
-                      aria-label="Filter by Ecclesiastical Rite"
-                    >
-                      <option value="ALL">All Ecclesiastical Rites ({dioceses.length})</option>
-                      {availableRites.map((r) => (
-                        <option key={r.name} value={r.name}>
-                          {r.name} ({r.count})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* State in India Dropdown Filter */}
-                  <div className="flex items-center gap-1.5">
-                    <select
-                      value={selectedStateFilter}
-                      onChange={(e) => setSelectedStateFilter(e.target.value)}
-                      className="h-9 px-3 py-1 text-xs font-semibold rounded-xl bg-parish-surface-subtle border border-parish-border text-parish-text focus:outline-none focus:ring-2 focus:ring-parish-primary transition-all cursor-pointer shadow-2xs hover:bg-[#eae3d5]"
-                      aria-label="Filter by State in India"
-                    >
-                      <option value="ALL">All States ({dioceses.length})</option>
-                      {availableStates.map((s) => (
-                        <option key={s.name} value={s.name}>
-                          {s.name} ({s.count})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Reset button if any filter is active */}
-                  {(selectedRiteFilter !== 'ALL' || selectedStateFilter !== 'ALL' || searchQuery) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedRiteFilter('ALL');
-                        setSelectedStateFilter('ALL');
-                        setSearchQuery('');
-                      }}
-                      className="h-9 px-2 text-xs font-semibold text-parish-primary hover:text-parish-primary-hover hover:underline transition-colors cursor-pointer"
-                    >
-                      Reset
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Dioceses Grid Cards */}
-              {isLoading ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 pt-2">
-                  {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-                    <div key={i} className="h-16 rounded-xl bg-parish-surface-subtle animate-pulse border border-parish-border/60" />
+            {/* Filter Dropdowns (Rite & State) */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Ecclesiastical Rite Dropdown Filter */}
+              <div className="flex items-center gap-1.5">
+                <select
+                  value={selectedRiteFilter}
+                  onChange={(e) => setSelectedRiteFilter(e.target.value)}
+                  className="h-9 px-3 py-1 text-xs font-semibold rounded-xl bg-parish-surface-subtle border border-parish-border text-parish-text focus:outline-none focus:ring-2 focus:ring-parish-primary transition-all cursor-pointer shadow-2xs hover:bg-[#eae3d5]"
+                  aria-label="Filter by Ecclesiastical Rite"
+                >
+                  <option value="ALL">All Ecclesiastical Rites ({dioceses.length})</option>
+                  {availableRites.map((r) => (
+                    <option key={r.name} value={r.name}>
+                      {r.name} ({r.count})
+                    </option>
                   ))}
-                </div>
-              ) : filteredDioceses.length === 0 ? (
-                <div className="py-12 text-center space-y-2 border border-dashed border-parish-border rounded-xl">
-                  <MapPin className="w-8 h-8 text-parish-text-muted/40 mx-auto" />
-                  <div className="text-sm font-semibold text-parish-text">No dioceses match your criteria</div>
-                  <p className="text-xs text-parish-text-muted max-w-sm mx-auto">
-                    {searchQuery
-                      ? `No results found for "${searchQuery}". Try a different search term or clear the filter.`
-                      : 'No dioceses currently registered for this selection.'}
-                  </p>
-                  {searchQuery && (
-                    <Button variant="outline" size="sm" onClick={() => setSearchQuery('')} className="mt-2">
-                      Clear Search
-                    </Button>
-                  )}
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-center justify-between text-[11px] text-parish-text-muted px-0.5">
-                    <span>
-                      Showing <strong className="text-parish-text">{filteredDioceses.length}</strong> of{' '}
-                      <strong className="text-parish-text">{dioceses.length}</strong> registered dioceses
-                    </span>
-                    {searchQuery && (
-                      <span className="italic">Filtered by &quot;{searchQuery}&quot;</span>
-                    )}
-                  </div>
+                </select>
+              </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {filteredDioceses.map((d) => (
-                      <div
-                        key={d.id}
-                        onClick={() => handleOpenEditModal(d)}
-                        className="group relative p-3 rounded-xl border border-parish-border bg-parish-surface-subtle hover:bg-parish-surface hover:shadow-xs transition-all duration-150 flex flex-col justify-between space-y-2 cursor-pointer"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="font-bold text-xs text-parish-text leading-tight group-hover:text-parish-primary transition-colors">
-                            {d.dioceseName}
-                          </div>
+              {/* State in India Dropdown Filter */}
+              <div className="flex items-center gap-1.5">
+                <select
+                  value={selectedStateFilter}
+                  onChange={(e) => setSelectedStateFilter(e.target.value)}
+                  className="h-9 px-3 py-1 text-xs font-semibold rounded-xl bg-parish-surface-subtle border border-parish-border text-parish-text focus:outline-none focus:ring-2 focus:ring-parish-primary transition-all cursor-pointer shadow-2xs hover:bg-[#eae3d5]"
+                  aria-label="Filter by State in India"
+                >
+                  <option value="ALL">All States ({dioceses.length})</option>
+                  {availableStates.map((s) => (
+                    <option key={s.name} value={s.name}>
+                      {s.name} ({s.count})
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-                          {/* Edit and Delete action buttons */}
-                          <div className="flex items-center gap-1 opacity-70 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0 -mr-1 -mt-1">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenEditModal(d);
-                              }}
-                              title={`Edit ${d.dioceseName}`}
-                              className="p-1 text-parish-text-muted hover:text-parish-primary hover:bg-parish-border/40 rounded transition-colors"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDioceseToDelete(d);
-                              }}
-                              title={`Remove ${d.dioceseName}`}
-                              className="p-1 text-parish-text-muted hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
+              {/* Reset button if any filter is active */}
+              {(selectedRiteFilter !== 'ALL' || selectedStateFilter !== 'ALL' || searchQuery) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedRiteFilter('ALL');
+                    setSelectedStateFilter('ALL');
+                    setSearchQuery('');
+                  }}
+                  className="h-9 px-2 text-xs font-semibold text-parish-primary hover:text-parish-primary-hover hover:underline transition-colors cursor-pointer"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+          </div>
 
-                        <div className="text-[10px] text-parish-text-muted flex items-center justify-between pt-1 border-t border-parish-border/40">
-                          <span className="truncate max-w-[110px]" title={d.stateInIndia}>
-                            {d.stateInIndia}
-                          </span>
-                          <Badge variant={getRiteBadgeVariant(d.rite)} size="sm" className="text-[9px] shrink-0">
-                            {d.rite}
-                          </Badge>
-                        </div>
+          {/* Dioceses Grid Cards */}
+          {isLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 pt-2">
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                <div key={i} className="h-16 rounded-xl bg-parish-surface-subtle animate-pulse border border-parish-border/60" />
+              ))}
+            </div>
+          ) : filteredDioceses.length === 0 ? (
+            <div className="py-12 text-center space-y-2 border border-dashed border-parish-border rounded-xl">
+              <MapPin className="w-8 h-8 text-parish-text-muted/40 mx-auto" />
+              <div className="text-sm font-semibold text-parish-text">No dioceses match your criteria</div>
+              <p className="text-xs text-parish-text-muted max-w-sm mx-auto">
+                {searchQuery
+                  ? `No results found for "${searchQuery}". Try a different search term or clear the filter.`
+                  : 'No dioceses currently registered for this selection.'}
+              </p>
+              {searchQuery && (
+                <Button variant="outline" size="sm" onClick={() => setSearchQuery('')} className="mt-2">
+                  Clear Search
+                </Button>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between text-[11px] text-parish-text-muted px-0.5">
+                <span>
+                  Showing <strong className="text-parish-text">{filteredDioceses.length}</strong> of{' '}
+                  <strong className="text-parish-text">{dioceses.length}</strong> registered dioceses
+                </span>
+                {searchQuery && (
+                  <span className="italic">Filtered by &quot;{searchQuery}&quot;</span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {filteredDioceses.map((d) => (
+                  <div
+                    key={d.id}
+                    onClick={() => handleOpenEditModal(d)}
+                    className="group relative p-3 rounded-xl border border-parish-border bg-parish-surface-subtle hover:bg-parish-surface hover:shadow-xs transition-all duration-150 flex flex-col justify-between space-y-2 cursor-pointer"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="font-bold text-xs text-parish-text leading-tight group-hover:text-parish-primary transition-colors">
+                        {d.dioceseName}
                       </div>
-                    ))}
+
+                      {/* Edit and Delete action buttons */}
+                      <div className="flex items-center gap-1 opacity-70 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0 -mr-1 -mt-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenEditModal(d);
+                          }}
+                          title={`Edit ${d.dioceseName}`}
+                          className="p-1 text-parish-text-muted hover:text-parish-primary hover:bg-parish-border/40 rounded transition-colors"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDioceseToDelete(d);
+                          }}
+                          title={`Remove ${d.dioceseName}`}
+                          className="p-1 text-parish-text-muted hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="text-[10px] text-parish-text-muted flex items-center justify-between pt-1 border-t border-parish-border/40">
+                      <span className="truncate max-w-[110px]" title={d.stateInIndia}>
+                        {d.stateInIndia}
+                      </span>
+                      <Badge variant={getRiteBadgeVariant(d.rite)} size="sm" className="text-[9px] shrink-0">
+                        {d.rite}
+                      </Badge>
+                    </div>
                   </div>
-                </>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* Add / Edit Diocese Modal Window */}
+          <Modal
+            isOpen={isModalOpen}
+            onClose={() => {
+              if (!isSaving) {
+                setIsModalOpen(false);
+                setEditingDiocese(null);
+                setSaveError(null);
+              }
+            }}
+            title={editingDiocese ? 'Edit Indian Diocese / Eparchy' : 'Add Indian Diocese / Eparchy'}
+            description={
+              editingDiocese
+                ? 'Update diocese name, Indian state, or ecclesiastical rite in the master reference table.'
+                : 'Register a canonical Catholic diocese to the master reference table for onboarding and verification.'
+            }
+            maxWidth="md"
+          >
+            <form onSubmit={handleSaveDiocese} className="space-y-4 pt-1">
+              {saveError && (
+                <div className="p-3 rounded-xl bg-red-50 text-red-700 text-xs flex items-center gap-2 border border-red-200">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{saveError}</span>
+                </div>
               )}
 
-              {/* Add / Edit Diocese Modal Window */}
-              <Modal
-                isOpen={isModalOpen}
-                onClose={() => {
-                  if (!isSaving) {
+              {/* Diocese Name */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-parish-text uppercase tracking-wide">
+                  Diocese / Eparchy Name <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  placeholder="e.g. Mananthavady, Mandya, or Neyyattinkara"
+                  value={dioceseName}
+                  onChange={(e) => {
+                    setDioceseName(e.target.value);
+                    if (saveError) setSaveError(null);
+                  }}
+                  required
+                  autoFocus
+                />
+              </div>
+
+              {/* State in India */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-parish-text uppercase tracking-wide">
+                  State in India
+                </label>
+                <select
+                  value={stateInIndia}
+                  onChange={(e) => setStateInIndia(e.target.value)}
+                  className="w-full bg-parish-surface text-parish-text text-sm rounded-lg border border-parish-border px-3 py-2 transition-all focus:outline-none focus:ring-2 focus:ring-parish-primary/30 focus:border-parish-primary"
+                >
+                  {COMMON_STATES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Ecclesiastical Rite */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-parish-text uppercase tracking-wide">
+                  Ecclesiastical Rite
+                </label>
+                <select
+                  value={rite}
+                  onChange={(e) => setRite(e.target.value)}
+                  className="w-full bg-parish-surface text-parish-text text-sm rounded-lg border border-parish-border px-3 py-2 transition-all focus:outline-none focus:ring-2 focus:ring-parish-primary/30 focus:border-parish-primary"
+                >
+                  {COMMON_RITES.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Actions */}
+              <div className="pt-3 border-t border-parish-border flex items-center justify-end gap-2.5">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
                     setIsModalOpen(false);
                     setEditingDiocese(null);
-                    setSaveError(null);
-                  }
-                }}
-                title={editingDiocese ? 'Edit Indian Diocese / Eparchy' : 'Add Indian Diocese / Eparchy'}
-                description={
-                  editingDiocese
-                    ? 'Update diocese name, Indian state, or ecclesiastical rite in the master reference table.'
-                    : 'Register a canonical Catholic diocese to the master reference table for onboarding and verification.'
-                }
-                maxWidth="md"
-              >
-                <form onSubmit={handleSaveDiocese} className="space-y-4 pt-1">
-                  {saveError && (
-                    <div className="p-3 rounded-xl bg-red-50 text-red-700 text-xs flex items-center gap-2 border border-red-200">
-                      <AlertCircle className="w-4 h-4 shrink-0" />
-                      <span>{saveError}</span>
-                    </div>
-                  )}
-
-                  {/* Diocese Name */}
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-semibold text-parish-text uppercase tracking-wide">
-                      Diocese / Eparchy Name <span className="text-red-500">*</span>
-                    </label>
-                    <Input
-                      placeholder="e.g. Mananthavady, Mandya, or Neyyattinkara"
-                      value={dioceseName}
-                      onChange={(e) => {
-                        setDioceseName(e.target.value);
-                        if (saveError) setSaveError(null);
-                      }}
-                      required
-                      autoFocus
-                    />
-                  </div>
-
-                  {/* State in India */}
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-semibold text-parish-text uppercase tracking-wide">
-                      State in India
-                    </label>
-                    <select
-                      value={stateInIndia}
-                      onChange={(e) => setStateInIndia(e.target.value)}
-                      className="w-full bg-parish-surface text-parish-text text-sm rounded-lg border border-parish-border px-3 py-2 transition-all focus:outline-none focus:ring-2 focus:ring-parish-primary/30 focus:border-parish-primary"
-                    >
-                      {COMMON_STATES.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Ecclesiastical Rite */}
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-semibold text-parish-text uppercase tracking-wide">
-                      Ecclesiastical Rite
-                    </label>
-                    <select
-                      value={rite}
-                      onChange={(e) => setRite(e.target.value)}
-                      className="w-full bg-parish-surface text-parish-text text-sm rounded-lg border border-parish-border px-3 py-2 transition-all focus:outline-none focus:ring-2 focus:ring-parish-primary/30 focus:border-parish-primary"
-                    >
-                      {COMMON_RITES.map((r) => (
-                        <option key={r} value={r}>
-                          {r}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="pt-3 border-t border-parish-border flex items-center justify-end gap-2.5">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setIsModalOpen(false);
-                        setEditingDiocese(null);
-                      }}
-                      disabled={isSaving}
-                    >
-                      Cancel
-                    </Button>
-                    <ConfirmButton
-                      variant="primary"
-                      size="sm"
-                      onConfirm={handleSaveDiocese}
-                      beforeConfirm={validateDiocese}
-                      isLoading={isSaving}
-                      icon={editingDiocese ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
-                      confirmLabel={editingDiocese ? 'Confirm Update?' : 'Confirm Save?'}
-                    >
-                      {editingDiocese ? 'Update Diocese' : 'Save Diocese'}
-                    </ConfirmButton>
-                  </div>
-                </form>
-              </Modal>
-
-              {/* Delete Diocese Confirmation Dialog */}
-              <ConfirmDialog
-                isOpen={!!dioceseToDelete}
-                onClose={() => setDioceseToDelete(null)}
-                onConfirm={handleDeleteDiocese}
-                title="Remove Diocese from Master Table"
-                message={`Are you sure you want to remove '${dioceseToDelete?.dioceseName}' from the master dioceses list? Existing parishioner records will remain untouched.`}
-                confirmLabel="Delete Diocese"
-                variant="danger"
-                isLoading={isDeleting}
-              />
-            </div>
-          )}
-
-          {activeSubTab === 'general' && (
-            <div className="space-y-6">
-              {/* Appearance & Colour Palette Themes Card */}
-              <div className="bg-parish-surface border border-parish-border rounded-2xl p-6 shadow-soft space-y-5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-parish-border">
-                  <div>
-                    <div className="text-sm font-bold text-parish-text flex items-center gap-2">
-                      <Palette className="w-4 h-4 text-parish-primary" />
-                      <span>Appearance & Colour Themes</span>
-                    </div>
-                    <p className="text-xs text-parish-text-muted mt-0.5">
-                      Select your preferred color scheme. The chosen theme applies instantly and persists across your browser sessions.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {availableThemes.map((t) => {
-                    const isSelected = t.id === theme;
-                    return (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() => setTheme(t.id as ThemeId)}
-                        className={`p-4 rounded-xl border text-left transition-all cursor-pointer relative flex flex-col justify-between space-y-3 ${isSelected
-                          ? 'border-parish-primary bg-parish-primary-light/50 shadow-soft ring-2 ring-parish-primary/30'
-                          : 'border-parish-border bg-parish-surface hover:border-parish-primary/50'
-                          }`}
-                      >
-                        <div className="space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div
-                              className="w-10 h-10 rounded-xl border border-black/10 p-1 flex items-center justify-center shadow-xs"
-                              style={{ backgroundColor: t.bgColor }}
-                            >
-                              <div className="flex items-center -space-x-1.5">
-                                <span
-                                  className="w-5 h-5 rounded-full border border-white/60 shadow-xs"
-                                  style={{ backgroundColor: t.primaryColor }}
-                                />
-                                <span
-                                  className="w-3.5 h-3.5 rounded-full border border-white/60 shadow-xs"
-                                  style={{ backgroundColor: t.accentColor }}
-                                />
-                              </div>
-                            </div>
-
-                            {isSelected ? (
-                              <Badge variant="default" size="sm" className="font-bold flex items-center gap-1">
-                                <Check className="w-3 h-3" />
-                                <span>Active</span>
-                              </Badge>
-                            ) : (
-                              <span className="text-[11px] font-semibold text-parish-text-muted hover:text-parish-primary">
-                                Select
-                              </span>
-                            )}
-                          </div>
-
-                          <div>
-                            <div className="text-sm font-bold text-parish-text">{t.name}</div>
-                            <div className="text-[11px] text-parish-text-muted mt-0.5">{t.tagline}</div>
-                          </div>
-                        </div>
-
-                        <div className="pt-2 border-t border-parish-border/60 flex items-center justify-between text-[11px]">
-                          <span className="text-parish-text-muted">Palette:</span>
-                          <div className="flex items-center gap-1.5 font-mono text-[10px]">
-                            <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: t.primaryColor }} />
-                            <span>Primary</span>
-                            <span className="inline-block w-2.5 h-2.5 rounded-full ml-1" style={{ backgroundColor: t.accentColor }} />
-                            <span>Accent</span>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+                  }}
+                  disabled={isSaving}
+                >
+                  Cancel
+                </Button>
+                <ConfirmButton
+                  variant="primary"
+                  size="sm"
+                  onConfirm={handleSaveDiocese}
+                  beforeConfirm={validateDiocese}
+                  isLoading={isSaving}
+                  icon={editingDiocese ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+                  confirmLabel={editingDiocese ? 'Confirm Update?' : 'Confirm Save?'}
+                >
+                  {editingDiocese ? 'Update Diocese' : 'Save Diocese'}
+                </ConfirmButton>
               </div>
+            </form>
+          </Modal>
 
-              <div className="bg-parish-surface border border-parish-border rounded-2xl p-6 shadow-soft space-y-6">
-                {/* Header & Refresh Action */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-parish-border">
-                  <div>
-                    <div className="text-sm font-bold text-parish-text flex items-center gap-2">
-                      <Database className="w-4 h-4 text-parish-primary" />
-                      <span>Parish System Environment & Health</span>
-                    </div>
-                    <p className="text-xs text-parish-text-muted mt-0.5">
-                      Real-time operational status, service ping telemetry, and database connectivity.
-                    </p>
-                  </div>
+          {/* Delete Diocese Confirmation Dialog */}
+          <ConfirmDialog
+            isOpen={!!dioceseToDelete}
+            onClose={() => setDioceseToDelete(null)}
+            onConfirm={handleDeleteDiocese}
+            title="Remove Diocese from Master Table"
+            message={`Are you sure you want to remove '${dioceseToDelete?.dioceseName}' from the master dioceses list? Existing parishioner records will remain untouched.`}
+            confirmLabel="Delete Diocese"
+            variant="danger"
+            isLoading={isDeleting}
+          />
+        </div>
+      )}
 
-                  <div className="flex items-center gap-3">
-                    {lastCheckedAt && (
-                      <span className="text-[11px] text-parish-text-muted flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        Last check: {lastCheckedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                      </span>
-                    )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={fetchHealth}
-                      isLoading={isCheckingHealth}
-                      icon={<RefreshCw className={`w-3.5 h-3.5 ${isCheckingHealth ? 'animate-spin' : ''}`} />}
-                    >
-                      Ping Telemetry
-                    </Button>
-                  </div>
+      {activeSubTab === 'general' && (
+        <div className="space-y-6">
+          {/* Appearance & Colour Palette Themes Card */}
+          <div className="bg-parish-surface border border-parish-border rounded-2xl p-6 shadow-soft space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-parish-border">
+              <div>
+                <div className="text-sm font-bold text-parish-text flex items-center gap-2">
+                  <Palette className="w-4 h-4 text-parish-primary" />
+                  <span>Appearance & Colour Themes</span>
                 </div>
+                <p className="text-xs text-parish-text-muted mt-0.5">
+                  Select your preferred color scheme. The chosen theme applies instantly and persists across your browser sessions.
+                </p>
+              </div>
+            </div>
 
-                {/* Overall Status Banner */}
-                {healthError ? (
-                  <div className="flex items-center justify-between p-3.5 rounded-xl bg-red-50/80 border border-red-200/60 text-red-700">
-                    <div className="flex items-center gap-2.5 text-xs font-semibold">
-                      <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
-                      <span>API Service Unreachable: {healthError}</span>
-                    </div>
-                    <Badge variant="danger" size="sm">Offline</Badge>
-                  </div>
-                ) : healthData ? (
-                  <div
-                    className={`flex items-center justify-between p-3.5 rounded-xl border ${healthData.status === 'healthy'
-                      ? 'bg-emerald-50/60 border-emerald-200/60 text-emerald-800'
-                      : 'bg-amber-50/60 border-amber-200/60 text-amber-800'
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {availableThemes.map((t) => {
+                const isSelected = t.id === theme;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setTheme(t.id as ThemeId)}
+                    className={`p-4 rounded-xl border text-left transition-all cursor-pointer relative flex flex-col justify-between space-y-3 ${isSelected
+                      ? 'border-parish-primary bg-parish-primary-light/50 shadow-soft ring-2 ring-parish-primary/30'
+                      : 'border-parish-border bg-parish-surface hover:border-parish-primary/50'
                       }`}
                   >
-                    <div className="flex items-center gap-2.5 text-xs font-semibold">
-                      <span className="relative flex h-2.5 w-2.5">
-                        <span
-                          className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${healthData.status === 'healthy' ? 'bg-emerald-400' : 'bg-amber-400'
-                            }`}
-                        />
-                        <span
-                          className={`relative inline-flex rounded-full h-2.5 w-2.5 ${healthData.status === 'healthy' ? 'bg-emerald-500' : 'bg-amber-500'
-                            }`}
-                        />
-                      </span>
-                      <span>
-                        {healthData.status === 'healthy'
-                          ? 'All Services & Database Systems Operational'
-                          : 'System Telemetry Warning / Degraded Mode'}
-                      </span>
+                    <div className="space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div
+                          className="w-10 h-10 rounded-xl border border-black/10 p-1 flex items-center justify-center shadow-xs"
+                          style={{ backgroundColor: t.bgColor }}
+                        >
+                          <div className="flex items-center -space-x-1.5">
+                            <span
+                              className="w-5 h-5 rounded-full border border-white/60 shadow-xs"
+                              style={{ backgroundColor: t.primaryColor }}
+                            />
+                            <span
+                              className="w-3.5 h-3.5 rounded-full border border-white/60 shadow-xs"
+                              style={{ backgroundColor: t.accentColor }}
+                            />
+                          </div>
+                        </div>
+
+                        {isSelected ? (
+                          <Badge variant="default" size="sm" className="font-bold flex items-center gap-1">
+                            <Check className="w-3 h-3" />
+                            <span>Active</span>
+                          </Badge>
+                        ) : (
+                          <span className="text-[11px] font-semibold text-parish-text-muted hover:text-parish-primary">
+                            Select
+                          </span>
+                        )}
+                      </div>
+
+                      <div>
+                        <div className="text-sm font-bold text-parish-text">{t.name}</div>
+                        <div className="text-[11px] text-parish-text-muted mt-0.5">{t.tagline}</div>
+                      </div>
                     </div>
-                    <Badge variant={healthData.status === 'healthy' ? 'success' : 'warning'} size="sm">
-                      {healthData.status === 'healthy' ? 'Healthy' : 'Degraded'}
-                    </Badge>
-                  </div>
-                ) : (
-                  <div className="p-4 rounded-xl bg-parish-surface-subtle animate-pulse h-12" />
+
+                    <div className="pt-2 border-t border-parish-border/60 flex items-center justify-between text-[11px]">
+                      <span className="text-parish-text-muted">Palette:</span>
+                      <div className="flex items-center gap-1.5 font-mono text-[10px]">
+                        <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: t.primaryColor }} />
+                        <span>Primary</span>
+                        <span className="inline-block w-2.5 h-2.5 rounded-full ml-1" style={{ backgroundColor: t.accentColor }} />
+                        <span>Accent</span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="bg-parish-surface border border-parish-border rounded-2xl p-6 shadow-soft space-y-6">
+            {/* Header & Refresh Action */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-parish-border">
+              <div>
+                <div className="text-sm font-bold text-parish-text flex items-center gap-2">
+                  <Database className="w-4 h-4 text-parish-primary" />
+                  <span>Parish System Environment & Health</span>
+                </div>
+                <p className="text-xs text-parish-text-muted mt-0.5">
+                  Real-time operational status, service ping telemetry, and database connectivity.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {lastCheckedAt && (
+                  <span className="text-[11px] text-parish-text-muted flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    Last check: {lastCheckedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </span>
                 )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={fetchHealth}
+                  isLoading={isCheckingHealth}
+                  icon={<RefreshCw className={`w-3.5 h-3.5 ${isCheckingHealth ? 'animate-spin' : ''}`} />}
+                >
+                  Ping Telemetry
+                </Button>
+              </div>
+            </div>
 
-                {/* Service Environment Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Database Service Card */}
-                  <div className="p-4 rounded-xl border border-parish-border bg-parish-surface-subtle flex flex-col justify-between space-y-3">
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-xs font-bold text-parish-text">
-                          <Database className="w-3.5 h-3.5 text-parish-primary" />
-                          <span>PostgreSQL Database</span>
-                        </div>
-                        {healthData ? (
-                          <Badge
-                            variant={healthData.database.status === 'connected' ? 'success' : 'danger'}
-                            size="sm"
-                          >
-                            {healthData.database.status === 'connected' ? 'Connected' : 'Disconnected'}
-                          </Badge>
-                        ) : (
-                          <Badge variant="subtle" size="sm">Checking...</Badge>
-                        )}
-                      </div>
-                      <div className="text-[11px] text-parish-text-muted">
-                        Engine: {healthData?.database.engine || 'PostgreSQL 16 (Local Docker)'}
-                      </div>
-                    </div>
+            {/* Overall Status Banner */}
+            {healthError ? (
+              <div className="flex items-center justify-between p-3.5 rounded-xl bg-red-50/80 border border-red-200/60 text-red-700">
+                <div className="flex items-center gap-2.5 text-xs font-semibold">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                  <span>API Service Unreachable: {healthError}</span>
+                </div>
+                <Badge variant="danger" size="sm">Offline</Badge>
+              </div>
+            ) : healthData ? (
+              <div
+                className={`flex items-center justify-between p-3.5 rounded-xl border ${healthData.status === 'healthy'
+                  ? 'bg-emerald-50/60 border-emerald-200/60 text-emerald-800'
+                  : 'bg-amber-50/60 border-amber-200/60 text-amber-800'
+                  }`}
+              >
+                <div className="flex items-center gap-2.5 text-xs font-semibold">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span
+                      className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${healthData.status === 'healthy' ? 'bg-emerald-400' : 'bg-amber-400'
+                        }`}
+                    />
+                    <span
+                      className={`relative inline-flex rounded-full h-2.5 w-2.5 ${healthData.status === 'healthy' ? 'bg-emerald-500' : 'bg-amber-500'
+                        }`}
+                    />
+                  </span>
+                  <span>
+                    {healthData.status === 'healthy'
+                      ? 'All Services & Database Systems Operational'
+                      : 'System Telemetry Warning / Degraded Mode'}
+                  </span>
+                </div>
+                <Badge variant={healthData.status === 'healthy' ? 'success' : 'warning'} size="sm">
+                  {healthData.status === 'healthy' ? 'Healthy' : 'Degraded'}
+                </Badge>
+              </div>
+            ) : (
+              <div className="p-4 rounded-xl bg-parish-surface-subtle animate-pulse h-12" />
+            )}
 
-                    <div className="pt-2 border-t border-parish-border/60 flex items-center justify-between text-[11px]">
-                      <span className="text-parish-text-muted flex items-center gap-1">
-                        <Zap className="w-3 h-3 text-amber-500" />
-                        Query Ping:
-                      </span>
-                      <span className="font-semibold text-parish-text">
-                        {healthData?.database.latencyMs !== null && healthData?.database.latencyMs !== undefined
-                          ? `${healthData.database.latencyMs} ms`
-                          : '—'}
-                      </span>
+            {/* Service Environment Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Database Service Card */}
+              <div className="p-4 rounded-xl border border-parish-border bg-parish-surface-subtle flex flex-col justify-between space-y-3">
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs font-bold text-parish-text">
+                      <Database className="w-3.5 h-3.5 text-parish-primary" />
+                      <span>PostgreSQL Database</span>
                     </div>
+                    {healthData ? (
+                      <Badge
+                        variant={healthData.database.status === 'connected' ? 'success' : 'danger'}
+                        size="sm"
+                      >
+                        {healthData.database.status === 'connected' ? 'Connected' : 'Disconnected'}
+                      </Badge>
+                    ) : (
+                      <Badge variant="subtle" size="sm">Checking...</Badge>
+                    )}
                   </div>
-
-                  {/* API Backend Service Card */}
-                  <div className="p-4 rounded-xl border border-parish-border bg-parish-surface-subtle flex flex-col justify-between space-y-3">
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-xs font-bold text-parish-text">
-                          <Server className="w-3.5 h-3.5 text-parish-primary" />
-                          <span>Backend API Server</span>
-                        </div>
-                        {healthData ? (
-                          <Badge variant="success" size="sm">
-                            Online (v{healthData.version})
-                          </Badge>
-                        ) : healthError ? (
-                          <Badge variant="danger" size="sm">Offline</Badge>
-                        ) : (
-                          <Badge variant="subtle" size="sm">Checking...</Badge>
-                        )}
-                      </div>
-                      <div className="text-[11px] text-parish-text-muted">
-                        Node.js (Express + TypeScript) on Port 5000
-                      </div>
-                    </div>
-
-                    <div className="pt-2 border-t border-parish-border/60 flex items-center justify-between text-[11px]">
-                      <span className="text-parish-text-muted">Endpoint:</span>
-                      <code className="text-[10px] bg-parish-surface px-1.5 py-0.5 rounded border border-parish-border text-parish-primary font-mono">
-                        /api/health
-                      </code>
-                    </div>
-                  </div>
-
-                  {/* Frontend Host Service Card */}
-                  <div className="p-4 rounded-xl border border-parish-border bg-parish-surface-subtle flex flex-col justify-between space-y-3">
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-xs font-bold text-parish-text">
-                          <Activity className="w-3.5 h-3.5 text-parish-primary" />
-                          <span>Web Client Host</span>
-                        </div>
-                        <Badge variant="info" size="sm">Active</Badge>
-                      </div>
-                      <div className="text-[11px] text-parish-text-muted">
-                        Vite + React 19 Client on Port 5173
-                      </div>
-                    </div>
-
-                    <div className="pt-2 border-t border-parish-border/60 flex items-center justify-between text-[11px]">
-                      <span className="text-parish-text-muted">Mode:</span>
-                      <span className="font-semibold text-emerald-600">Local Development</span>
-                    </div>
+                  <div className="text-[11px] text-parish-text-muted">
+                    Engine: {healthData?.database.engine || 'PostgreSQL 16 (Local Docker)'}
                   </div>
                 </div>
 
-                {/* Diagnostic Details Summary */}
-                <div className="p-4 rounded-xl bg-parish-surface-subtle border border-parish-border space-y-2 text-xs">
-                  <div className="font-bold text-parish-text text-[11px] uppercase tracking-wider mb-2">
-                    Operational Telemetry Summary
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-parish-text-muted">Database Engine:</span>
-                    <span className="font-semibold text-parish-text">
-                      {healthData?.database.engine || 'PostgreSQL 16'} (Prisma ORM via Docker Container)
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-parish-text-muted">Database Connectivity:</span>
-                    <span className="font-semibold text-parish-text flex items-center gap-1.5">
-                      {healthData?.database.status === 'connected' ? (
-                        <>
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 inline" />
-                          <span className="text-emerald-700">
-                            Live & Queryable (ping: {healthData.database.latencyMs} ms)
-                          </span>
-                        </>
-                      ) : healthData?.database.error ? (
-                        <span className="text-red-600">{healthData.database.error}</span>
-                      ) : (
-                        <span className="text-parish-text-muted">Checking connection...</span>
-                      )}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-parish-text-muted">Backend Service:</span>
-                    <span className="font-semibold text-parish-text">Node.js LTS (Express + TypeScript) on port 5000</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-parish-text-muted">Frontend Host:</span>
-                    <span className="font-semibold text-parish-text">Vite + React 19 on port 5173</span>
-                  </div>
-                  {healthData?.timestamp && (
-                    <div className="flex justify-between">
-                      <span className="text-parish-text-muted">Backend Server Timestamp:</span>
-                      <span className="font-mono text-[11px] text-parish-text">
-                        {new Date(healthData.timestamp).toLocaleString()}
-                      </span>
+                <div className="pt-2 border-t border-parish-border/60 flex items-center justify-between text-[11px]">
+                  <span className="text-parish-text-muted flex items-center gap-1">
+                    <Zap className="w-3 h-3 text-amber-500" />
+                    Query Ping:
+                  </span>
+                  <span className="font-semibold text-parish-text">
+                    {healthData?.database.latencyMs !== null && healthData?.database.latencyMs !== undefined
+                      ? `${healthData.database.latencyMs} ms`
+                      : '—'}
+                  </span>
+                </div>
+              </div>
+
+              {/* API Backend Service Card */}
+              <div className="p-4 rounded-xl border border-parish-border bg-parish-surface-subtle flex flex-col justify-between space-y-3">
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs font-bold text-parish-text">
+                      <Server className="w-3.5 h-3.5 text-parish-primary" />
+                      <span>Backend API Server</span>
                     </div>
-                  )}
+                    {healthData ? (
+                      <Badge variant="success" size="sm">
+                        Online (v{healthData.version})
+                      </Badge>
+                    ) : healthError ? (
+                      <Badge variant="danger" size="sm">Offline</Badge>
+                    ) : (
+                      <Badge variant="subtle" size="sm">Checking...</Badge>
+                    )}
+                  </div>
+                  <div className="text-[11px] text-parish-text-muted">
+                    Node.js (Express + TypeScript) on Port 5000
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-parish-border/60 flex items-center justify-between text-[11px]">
+                  <span className="text-parish-text-muted">Endpoint:</span>
+                  <code className="text-[10px] bg-parish-surface px-1.5 py-0.5 rounded border border-parish-border text-parish-primary font-mono">
+                    /api/health
+                  </code>
+                </div>
+              </div>
+
+              {/* Frontend Host Service Card */}
+              <div className="p-4 rounded-xl border border-parish-border bg-parish-surface-subtle flex flex-col justify-between space-y-3">
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs font-bold text-parish-text">
+                      <Activity className="w-3.5 h-3.5 text-parish-primary" />
+                      <span>Web Client Host</span>
+                    </div>
+                    <Badge variant="info" size="sm">Active</Badge>
+                  </div>
+                  <div className="text-[11px] text-parish-text-muted">
+                    Vite + React 19 Client on Port 5173
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-parish-border/60 flex items-center justify-between text-[11px]">
+                  <span className="text-parish-text-muted">Mode:</span>
+                  <span className="font-semibold text-emerald-600">Local Development</span>
                 </div>
               </div>
             </div>
-          )}
 
-          {activeSubTab === 'email' && (
-            <EmailSmtpTab />
-          )}
-
-          {activeSubTab === 'logs' && (
-            <ActivityLogsTab />
-          )}
-
-          {activeSubTab === 'backup' && (
-            <BackupRestoreTab />
-          )}
-
-          {activeSubTab === 'developer' && (isDeveloper || user?.role === 'SUPER_ADMIN') && (
-            <DeveloperControlsTab />
-          )}
+            {/* Diagnostic Details Summary */}
+            <div className="p-4 rounded-xl bg-parish-surface-subtle border border-parish-border space-y-2 text-xs">
+              <div className="font-bold text-parish-text text-[11px] uppercase tracking-wider mb-2">
+                Operational Telemetry Summary
+              </div>
+              <div className="flex justify-between">
+                <span className="text-parish-text-muted">Database Engine:</span>
+                <span className="font-semibold text-parish-text">
+                  {healthData?.database.engine || 'PostgreSQL 16'} (Prisma ORM via Docker Container)
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-parish-text-muted">Database Connectivity:</span>
+                <span className="font-semibold text-parish-text flex items-center gap-1.5">
+                  {healthData?.database.status === 'connected' ? (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 inline" />
+                      <span className="text-emerald-700">
+                        Live & Queryable (ping: {healthData.database.latencyMs} ms)
+                      </span>
+                    </>
+                  ) : healthData?.database.error ? (
+                    <span className="text-red-600">{healthData.database.error}</span>
+                  ) : (
+                    <span className="text-parish-text-muted">Checking connection...</span>
+                  )}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-parish-text-muted">Backend Service:</span>
+                <span className="font-semibold text-parish-text">Node.js LTS (Express + TypeScript) on port 5000</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-parish-text-muted">Frontend Host:</span>
+                <span className="font-semibold text-parish-text">Vite + React 19 on port 5173</span>
+              </div>
+              {healthData?.timestamp && (
+                <div className="flex justify-between">
+                  <span className="text-parish-text-muted">Backend Server Timestamp:</span>
+                  <span className="font-mono text-[11px] text-parish-text">
+                    {new Date(healthData.timestamp).toLocaleString()}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
-      );
+      )}
+
+      {activeSubTab === 'email' && (
+        <EmailSmtpTab />
+      )}
+
+      {activeSubTab === 'logs' && (
+        <ActivityLogsTab />
+      )}
+
+      {activeSubTab === 'backup' && (
+        <BackupRestoreTab />
+      )}
+
+      {activeSubTab === 'developer' && (isDeveloper || user?.role === 'SUPER_ADMIN') && (
+        <DeveloperControlsTab />
+      )}
+    </div>
+  );
 };
 

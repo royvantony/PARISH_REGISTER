@@ -136,7 +136,7 @@ export const InactivateFamilyModal: React.FC<InactivateFamilyModalProps> = ({
           </label>
           <textarea
             rows={2}
-            placeholder="e.g. Relocated to Melbourne. Joining St. Mary's Syro-Malabar Parish."
+            placeholder="e.g. Relocated to India. Joining St. Mary's Syro-Malabar Parish."
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             disabled={isLoading}

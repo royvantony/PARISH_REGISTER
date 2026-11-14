@@ -149,8 +149,8 @@ export const AttachDocumentModal: React.FC<AttachDocumentModalProps> = ({
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
             className={`border-2 border-dashed rounded-2xl p-5 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2 ${selectedFile
-                ? 'border-emerald-400 bg-emerald-50/40 dark:bg-emerald-950/20'
-                : 'border-parish-border hover:border-parish-primary/50 bg-parish-surface-subtle'
+              ? 'border-emerald-400 bg-emerald-50/40 dark:bg-emerald-950/20'
+              : 'border-parish-border hover:border-parish-primary/50 bg-parish-surface-subtle'
               }`}
           >
             <input
@@ -222,7 +222,7 @@ export const AttachDocumentModal: React.FC<AttachDocumentModalProps> = ({
               if (error) setError(null);
             }}
             maxLength={100}
-            placeholder="e.g. Baptism Certificate, Marriage Certificate, Parish Release Letter..."
+            placeholder="e.g. Baptism Certificate, Marriage Certificate..."
             className="w-full px-3 py-2 text-xs rounded-xl border border-parish-border bg-parish-surface text-parish-text placeholder:text-parish-text-muted/60 focus:outline-none focus:ring-2 focus:ring-parish-primary font-medium"
             required
           />

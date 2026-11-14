@@ -1434,142 +1434,142 @@ export const UsersPage: React.FC = () => {
                       </tr>
                     ) : (
                       allowedModules.map((mod) => {
-                      const rec = roleMatrix[selectedRole]?.[mod.key] || {
-                        role: selectedRole,
-                        module: mod.key,
-                        canView: false,
-                        canCreate: false,
-                        canEdit: false,
-                        canArchive: false,
-                        canDelete: false,
-                        canExport: false,
-                      };
+                        const rec = roleMatrix[selectedRole]?.[mod.key] || {
+                          role: selectedRole,
+                          module: mod.key,
+                          canView: false,
+                          canCreate: false,
+                          canEdit: false,
+                          canArchive: false,
+                          canDelete: false,
+                          canExport: false,
+                        };
 
-                      const isLockedRole = selectedRole === 'SUPER_ADMIN';
+                        const isLockedRole = selectedRole === 'SUPER_ADMIN';
 
-                      return (
-                        <tr key={mod.key} className="hover:bg-parish-surface-subtle/40 transition-colors">
-                          <td className="py-3.5 px-4">
-                            <div className="flex items-center gap-2.5">
-                              {getModuleIcon(mod.key)}
-                              <div>
-                                <div className="font-bold text-parish-text text-sm">{mod.name}</div>
-                                <div className="text-[10px] text-parish-text-muted font-mono">{mod.category}</div>
+                        return (
+                          <tr key={mod.key} className="hover:bg-parish-surface-subtle/40 transition-colors">
+                            <td className="py-3.5 px-4">
+                              <div className="flex items-center gap-2.5">
+                                {getModuleIcon(mod.key)}
+                                <div>
+                                  <div className="font-bold text-parish-text text-sm">{mod.name}</div>
+                                  <div className="text-[10px] text-parish-text-muted font-mono">{mod.category}</div>
+                                </div>
                               </div>
-                            </div>
-                          </td>
+                            </td>
 
-                          {/* View Toggle */}
-                          <td className="py-3.5 px-4 text-center">
-                            <button
-                              type="button"
-                              disabled={isLockedRole || !canEditUsers}
-                              onClick={() => handleToggleMatrixCell(mod.key, 'canView')}
-                              className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${rec.canView
-                                ? 'bg-emerald-600 text-white shadow-xs'
-                                : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border hover:border-parish-text-muted'
-                                } ${isLockedRole || !canEditUsers ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            >
-                              {rec.canView ? 'ON' : 'OFF'}
-                            </button>
-                          </td>
+                            {/* View Toggle */}
+                            <td className="py-3.5 px-4 text-center">
+                              <button
+                                type="button"
+                                disabled={isLockedRole || !canEditUsers}
+                                onClick={() => handleToggleMatrixCell(mod.key, 'canView')}
+                                className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${rec.canView
+                                  ? 'bg-emerald-600 text-white shadow-xs'
+                                  : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border hover:border-parish-text-muted'
+                                  } ${isLockedRole || !canEditUsers ? 'opacity-50 cursor-not-allowed' : ''}`}
+                              >
+                                {rec.canView ? 'ON' : 'OFF'}
+                              </button>
+                            </td>
 
-                          {/* Create Toggle */}
-                          <td className="py-3.5 px-4 text-center">
-                            <button
-                              type="button"
-                              disabled={isLockedRole || !canEditUsers || !rec.canView}
-                              onClick={() => handleToggleMatrixCell(mod.key, 'canCreate')}
-                              className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${rec.canCreate
-                                ? 'bg-emerald-600 text-white shadow-xs'
-                                : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border hover:border-parish-text-muted'
-                                } ${isLockedRole || !canEditUsers || !rec.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
-                            >
-                              {rec.canCreate ? 'ON' : 'OFF'}
-                            </button>
-                          </td>
-
-                          {/* Edit Toggle */}
-                          <td className="py-3.5 px-4 text-center">
-                            <button
-                              type="button"
-                              disabled={isLockedRole || !canEditUsers || !rec.canView}
-                              onClick={() => handleToggleMatrixCell(mod.key, 'canEdit')}
-                              className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${rec.canEdit
-                                ? 'bg-amber-600 text-white shadow-xs'
-                                : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border hover:border-parish-text-muted'
-                                } ${isLockedRole || !canEditUsers || !rec.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
-                            >
-                              {rec.canEdit ? 'ON' : 'OFF'}
-                            </button>
-                          </td>
-
-                          {/* Deactivate Toggle */}
-                          <td className="py-3.5 px-4 text-center">
-                            <button
-                              type="button"
-                              disabled={isLockedRole || !canEditUsers || !rec.canView}
-                              onClick={() => handleToggleMatrixCell(mod.key, 'canArchive')}
-                              className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${rec.canArchive
-                                ? 'bg-orange-600 text-white shadow-xs'
-                                : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border hover:border-parish-text-muted'
-                                } ${isLockedRole || !canEditUsers || !rec.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
-                            >
-                              {rec.canArchive ? 'ON' : 'OFF'}
-                            </button>
-                          </td>
-
-                          {/* Hard Delete Toggle */}
-                          <td className="py-3.5 px-4 text-center">
-                            <button
-                              type="button"
-                              disabled={isLockedRole || !canEditUsers || !rec.canView}
-                              onClick={() => handleToggleMatrixCell(mod.key, 'canDelete')}
-                              className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${rec.canDelete
-                                ? 'bg-red-600 text-white shadow-xs'
-                                : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border hover:border-parish-text-muted'
-                                } ${isLockedRole || !canEditUsers || !rec.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
-                            >
-                              {rec.canDelete ? 'ON' : 'OFF'}
-                            </button>
-                          </td>
-
-                          {/* Export Toggle */}
-                          <td className="py-3.5 px-4 text-center">
-                            <button
-                              type="button"
-                              disabled={isLockedRole || !canEditUsers || !rec.canView}
-                              onClick={() => handleToggleMatrixCell(mod.key, 'canExport')}
-                              className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${rec.canExport
-                                ? 'bg-sky-600 text-white shadow-xs'
-                                : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border hover:border-parish-text-muted'
-                                } ${isLockedRole || !canEditUsers || !rec.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
-                            >
-                              {rec.canExport ? 'ON' : 'OFF'}
-                            </button>
-                          </td>
-
-                          {/* Approve Toggle */}
-                          <td className="py-3.5 px-4 text-center">
-                            {['REGISTER_NEW', 'IMPORT_REGISTRATIONS'].includes(mod.key) ? (
+                            {/* Create Toggle */}
+                            <td className="py-3.5 px-4 text-center">
                               <button
                                 type="button"
                                 disabled={isLockedRole || !canEditUsers || !rec.canView}
-                                onClick={() => handleToggleMatrixCell(mod.key, 'canApprove')}
-                                className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${rec.canApprove
-                                  ? 'bg-emerald-700 text-white shadow-xs'
+                                onClick={() => handleToggleMatrixCell(mod.key, 'canCreate')}
+                                className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${rec.canCreate
+                                  ? 'bg-emerald-600 text-white shadow-xs'
                                   : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border hover:border-parish-text-muted'
                                   } ${isLockedRole || !canEditUsers || !rec.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
                               >
-                                {rec.canApprove ? 'ON' : 'OFF'}
+                                {rec.canCreate ? 'ON' : 'OFF'}
                               </button>
-                            ) : (
-                              <span className="text-parish-text-muted/40 font-mono text-xs select-none" title="Approval workflow not applicable to this screen">—</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    }))}
+                            </td>
+
+                            {/* Edit Toggle */}
+                            <td className="py-3.5 px-4 text-center">
+                              <button
+                                type="button"
+                                disabled={isLockedRole || !canEditUsers || !rec.canView}
+                                onClick={() => handleToggleMatrixCell(mod.key, 'canEdit')}
+                                className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${rec.canEdit
+                                  ? 'bg-amber-600 text-white shadow-xs'
+                                  : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border hover:border-parish-text-muted'
+                                  } ${isLockedRole || !canEditUsers || !rec.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
+                              >
+                                {rec.canEdit ? 'ON' : 'OFF'}
+                              </button>
+                            </td>
+
+                            {/* Deactivate Toggle */}
+                            <td className="py-3.5 px-4 text-center">
+                              <button
+                                type="button"
+                                disabled={isLockedRole || !canEditUsers || !rec.canView}
+                                onClick={() => handleToggleMatrixCell(mod.key, 'canArchive')}
+                                className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${rec.canArchive
+                                  ? 'bg-orange-600 text-white shadow-xs'
+                                  : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border hover:border-parish-text-muted'
+                                  } ${isLockedRole || !canEditUsers || !rec.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
+                              >
+                                {rec.canArchive ? 'ON' : 'OFF'}
+                              </button>
+                            </td>
+
+                            {/* Hard Delete Toggle */}
+                            <td className="py-3.5 px-4 text-center">
+                              <button
+                                type="button"
+                                disabled={isLockedRole || !canEditUsers || !rec.canView}
+                                onClick={() => handleToggleMatrixCell(mod.key, 'canDelete')}
+                                className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${rec.canDelete
+                                  ? 'bg-red-600 text-white shadow-xs'
+                                  : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border hover:border-parish-text-muted'
+                                  } ${isLockedRole || !canEditUsers || !rec.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
+                              >
+                                {rec.canDelete ? 'ON' : 'OFF'}
+                              </button>
+                            </td>
+
+                            {/* Export Toggle */}
+                            <td className="py-3.5 px-4 text-center">
+                              <button
+                                type="button"
+                                disabled={isLockedRole || !canEditUsers || !rec.canView}
+                                onClick={() => handleToggleMatrixCell(mod.key, 'canExport')}
+                                className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${rec.canExport
+                                  ? 'bg-sky-600 text-white shadow-xs'
+                                  : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border hover:border-parish-text-muted'
+                                  } ${isLockedRole || !canEditUsers || !rec.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
+                              >
+                                {rec.canExport ? 'ON' : 'OFF'}
+                              </button>
+                            </td>
+
+                            {/* Approve Toggle */}
+                            <td className="py-3.5 px-4 text-center">
+                              {['REGISTER_NEW', 'IMPORT_REGISTRATIONS'].includes(mod.key) ? (
+                                <button
+                                  type="button"
+                                  disabled={isLockedRole || !canEditUsers || !rec.canView}
+                                  onClick={() => handleToggleMatrixCell(mod.key, 'canApprove')}
+                                  className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${rec.canApprove
+                                    ? 'bg-emerald-700 text-white shadow-xs'
+                                    : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border hover:border-parish-text-muted'
+                                    } ${isLockedRole || !canEditUsers || !rec.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
+                                >
+                                  {rec.canApprove ? 'ON' : 'OFF'}
+                                </button>
+                              ) : (
+                                <span className="text-parish-text-muted/40 font-mono text-xs select-none" title="Approval workflow not applicable to this screen">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      }))}
                   </tbody>
                 </table>
               </div>
@@ -1696,150 +1696,150 @@ export const UsersPage: React.FC = () => {
                       </tr>
                     ) : (
                       allowedOverrides.map((item) => {
-                      const current = userOverrides[item.module] || {};
-                      const isOverridden =
-                        current.canView !== item.base.canView ||
-                        current.canCreate !== item.base.canCreate ||
-                        current.canEdit !== item.base.canEdit ||
-                        current.canArchive !== item.base.canArchive ||
-                        current.canDelete !== item.base.canDelete ||
-                        current.canExport !== item.base.canExport ||
-                        current.canApprove !== item.base.canApprove;
+                        const current = userOverrides[item.module] || {};
+                        const isOverridden =
+                          current.canView !== item.base.canView ||
+                          current.canCreate !== item.base.canCreate ||
+                          current.canEdit !== item.base.canEdit ||
+                          current.canArchive !== item.base.canArchive ||
+                          current.canDelete !== item.base.canDelete ||
+                          current.canExport !== item.base.canExport ||
+                          current.canApprove !== item.base.canApprove;
 
-                      return (
-                        <tr
-                          key={item.module}
-                          className={`hover:bg-parish-surface-subtle/40 transition-colors ${isOverridden ? 'bg-amber-50/40' : ''
-                            }`}
-                        >
-                          <td className="py-3.5 px-4">
-                            <div className="flex items-center gap-2.5">
-                              {getModuleIcon(item.module)}
-                              <div>
-                                <div className="font-bold text-parish-text text-sm flex items-center gap-1.5">
-                                  <span>{item.name}</span>
-                                  {isOverridden && (
-                                    <Badge variant="warning" size="sm" className="text-[9px]">
-                                      Override
-                                    </Badge>
-                                  )}
+                        return (
+                          <tr
+                            key={item.module}
+                            className={`hover:bg-parish-surface-subtle/40 transition-colors ${isOverridden ? 'bg-amber-50/40' : ''
+                              }`}
+                          >
+                            <td className="py-3.5 px-4">
+                              <div className="flex items-center gap-2.5">
+                                {getModuleIcon(item.module)}
+                                <div>
+                                  <div className="font-bold text-parish-text text-sm flex items-center gap-1.5">
+                                    <span>{item.name}</span>
+                                    {isOverridden && (
+                                      <Badge variant="warning" size="sm" className="text-[9px]">
+                                        Override
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="text-[10px] text-parish-text-muted">{item.category}</div>
                                 </div>
-                                <div className="text-[10px] text-parish-text-muted">{item.category}</div>
                               </div>
-                            </div>
-                          </td>
+                            </td>
 
-                          {/* View Toggle */}
-                          <td className="py-3.5 px-4 text-center">
-                            <button
-                              type="button"
-                              disabled={!canEditUsers}
-                              onClick={() => handleToggleUserOverrideCell(item.module, 'canView')}
-                              className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${current.canView
-                                ? 'bg-emerald-600 text-white shadow-xs'
-                                : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border'
-                                } ${!canEditUsers ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            >
-                              {current.canView ? 'ON' : 'OFF'}
-                            </button>
-                          </td>
+                            {/* View Toggle */}
+                            <td className="py-3.5 px-4 text-center">
+                              <button
+                                type="button"
+                                disabled={!canEditUsers}
+                                onClick={() => handleToggleUserOverrideCell(item.module, 'canView')}
+                                className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${current.canView
+                                  ? 'bg-emerald-600 text-white shadow-xs'
+                                  : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border'
+                                  } ${!canEditUsers ? 'opacity-50 cursor-not-allowed' : ''}`}
+                              >
+                                {current.canView ? 'ON' : 'OFF'}
+                              </button>
+                            </td>
 
-                          {/* Create Toggle */}
-                          <td className="py-3.5 px-4 text-center">
-                            <button
-                              type="button"
-                              disabled={!canEditUsers || !current.canView}
-                              onClick={() => handleToggleUserOverrideCell(item.module, 'canCreate')}
-                              className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${current.canCreate
-                                ? 'bg-emerald-600 text-white shadow-xs'
-                                : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border'
-                                } ${!canEditUsers || !current.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
-                            >
-                              {current.canCreate ? 'ON' : 'OFF'}
-                            </button>
-                          </td>
-
-                          {/* Edit Toggle */}
-                          <td className="py-3.5 px-4 text-center">
-                            <button
-                              type="button"
-                              disabled={!canEditUsers || !current.canView}
-                              onClick={() => handleToggleUserOverrideCell(item.module, 'canEdit')}
-                              className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${current.canEdit
-                                ? 'bg-amber-600 text-white shadow-xs'
-                                : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border'
-                                } ${!canEditUsers || !current.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
-                            >
-                              {current.canEdit ? 'ON' : 'OFF'}
-                            </button>
-                          </td>
-
-                          {/* Deactivate Toggle */}
-                          <td className="py-3.5 px-4 text-center">
-                            <button
-                              type="button"
-                              disabled={!canEditUsers || !current.canView}
-                              onClick={() => handleToggleUserOverrideCell(item.module, 'canArchive')}
-                              className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${current.canArchive
-                                ? 'bg-orange-600 text-white shadow-xs'
-                                : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border'
-                                } ${!canEditUsers || !current.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
-                            >
-                              {current.canArchive ? 'ON' : 'OFF'}
-                            </button>
-                          </td>
-
-                          {/* Hard Delete Toggle */}
-                          <td className="py-3.5 px-4 text-center">
-                            <button
-                              type="button"
-                              disabled={!canEditUsers || !current.canView}
-                              onClick={() => handleToggleUserOverrideCell(item.module, 'canDelete')}
-                              className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${current.canDelete
-                                ? 'bg-red-600 text-white shadow-xs'
-                                : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border'
-                                } ${!canEditUsers || !current.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
-                            >
-                              {current.canDelete ? 'ON' : 'OFF'}
-                            </button>
-                          </td>
-
-                          {/* Export Toggle */}
-                          <td className="py-3.5 px-4 text-center">
-                            <button
-                              type="button"
-                              disabled={!canEditUsers || !current.canView}
-                              onClick={() => handleToggleUserOverrideCell(item.module, 'canExport')}
-                              className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${current.canExport
-                                ? 'bg-sky-600 text-white shadow-xs'
-                                : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border'
-                                } ${!canEditUsers || !current.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
-                            >
-                              {current.canExport ? 'ON' : 'OFF'}
-                            </button>
-                          </td>
-
-                          {/* Approve Toggle */}
-                          <td className="py-3.5 px-4 text-center">
-                            {['REGISTER_NEW', 'IMPORT_REGISTRATIONS'].includes(item.module) ? (
+                            {/* Create Toggle */}
+                            <td className="py-3.5 px-4 text-center">
                               <button
                                 type="button"
                                 disabled={!canEditUsers || !current.canView}
-                                onClick={() => handleToggleUserOverrideCell(item.module, 'canApprove')}
-                                className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${current.canApprove
-                                  ? 'bg-emerald-700 text-white shadow-xs'
+                                onClick={() => handleToggleUserOverrideCell(item.module, 'canCreate')}
+                                className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${current.canCreate
+                                  ? 'bg-emerald-600 text-white shadow-xs'
                                   : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border'
                                   } ${!canEditUsers || !current.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
                               >
-                                {current.canApprove ? 'ON' : 'OFF'}
+                                {current.canCreate ? 'ON' : 'OFF'}
                               </button>
-                            ) : (
-                              <span className="text-parish-text-muted/40 font-mono text-xs select-none" title="Approval workflow not applicable to this screen">—</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    }))}
+                            </td>
+
+                            {/* Edit Toggle */}
+                            <td className="py-3.5 px-4 text-center">
+                              <button
+                                type="button"
+                                disabled={!canEditUsers || !current.canView}
+                                onClick={() => handleToggleUserOverrideCell(item.module, 'canEdit')}
+                                className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${current.canEdit
+                                  ? 'bg-amber-600 text-white shadow-xs'
+                                  : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border'
+                                  } ${!canEditUsers || !current.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
+                              >
+                                {current.canEdit ? 'ON' : 'OFF'}
+                              </button>
+                            </td>
+
+                            {/* Deactivate Toggle */}
+                            <td className="py-3.5 px-4 text-center">
+                              <button
+                                type="button"
+                                disabled={!canEditUsers || !current.canView}
+                                onClick={() => handleToggleUserOverrideCell(item.module, 'canArchive')}
+                                className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${current.canArchive
+                                  ? 'bg-orange-600 text-white shadow-xs'
+                                  : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border'
+                                  } ${!canEditUsers || !current.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
+                              >
+                                {current.canArchive ? 'ON' : 'OFF'}
+                              </button>
+                            </td>
+
+                            {/* Hard Delete Toggle */}
+                            <td className="py-3.5 px-4 text-center">
+                              <button
+                                type="button"
+                                disabled={!canEditUsers || !current.canView}
+                                onClick={() => handleToggleUserOverrideCell(item.module, 'canDelete')}
+                                className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${current.canDelete
+                                  ? 'bg-red-600 text-white shadow-xs'
+                                  : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border'
+                                  } ${!canEditUsers || !current.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
+                              >
+                                {current.canDelete ? 'ON' : 'OFF'}
+                              </button>
+                            </td>
+
+                            {/* Export Toggle */}
+                            <td className="py-3.5 px-4 text-center">
+                              <button
+                                type="button"
+                                disabled={!canEditUsers || !current.canView}
+                                onClick={() => handleToggleUserOverrideCell(item.module, 'canExport')}
+                                className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${current.canExport
+                                  ? 'bg-sky-600 text-white shadow-xs'
+                                  : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border'
+                                  } ${!canEditUsers || !current.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
+                              >
+                                {current.canExport ? 'ON' : 'OFF'}
+                              </button>
+                            </td>
+
+                            {/* Approve Toggle */}
+                            <td className="py-3.5 px-4 text-center">
+                              {['REGISTER_NEW', 'IMPORT_REGISTRATIONS'].includes(item.module) ? (
+                                <button
+                                  type="button"
+                                  disabled={!canEditUsers || !current.canView}
+                                  onClick={() => handleToggleUserOverrideCell(item.module, 'canApprove')}
+                                  className={`w-14 py-1.5 rounded-lg font-bold text-xs transition-all ${current.canApprove
+                                    ? 'bg-emerald-700 text-white shadow-xs'
+                                    : 'bg-parish-surface-subtle text-parish-text-muted border border-parish-border'
+                                    } ${!canEditUsers || !current.canView ? 'opacity-35 cursor-not-allowed' : ''}`}
+                                >
+                                  {current.canApprove ? 'ON' : 'OFF'}
+                                </button>
+                              ) : (
+                                <span className="text-parish-text-muted/40 font-mono text-xs select-none" title="Approval workflow not applicable to this screen">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      }))}
                   </tbody>
                 </table>
               </div>
@@ -2037,7 +2037,7 @@ export const UsersPage: React.FC = () => {
                 Full Name <span className="text-red-500">*</span>
               </label>
               <Input
-                placeholder="e.g. Fr. Abraham Mathew, Maria Jose"
+                placeholder="e.g. Fr. Abraham Mathew, Sarah Roy"
                 value={inviteFullName}
                 onChange={(e) => setInviteFullName(e.target.value)}
                 required
@@ -2225,7 +2225,7 @@ export const UsersPage: React.FC = () => {
               <Input
                 value={editUsername}
                 onChange={(e) => setEditUsername(e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, ''))}
-                placeholder="e.g. fr.abraham, maria.jose"
+                placeholder="e.g. fr.abraham, anna.roy"
                 className="w-full font-mono text-xs"
               />
               <p className="text-[10px] text-parish-text-muted mt-1">
@@ -2243,7 +2243,7 @@ export const UsersPage: React.FC = () => {
                 onChange={(e) => setEditFullName(e.target.value)}
                 required
                 className="w-full"
-                placeholder="e.g. Fr. Abraham Mathew, Thomas Trustee"
+                placeholder="e.g. Fr. Abraham Mathew, Thomas Peter"
               />
               <p className="text-[10px] text-parish-text-muted mt-1">
                 Official name displayed on certificates and register records.

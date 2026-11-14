@@ -207,7 +207,7 @@ export const DirectDebitModal: React.FC<DirectDebitModalProps> = ({
               id="dd-reference-input"
               type="text"
               maxLength={100}
-              placeholder="e.g. Husband - Thomas, Wife - Mary"
+              placeholder="e.g. Husband - Antony, Wife - Mary"
               value={reference}
               onChange={(e) => setReference(e.target.value)}
               disabled={!canEdit || isLoading}

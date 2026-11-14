@@ -215,9 +215,9 @@ export const EditFamilyPage: React.FC = () => {
       status,
       unit: selectedUnitObj
         ? {
-            id: selectedUnitObj.id,
-            unitName: selectedUnitObj.unitName,
-          }
+          id: selectedUnitObj.id,
+          unitName: selectedUnitObj.unitName,
+        }
         : null,
       streetAddress: streetAddress.trim() || null,
       city: city.trim() || null,
@@ -928,7 +928,7 @@ export const EditFamilyPage: React.FC = () => {
                 Full Name <span className="text-red-500">*</span>
               </label>
               <Input
-                placeholder="e.g. Thomas Mathew"
+                placeholder="e.g. Thomas Antony"
                 value={headName}
                 onChange={(e) => setHeadName(e.target.value)}
                 required

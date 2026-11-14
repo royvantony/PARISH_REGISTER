@@ -290,11 +290,10 @@ export const EmailSmtpTab: React.FC = () => {
       <form onSubmit={handleSaveSettings} className="p-6 rounded-2xl bg-parish-surface border border-parish-border shadow-xs space-y-6">
         {saveFeedback && (
           <div
-            className={`p-3.5 rounded-xl border text-xs flex items-center gap-2 ${
-              saveFeedback.type === 'success'
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                : 'bg-red-50 border-red-200 text-red-700'
-            }`}
+            className={`p-3.5 rounded-xl border text-xs flex items-center gap-2 ${saveFeedback.type === 'success'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+              : 'bg-red-50 border-red-200 text-red-700'
+              }`}
           >
             {saveFeedback.type === 'success' ? (
               <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
@@ -494,11 +493,10 @@ export const EmailSmtpTab: React.FC = () => {
 
         {testFeedback && (
           <div
-            className={`p-3.5 rounded-xl border text-xs flex items-center gap-2.5 ${
-              testFeedback.type === 'success'
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                : 'bg-red-50 border-red-200 text-red-700'
-            }`}
+            className={`p-3.5 rounded-xl border text-xs flex items-center gap-2.5 ${testFeedback.type === 'success'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+              : 'bg-red-50 border-red-200 text-red-700'
+              }`}
           >
             {testFeedback.type === 'success' ? (
               <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
