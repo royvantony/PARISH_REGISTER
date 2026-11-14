@@ -19,7 +19,19 @@ import {
 
 export const BackupRestoreTab: React.FC = () => {
   const { activeParish, user } = useAuth();
-  const { isFeatureEnabled } = useFeatures();
+  const { isFeatureEnabled, getStoredFlag, isSimulatingClient, isDeveloper } = useFeatures();
+
+  // Strict adherence to Developer Controls toggles
+  const showExport = isSimulatingClient
+    ? isFeatureEnabled('SETTING_BACKUP_EXPORT')
+    : (getStoredFlag('SETTING_BACKUP_EXPORT') || (!isDeveloper && isFeatureEnabled('SETTING_BACKUP_EXPORT')));
+
+  const showImport = isSimulatingClient
+    ? isFeatureEnabled('SETTING_BACKUP_IMPORT')
+    : (getStoredFlag('SETTING_BACKUP_IMPORT') || (!isDeveloper && isFeatureEnabled('SETTING_BACKUP_IMPORT')));
+
+  const canExport = showExport;
+  const canImport = showImport;
 
   // Export state
   const [isExporting, setIsExporting] = useState(false);
@@ -37,9 +49,6 @@ export const BackupRestoreTab: React.FC = () => {
   const [devOtpHint, setDevOtpHint] = useState<string | null>(null);
   const [auditResult, setAuditResult] = useState<any | null>(null);
   const [commitResult, setCommitResult] = useState<any | null>(null);
-
-  const canExport = isFeatureEnabled('SETTING_BACKUP_EXPORT') || user?.role === 'SUPER_ADMIN';
-  const canImport = isFeatureEnabled('SETTING_BACKUP_IMPORT') || user?.role === 'SUPER_ADMIN';
 
   // 1. Trigger Full Archive Export (.parishpack download)
   const handleExport = async () => {
@@ -176,19 +185,21 @@ export const BackupRestoreTab: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExport}
-            isLoading={isExporting}
-            disabled={!canExport}
-            icon={<Download className="w-4 h-4 text-parish-primary" />}
-            title="Export complete encrypted archive of active parish"
-          >
-            Export .parishpack
-          </Button>
-        </div>
+        {showExport && (
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExport}
+              isLoading={isExporting}
+              disabled={!canExport}
+              icon={<Download className="w-4 h-4 text-parish-primary" />}
+              title="Export complete encrypted archive of active parish"
+            >
+              Export .parishpack
+            </Button>
+          </div>
+        )}
       </div>
 
       {exportFeedback && (
@@ -205,68 +216,71 @@ export const BackupRestoreTab: React.FC = () => {
         </div>
       )}
 
-      {/* Grid: 2 Columns (Export Card & OTP Import Card) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Grid: 2 Columns when both active, 1 Column when only one is active */}
+      <div className={`grid gap-6 ${showExport && showImport ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
         {/* CARD 1: Export Package */}
-        <div className="p-6 rounded-2xl bg-parish-surface border border-parish-border shadow-xs space-y-4 flex flex-col justify-between">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm font-bold text-parish-text">
-                <Download className="w-4 h-4 text-parish-primary" />
-                <span>Export Parish Archive</span>
+        {showExport && (
+          <div className="p-6 rounded-2xl bg-parish-surface border border-parish-border shadow-xs space-y-4 flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm font-bold text-parish-text">
+                  <Download className="w-4 h-4 text-parish-primary" />
+                  <span>Export Parish Archive</span>
+                </div>
+                <Badge variant="default" size="sm">Active Parish</Badge>
               </div>
-              <Badge variant="default" size="sm">Active Parish</Badge>
+              <p className="text-xs text-parish-text-muted leading-relaxed">
+                Generates an encrypted package containing:
+              </p>
+              <ul className="text-xs text-parish-text space-y-1.5 pl-2">
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>All Family households, member census, and direct debits</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>All physical uploaded certificates, IDs, and PDF documents</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Parish user accounts, roles, and security overrides</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Territorial wards, prayer units, and origin dioceses</span>
+                </li>
+              </ul>
             </div>
-            <p className="text-xs text-parish-text-muted leading-relaxed">
-              Generates an encrypted package containing:
-            </p>
-            <ul className="text-xs text-parish-text space-y-1.5 pl-2">
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                <span>All Family households, member census, and direct debits</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                <span>All physical uploaded certificates, IDs, and PDF documents</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Parish user accounts, roles, and security overrides</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Territorial wards, prayer units, and origin dioceses</span>
-              </li>
-            </ul>
-          </div>
 
-          <div className="pt-4 border-t border-parish-border flex items-center justify-between">
-            <span className="text-[11px] text-parish-text-muted flex items-center gap-1">
-              <Lock className="w-3 h-3 text-amber-600" />
-              <span>AES-256 proprietary envelope</span>
-            </span>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleExport}
-              isLoading={isExporting}
-              disabled={!canExport}
-              icon={<Download className="w-4 h-4" />}
-            >
-              Export Archive Now
-            </Button>
+            <div className="pt-4 border-t border-parish-border flex items-center justify-between">
+              <span className="text-[11px] text-parish-text-muted flex items-center gap-1">
+                <Lock className="w-3 h-3 text-amber-600" />
+                <span>AES-256 proprietary envelope</span>
+              </span>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleExport}
+                isLoading={isExporting}
+                disabled={!canExport}
+                icon={<Download className="w-4 h-4" />}
+              >
+                Export Archive Now
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* CARD 2: Import & Integrity Audit */}
-        <div className="p-6 rounded-2xl bg-parish-surface border border-parish-border shadow-xs space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm font-bold text-parish-text">
-              <Upload className="w-4 h-4 text-indigo-600" />
-              <span>Import Archive with OTP Verification</span>
+        {showImport && (
+          <div className="p-6 rounded-2xl bg-parish-surface border border-parish-border shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm font-bold text-parish-text">
+                <Upload className="w-4 h-4 text-indigo-600" />
+                <span>Import Archive with OTP Verification</span>
+              </div>
+              <Badge variant="warning" size="sm">2FA Protected</Badge>
             </div>
-            <Badge variant="warning" size="sm">2FA Protected</Badge>
-          </div>
 
           {importStep === 'IDLE' && (
             <div className="space-y-4">
@@ -438,6 +452,7 @@ export const BackupRestoreTab: React.FC = () => {
             </div>
           )}
         </div>
+        )}
       </div>
     </div>
   );
