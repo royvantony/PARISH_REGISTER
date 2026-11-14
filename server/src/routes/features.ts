@@ -23,7 +23,7 @@ export const SYSTEM_FEATURES: FeatureDefinition[] = [
     category: 'PAGE',
     description: 'Main Parish Register list, household search and member directory',
     route: '/register',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
   {
     key: 'PAGE_REGISTER_NEW',
@@ -31,7 +31,7 @@ export const SYSTEM_FEATURES: FeatureDefinition[] = [
     category: 'PAGE',
     description: 'Family registration wizard for adding new households',
     route: '/register/new',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
   {
     key: 'PAGE_REGISTER_IMPORT',
@@ -39,7 +39,7 @@ export const SYSTEM_FEATURES: FeatureDefinition[] = [
     category: 'PAGE',
     description: 'Bulk CSV registration upload and mapping pipeline',
     route: '/register/import',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
   {
     key: 'PAGE_UNITS',
@@ -47,7 +47,7 @@ export const SYSTEM_FEATURES: FeatureDefinition[] = [
     category: 'PAGE',
     description: 'Geographic and demographic family unit administration',
     route: '/units',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
   {
     key: 'PAGE_USERS',
@@ -55,7 +55,7 @@ export const SYSTEM_FEATURES: FeatureDefinition[] = [
     category: 'PAGE',
     description: 'Parish user accounts, credentials, and access control',
     route: '/users',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
   {
     key: 'PAGE_SETTINGS',
@@ -63,7 +63,7 @@ export const SYSTEM_FEATURES: FeatureDefinition[] = [
     category: 'PAGE',
     description: 'Parish profile, diocese details, and origin diocese configuration',
     route: '/settings',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
 
   // 2. Dashboard Sub-Items
@@ -72,70 +72,70 @@ export const SYSTEM_FEATURES: FeatureDefinition[] = [
     name: 'Demographic Summary Cards',
     category: 'DASHBOARD',
     description: 'Active families, student singles, and member metrics',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
   {
     key: 'DASH_DEMO_COMPOSITION',
     name: 'Demographic Composition Chart',
     category: 'DASHBOARD',
     description: 'Families vs International Students vs Individuals pie chart',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
   {
     key: 'DASH_WARD_CHART',
     name: 'Ward Distribution Bar Chart',
     category: 'DASHBOARD',
     description: 'Household distribution breakdown across parish wards/units',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
   {
     key: 'DASH_AGE_BRACKETS',
     name: 'Age Cohorts Breakdown',
     category: 'DASHBOARD',
     description: 'Demographic age pyramids and parishioner life stages',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
   {
     key: 'DASH_TREND_CHART',
     name: 'Registration Trends Over Time',
     category: 'DASHBOARD',
     description: 'Yearly registration growth and cumulative parishioner volume',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
   {
     key: 'DASH_SUBURB_CHART',
     name: 'Top Suburbs Geographic Spread',
     category: 'DASHBOARD',
     description: 'Geographic distribution of registered households across residential suburbs',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
   {
     key: 'DASH_FAMILY_SIZE',
     name: 'Family Size Breakdown Chart',
     category: 'DASHBOARD',
     description: 'Household size distribution from 1 to 5+ members',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
   {
     key: 'DASH_ORIGIN_DIOCESES',
     name: 'Dioceses of Origin (Kerala / India)',
     category: 'DASHBOARD',
     description: 'Parishioners native roots across Kerala & India searchable ranked breakdown',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
   {
     key: 'DASH_QUICK_ACTIONS',
     name: 'Dashboard Quick Action Buttons',
     category: 'DASHBOARD',
     description: 'Top header action shortcuts and directory navigation buttons',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
   {
     key: 'DASH_ACTIVITY_FEED',
     name: 'Pastoral Activity & Notes Feed',
     category: 'DASHBOARD',
     description: 'Recent pastoral visits, updates, and family activity audit stream',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
 
   // 3. Settings Components
@@ -144,63 +144,63 @@ export const SYSTEM_FEATURES: FeatureDefinition[] = [
     name: 'Governing Diocese Profile Box',
     category: 'SETTINGS',
     description: 'Official diocese contact, Bishop name, and diocesan credentials',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
   {
     key: 'SETTING_PARISH_BOX',
     name: 'Parish Profile & Identifiers Box',
     category: 'SETTINGS',
     description: 'Parish code, contact details, priest details, and auto-numbering',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
   {
     key: 'SETTING_NATIVE_DIOCESES',
     name: 'Origin Dioceses Masters Tab',
     category: 'SETTINGS',
     description: 'Indian native dioceses catalogue, states, and rites management',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
   {
     key: 'SETTING_SYSTEM_HEALTH',
     name: 'System Health & Telemetry Box',
     category: 'SETTINGS',
     description: 'Database latency, uptime monitor, and diagnostic telemetry',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
   {
     key: 'SETTING_SMTP',
     name: 'Email & SMTP Gateway Configuration',
     category: 'SETTINGS',
     description: 'Outgoing email server settings, Gmail App Passwords, and test email dispatcher',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
   {
     key: 'SETTING_ACTIVITY_LOGS',
     name: 'Security & System Activity Logs Tab',
     category: 'SETTINGS',
     description: 'System audit logs, user authentication tracking, and settings change history',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
   {
     key: 'SETTING_BACKUP_EXPORT',
     name: 'Parish Archive Export (.parishpack)',
     category: 'SETTINGS',
     description: 'Export complete parish data, members, users, and certificates in an encrypted package',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
   {
     key: 'SETTING_BACKUP_IMPORT',
     name: 'Parish Archive Import with OTP Verification',
     category: 'SETTINGS',
     description: 'Import full parish archive with 2FA email authorization and identity integrity verification',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
   {
     key: 'SYS_ACTIVITY_LOGGING',
     name: 'Global System Activity Logging Engine',
     category: 'SETTINGS',
     description: 'Master switch to record user logins, logouts, page visits, and administrative changes',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
 
   // 4. Users Page Tabs
@@ -209,21 +209,21 @@ export const SYSTEM_FEATURES: FeatureDefinition[] = [
     name: 'User Accounts Directory Tab',
     category: 'USERS',
     description: 'List, invite, search, and edit parish user accounts',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
   {
     key: 'USERS_TAB_MATRIX',
     name: 'Role Permissions Matrix Tab',
     category: 'USERS',
     description: 'Configure standard permissions per role',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
   {
     key: 'USERS_TAB_OVERRIDES',
     name: 'User Permission Overrides Tab',
     category: 'USERS',
     description: 'Fine-grained permission overrides per individual user',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
 
   // 5. Parish Register Sub-Features
@@ -232,28 +232,28 @@ export const SYSTEM_FEATURES: FeatureDefinition[] = [
     name: 'Direct Debit Banking Feature',
     category: 'REGISTER',
     description: 'Direct debit pledge amounts, frequencies, and management drawer',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
   {
     key: 'REGISTER_DOCUMENTS',
     name: 'Family Documents & Certificates',
     category: 'REGISTER',
     description: 'Secure attachments repository for parish release letters, baptism certificates, and ID documents',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
   {
     key: 'REGISTER_PRINT_DOSSIER',
     name: 'Print Family Dossier',
     category: 'REGISTER',
     description: 'Printable individual family dossiers (preview and PDF export)',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
   {
     key: 'REGISTER_PRINT_LIST',
     name: 'Print Directory Lists',
     category: 'REGISTER',
     description: 'Parish directory printable list (PDF Formatted Colour and Flat Black & White)',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
 
   // 6. Visual Theme Selector
@@ -262,7 +262,7 @@ export const SYSTEM_FEATURES: FeatureDefinition[] = [
     name: 'Theme Selector Buttons',
     category: 'GENERAL',
     description: 'Show/hide theme switch buttons. When hidden, Cathedral Burgundy is forced as default.',
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
 ];
 
@@ -357,9 +357,8 @@ export async function getParishFeatures(parishId: number): Promise<SystemFeature
         category: def.category,
         description: def.description || null,
         route: def.route || null,
-        // If initializing a brand new parish, use def.defaultEnabled.
-        // If backfilling an existing vault where a key was missing, fail-closed to false (hidden).
-        isEnabled: vault ? false : def.defaultEnabled,
+        // By default on new database or new parish creation: all features are disabled (false)
+        isEnabled: false,
       });
       hasMissing = true;
     }
