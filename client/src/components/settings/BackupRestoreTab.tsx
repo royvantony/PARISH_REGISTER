@@ -19,16 +19,19 @@ import {
 
 export const BackupRestoreTab: React.FC = () => {
   const { activeParish, user } = useAuth();
-  const { isFeatureEnabled, getStoredFlag, isSimulatingClient, isDeveloper } = useFeatures();
+  const { getStoredFlag, isSimulatingClient, isFeatureEnabled } = useFeatures();
 
-  // Strict adherence to Developer Controls toggles
-  const showExport = isSimulatingClient
+  // Each card strictly and independently adheres to its own Developer Controls toggle.
+  const isExportFlagActive = isSimulatingClient
     ? isFeatureEnabled('SETTING_BACKUP_EXPORT')
-    : (getStoredFlag('SETTING_BACKUP_EXPORT') || (!isDeveloper && isFeatureEnabled('SETTING_BACKUP_EXPORT')));
+    : getStoredFlag('SETTING_BACKUP_EXPORT');
 
-  const showImport = isSimulatingClient
+  const isImportFlagActive = isSimulatingClient
     ? isFeatureEnabled('SETTING_BACKUP_IMPORT')
-    : (getStoredFlag('SETTING_BACKUP_IMPORT') || (!isDeveloper && isFeatureEnabled('SETTING_BACKUP_IMPORT')));
+    : getStoredFlag('SETTING_BACKUP_IMPORT');
+
+  const showExport = Boolean(isExportFlagActive);
+  const showImport = Boolean(isImportFlagActive);
 
   const canExport = showExport;
   const canImport = showImport;
@@ -70,7 +73,17 @@ export const BackupRestoreTab: React.FC = () => {
 
       setExportFeedback('Encrypted .parishpack backup exported and downloaded successfully.');
     } catch (err: any) {
-      setErrorMessage(err.response?.data?.error || 'Failed to export parish backup.');
+      if (err.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          const json = JSON.parse(text);
+          setErrorMessage(json.error || 'Failed to export parish backup.');
+        } catch {
+          setErrorMessage('Failed to export parish backup.');
+        }
+      } else {
+        setErrorMessage(err.response?.data?.error || err.message || 'Failed to export parish backup.');
+      }
     } finally {
       setIsExporting(false);
     }
@@ -213,6 +226,20 @@ export const BackupRestoreTab: React.FC = () => {
         <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
           <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
           <span>{errorMessage}</span>
+        </div>
+      )}
+
+      {/* Empty state when both features are disabled in Developer Controls */}
+      {!showExport && !showImport && (
+        <div className="p-8 rounded-2xl bg-parish-surface border border-dashed border-parish-border text-center space-y-3">
+          <div className="w-12 h-12 rounded-full bg-amber-500/10 text-amber-600 flex items-center justify-center mx-auto">
+            <Archive className="w-6 h-6" />
+          </div>
+          <h4 className="font-bold text-sm text-parish-text">Parish Archive Features Disabled</h4>
+          <p className="text-xs text-parish-text-muted max-w-md mx-auto">
+            Both Parish Archive Export and Parish Archive Import are currently toggled off in Developer Controls.
+            Enable either feature to activate its migration card.
+          </p>
         </div>
       )}
 
