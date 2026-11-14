@@ -155,7 +155,9 @@ authRouter.post('/login', async (req: Request, res: Response) => {
 
 const isDevLoginAllowed = () => {
   const env = (process.env.APP_ENV || process.env.NODE_ENV || 'Dev').toLowerCase();
-  return env === 'dev' || env === 'demo' || process.env.ALLOW_DEV_LOGIN === 'true';
+  const isDevOrDemo = env === 'dev' || env === 'demo';
+  const hasAllowFlag = process.env.ALLOW_DEV_LOGIN === 'true';
+  return isDevOrDemo && hasAllowFlag;
 };
 
 // POST /api/auth/dev-available - Check which configured dev shortcut emails exist and are active
