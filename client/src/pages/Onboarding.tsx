@@ -22,6 +22,11 @@ import {
   ArrowRight,
   MapPin,
   Baby,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from 'lucide-react';
 
 interface StagingDocItem {
@@ -113,9 +118,16 @@ export const OnboardingPage: React.FC = () => {
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  // Staging Mediator Grid state
+  // Staging Mediator Grid state & filters
   const [filterTab, setFilterTab] = useState<'ALL' | 'ERRORS' | 'WARNINGS' | 'READY' | 'ACTIVE' | 'INACTIVE'>('ALL');
+  const [wardFilter, setWardFilter] = useState<string>('ALL');
+  const [customFilter, setCustomFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(25);
+
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [isCachingDocs, setIsCachingDocs] = useState<boolean>(false);
   const [isSavingDraft, setIsSavingDraft] = useState<boolean>(false);
@@ -305,27 +317,68 @@ export const OnboardingPage: React.FC = () => {
     setExpandedRows((prev) => ({ ...prev, [rowId]: !prev[rowId] }));
   };
 
+  // Reset page when any filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterTab, wardFilter, customFilter, searchQuery, pageSize]);
+
   // Filter and search
   const filteredRows = (session?.rows || []).filter((r) => {
-    // Tab filter
+    // 1. Status Tab filter
     if (filterTab === 'ERRORS' && r.validationStatus !== 'ERROR') return false;
     if (filterTab === 'WARNINGS' && r.validationStatus !== 'WARNING') return false;
     if (filterTab === 'READY' && r.validationStatus !== 'READY') return false;
     if (filterTab === 'ACTIVE' && r.membershipStatus !== 'ACTIVE') return false;
     if (filterTab === 'INACTIVE' && r.membershipStatus !== 'INACTIVE') return false;
 
-    // Search query
+    // 2. Ward dropdown filter
+    if (wardFilter === 'UNMATCHED') {
+      if (r.wardStatus === 'MATCHED') return false;
+    } else if (wardFilter !== 'ALL') {
+      if (String(r.wardId) !== wardFilter) return false;
+    }
+
+    // 3. Custom Issue filter
+    if (customFilter === 'ERRORS' && r.validationStatus !== 'ERROR') return false;
+    if (customFilter === 'WARNINGS' && r.validationStatus !== 'WARNING') return false;
+    if (customFilter === 'READY' && r.validationStatus !== 'READY') return false;
+    if (customFilter === 'MISSING_HEAD' && r.headName.trim()) return false;
+    if (customFilter === 'MISSING_DOB' && (r.headDob.trim() && !r.errors.some((e) => e.includes('Date of Birth')))) return false;
+    if (customFilter === 'MISSING_HOUSE' && r.houseName.trim()) return false;
+    if (customFilter === 'UNMAPPED_WARD' && r.wardStatus === 'MATCHED') return false;
+    if (customFilter === 'HAS_DOCS') {
+      const hasAny = Object.values(r.documents).some((d) => Boolean(d.url) || d.status === 'CACHED');
+      if (!hasAny) return false;
+    }
+    if (customFilter === 'NO_DOCS') {
+      const hasAny = Object.values(r.documents).some((d) => Boolean(d.url) || d.status === 'CACHED');
+      if (hasAny) return false;
+    }
+
+    // 4. Search query
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const match =
         r.houseName.toLowerCase().includes(q) ||
         r.headName.toLowerCase().includes(q) ||
         r.legacyCode.toLowerCase().includes(q) ||
-        r.wardName.toLowerCase().includes(q);
+        r.wardName.toLowerCase().includes(q) ||
+        r.addressStreet.toLowerCase().includes(q) ||
+        r.headPhone.toLowerCase().includes(q) ||
+        r.headEmail.toLowerCase().includes(q);
       if (!match) return false;
     }
     return true;
   });
+
+  // Pagination computations
+  const totalItems = filteredRows.length;
+  const isShowAll = pageSize === -1;
+  const totalPages = isShowAll ? 1 : Math.max(1, Math.ceil(totalItems / pageSize));
+  const effectivePage = Math.min(currentPage, totalPages);
+  const startIndex = isShowAll ? 0 : (effectivePage - 1) * pageSize;
+  const endIndex = isShowAll ? totalItems : Math.min(startIndex + pageSize, totalItems);
+  const paginatedRows = isShowAll ? filteredRows : filteredRows.slice(startIndex, endIndex);
 
   if (isLoadingSession) {
     return (
@@ -555,7 +608,7 @@ export const OnboardingPage: React.FC = () => {
               File: {session.fileName || 'Spreadsheet'}
             </span>
           </div>
-          <div className="flex items-center gap-3 text-xs text-parish-text-muted">
+          <div className="flex items-center gap-3 text-xs text-parish-text-muted flex-wrap">
             <span>Total: <strong>{session.totalRows}</strong></span>
             <span className="text-emerald-600 font-bold">Ready: {session.validRows}</span>
             <span className="text-amber-600 font-bold">Warnings: {session.warningRows}</span>
@@ -617,89 +670,230 @@ export const OnboardingPage: React.FC = () => {
         </div>
       )}
 
-      {/* Filter Tabs & Search Bar */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-parish-bg border border-parish-border text-xs font-bold">
-          <button
-            onClick={() => setFilterTab('ALL')}
-            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
-              filterTab === 'ALL' ? 'bg-parish-surface text-parish-text shadow-xs' : 'text-parish-text-muted hover:text-parish-text'
-            }`}
-          >
-            All ({session.totalRows})
-          </button>
-          <button
-            onClick={() => setFilterTab('ERRORS')}
-            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
-              filterTab === 'ERRORS' ? 'bg-rose-500 text-white shadow-xs' : 'text-rose-600 hover:bg-rose-50/50'
-            }`}
-          >
-            Needs Attention ({session.errorRows})
-          </button>
-          <button
-            onClick={() => setFilterTab('WARNINGS')}
-            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
-              filterTab === 'WARNINGS' ? 'bg-amber-500 text-white shadow-xs' : 'text-amber-600 hover:bg-amber-50/50'
-            }`}
-          >
-            Warnings ({session.warningRows})
-          </button>
-          <button
-            onClick={() => setFilterTab('READY')}
-            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
-              filterTab === 'READY' ? 'bg-emerald-600 text-white shadow-xs' : 'text-emerald-600 hover:bg-emerald-50/50'
-            }`}
-          >
-            Ready ({session.validRows})
-          </button>
-          <button
-            onClick={() => setFilterTab('ACTIVE')}
-            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
-              filterTab === 'ACTIVE' ? 'bg-parish-surface text-parish-primary shadow-xs' : 'text-parish-text-muted hover:text-parish-text'
-            }`}
-          >
-            Active
-          </button>
-          <button
-            onClick={() => setFilterTab('INACTIVE')}
-            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
-              filterTab === 'INACTIVE' ? 'bg-parish-surface text-parish-text-muted shadow-xs' : 'text-parish-text-muted hover:text-parish-text'
-            }`}
-          >
-            Inactive
-          </button>
+      {/* Filter Toolbar: Status Tabs + Ward Dropdown + Custom Issues Dropdown + Search */}
+      <div className="p-3 rounded-2xl bg-parish-surface border border-parish-border shadow-xs space-y-3">
+        {/* Row 1: Status Tabs */}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-parish-bg border border-parish-border text-xs font-bold overflow-x-auto max-w-full">
+            <button
+              onClick={() => setFilterTab('ALL')}
+              className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer shrink-0 ${
+                filterTab === 'ALL' ? 'bg-parish-surface text-parish-text shadow-xs' : 'text-parish-text-muted hover:text-parish-text'
+              }`}
+            >
+              All ({session.totalRows})
+            </button>
+            <button
+              onClick={() => setFilterTab('ERRORS')}
+              className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer shrink-0 ${
+                filterTab === 'ERRORS' ? 'bg-rose-500 text-white shadow-xs' : 'text-rose-600 hover:bg-rose-50/50'
+              }`}
+            >
+              Needs Fix ({session.errorRows})
+            </button>
+            <button
+              onClick={() => setFilterTab('WARNINGS')}
+              className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer shrink-0 ${
+                filterTab === 'WARNINGS' ? 'bg-amber-500 text-white shadow-xs' : 'text-amber-600 hover:bg-amber-50/50'
+              }`}
+            >
+              Warnings ({session.warningRows})
+            </button>
+            <button
+              onClick={() => setFilterTab('READY')}
+              className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer shrink-0 ${
+                filterTab === 'READY' ? 'bg-emerald-600 text-white shadow-xs' : 'text-emerald-600 hover:bg-emerald-50/50'
+              }`}
+            >
+              Ready ({session.validRows})
+            </button>
+            <button
+              onClick={() => setFilterTab('ACTIVE')}
+              className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer shrink-0 ${
+                filterTab === 'ACTIVE' ? 'bg-parish-surface text-parish-primary shadow-xs' : 'text-parish-text-muted hover:text-parish-text'
+              }`}
+            >
+              Active
+            </button>
+            <button
+              onClick={() => setFilterTab('INACTIVE')}
+              className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer shrink-0 ${
+                filterTab === 'INACTIVE' ? 'bg-parish-surface text-parish-text-muted shadow-xs' : 'text-parish-text-muted hover:text-parish-text'
+              }`}
+            >
+              Inactive
+            </button>
+          </div>
+
+          {/* Search Box */}
+          <div className="relative min-w-[240px] flex-1 sm:max-w-xs">
+            <Search className="w-4 h-4 text-parish-text-muted absolute left-3 top-2.5" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search house, head, code, phone..."
+              className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl border border-parish-border bg-parish-bg/50 focus:bg-parish-surface focus:outline-none focus:ring-1 focus:ring-parish-primary"
+            />
+          </div>
         </div>
 
-        <div className="relative min-w-[260px]">
-          <Search className="w-4 h-4 text-parish-text-muted absolute left-3 top-2.5" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search house, head, code, ward..."
-            className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl border border-parish-border bg-parish-surface focus:outline-none focus:ring-1 focus:ring-parish-primary"
-          />
+        {/* Row 2: Secondary Dropdown Filters (Ward + Custom Issues) */}
+        <div className="flex items-center gap-3 flex-wrap pt-2 border-t border-parish-border/60 text-xs">
+          <div className="flex items-center gap-2">
+            <MapPin className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+            <span className="font-bold text-parish-text-muted">Ward:</span>
+            <select
+              value={wardFilter}
+              onChange={(e) => setWardFilter(e.target.value)}
+              className="px-2.5 py-1 text-xs rounded-lg border border-parish-border bg-parish-bg/50 font-semibold cursor-pointer"
+            >
+              <option value="ALL">All Wards</option>
+              <option value="UNMATCHED">Unmapped / Missing Wards Only</option>
+              {wards.map((w) => (
+                <option key={w.id} value={String(w.id)}>
+                  {w.unitName}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Filter className="w-3.5 h-3.5 text-parish-primary shrink-0" />
+            <span className="font-bold text-parish-text-muted">Specific Issues:</span>
+            <select
+              value={customFilter}
+              onChange={(e) => setCustomFilter(e.target.value)}
+              className="px-2.5 py-1 text-xs rounded-lg border border-parish-border bg-parish-bg/50 font-semibold cursor-pointer"
+            >
+              <option value="ALL">All Families</option>
+              <option value="ERRORS">Only Rows with Critical Errors</option>
+              <option value="WARNINGS">Only Rows with Warnings</option>
+              <option value="READY">Only Ready / Valid Rows</option>
+              <option value="MISSING_HEAD">Missing Head Full Name</option>
+              <option value="MISSING_DOB">Missing / Invalid Head Date of Birth</option>
+              <option value="MISSING_HOUSE">Missing House Name (Veettuperu)</option>
+              <option value="UNMAPPED_WARD">Unmapped Ward</option>
+              <option value="HAS_DOCS">Has Document URLs</option>
+              <option value="NO_DOCS">No Documents</option>
+            </select>
+          </div>
+
+          {/* Reset Filters Shortcut */}
+          {(wardFilter !== 'ALL' || customFilter !== 'ALL' || searchQuery || filterTab !== 'ALL') && (
+            <button
+              onClick={() => {
+                setFilterTab('ALL');
+                setWardFilter('ALL');
+                setCustomFilter('ALL');
+                setSearchQuery('');
+              }}
+              className="text-[11px] text-parish-primary hover:underline font-bold cursor-pointer ml-auto"
+            >
+              Reset Filters
+            </button>
+          )}
         </div>
       </div>
 
-      {/* 2-Row Household Card Grid */}
+      {/* Pagination Bar (Top) */}
+      <div className="flex items-center justify-between gap-3 flex-wrap px-1 text-xs text-parish-text-muted">
+        <div>
+          Showing <strong>{totalItems === 0 ? 0 : startIndex + 1}</strong> to{' '}
+          <strong>{endIndex}</strong> of <strong>{totalItems}</strong> families
+          {totalItems !== session.totalRows && (
+            <span className="opacity-75"> (filtered from {session.totalRows})</span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-[11px]">Per page:</span>
+          <select
+            value={pageSize}
+            onChange={(e) => setPageSize(Number(e.target.value))}
+            className="px-2 py-0.5 text-xs rounded border border-parish-border bg-parish-surface font-semibold cursor-pointer"
+          >
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+            <option value={-1}>Show All</option>
+          </select>
+
+          {!isShowAll && totalPages > 1 && (
+            <div className="flex items-center gap-1 ml-2">
+              <button
+                type="button"
+                disabled={effectivePage <= 1}
+                onClick={() => setCurrentPage(1)}
+                className="p-1 rounded border border-parish-border hover:bg-parish-surface disabled:opacity-30 cursor-pointer"
+                title="First Page"
+              >
+                <ChevronsLeft className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                disabled={effectivePage <= 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                className="p-1 rounded border border-parish-border hover:bg-parish-surface disabled:opacity-30 cursor-pointer"
+                title="Previous Page"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+              <span className="px-2 text-xs font-bold font-mono">
+                {effectivePage} / {totalPages}
+              </span>
+              <button
+                type="button"
+                disabled={effectivePage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                className="p-1 rounded border border-parish-border hover:bg-parish-surface disabled:opacity-30 cursor-pointer"
+                title="Next Page"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                disabled={effectivePage >= totalPages}
+                onClick={() => setCurrentPage(totalPages)}
+                className="p-1 rounded border border-parish-border hover:bg-parish-surface disabled:opacity-30 cursor-pointer"
+                title="Last Page"
+              >
+                <ChevronsRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 2-Row Household Card Grid (Zebra Alternating Colors & Paged) */}
       <div className="space-y-3">
-        {filteredRows.map((row) => {
+        {paginatedRows.map((row, index) => {
           const isExpanded = Boolean(expandedRows[row.rowId]);
           const docEntries = Object.entries(row.documents);
-          const cachedDocsCount = docEntries.filter(([_, d]) => d.status === 'CACHED').length;
-          const totalDocsCount = docEntries.filter(([_, d]) => Boolean(d.url)).length;
+          const activeDocs = docEntries.filter(([_, d]) => Boolean(d.url) || d.status === 'CACHED');
+          const cachedDocsCount = activeDocs.filter(([_, d]) => d.status === 'CACHED').length;
+          const totalDocsCount = activeDocs.length;
+
+          // Alternating zebra styling
+          const isEven = index % 2 === 0;
+          let cardBgClass = isEven
+            ? 'bg-white dark:bg-slate-900 border-slate-200/90 dark:border-slate-800'
+            : 'bg-slate-50/90 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700/60';
+
+          if (row.validationStatus === 'ERROR') {
+            cardBgClass = isEven
+              ? 'border-rose-300 dark:border-rose-900/70 bg-rose-50/40 dark:bg-rose-950/20'
+              : 'border-rose-300 dark:border-rose-900/70 bg-rose-50/20 dark:bg-rose-950/10';
+          } else if (row.validationStatus === 'WARNING') {
+            cardBgClass = isEven
+              ? 'border-amber-300 dark:border-amber-900/70 bg-amber-50/40 dark:bg-amber-950/20'
+              : 'border-amber-300 dark:border-amber-900/70 bg-amber-50/20 dark:bg-amber-950/10';
+          }
 
           return (
             <div
               key={row.rowId}
-              className={`p-4 rounded-2xl border transition-all ${
-                row.validationStatus === 'ERROR'
-                  ? 'border-rose-300 dark:border-rose-900/60 bg-rose-50/20 dark:bg-rose-950/10'
-                  : row.validationStatus === 'WARNING'
-                  ? 'border-amber-300 dark:border-amber-900/60 bg-amber-50/20 dark:bg-amber-950/10'
-                  : 'border-parish-border bg-parish-surface shadow-xs'
-              }`}
+              className={`p-4 rounded-2xl border transition-all shadow-xs ${cardBgClass}`}
             >
               {/* ROW 1: HOUSEHOLD, STATUS & WARD MAPPING */}
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
@@ -723,7 +917,7 @@ export const OnboardingPage: React.FC = () => {
                     value={row.legacyCode}
                     onChange={(e) => handleUpdateRowField(row.rowId, 'legacyCode', e.target.value)}
                     placeholder="Auto Code"
-                    className="w-full px-2.5 py-1 text-xs font-mono font-bold rounded-lg border border-parish-border bg-parish-bg/50 focus:bg-white dark:focus:bg-slate-900"
+                    className="w-full px-2.5 py-1 text-xs font-mono font-bold rounded-lg border border-parish-border bg-parish-bg/40 focus:bg-white dark:focus:bg-slate-900"
                     title="Family Registration Code"
                   />
                 </div>
@@ -738,7 +932,7 @@ export const OnboardingPage: React.FC = () => {
                     className={`w-full px-2.5 py-1 text-xs font-bold rounded-lg border ${
                       !row.houseName.trim()
                         ? 'border-rose-500 bg-rose-50 dark:bg-rose-950/30'
-                        : 'border-parish-border bg-parish-bg/50 focus:bg-white dark:focus:bg-slate-900'
+                        : 'border-parish-border bg-parish-bg/40 focus:bg-white dark:focus:bg-slate-900'
                     }`}
                     title="House Name / Veettuperu"
                   />
@@ -749,7 +943,7 @@ export const OnboardingPage: React.FC = () => {
                   <select
                     value={row.membershipStatus}
                     onChange={(e) => handleUpdateRowField(row.rowId, 'membershipStatus', e.target.value)}
-                    className="w-full px-2.5 py-1 text-xs font-bold rounded-lg border border-parish-border bg-parish-bg/50 cursor-pointer"
+                    className="w-full px-2.5 py-1 text-xs font-bold rounded-lg border border-parish-border bg-parish-bg/40 cursor-pointer"
                   >
                     <option value="ACTIVE">ACTIVE</option>
                     <option value="INACTIVE">INACTIVE</option>
@@ -764,7 +958,7 @@ export const OnboardingPage: React.FC = () => {
                     className={`w-full px-2.5 py-1 text-xs font-semibold rounded-lg border cursor-pointer ${
                       row.wardStatus === 'UNMATCHED'
                         ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200'
-                        : 'border-parish-border bg-parish-bg/50 focus:bg-white dark:focus:bg-slate-900'
+                        : 'border-parish-border bg-parish-bg/40 focus:bg-white dark:focus:bg-slate-900'
                     }`}
                   >
                     <option value="">
@@ -943,44 +1137,43 @@ export const OnboardingPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Document URLs & Caching Status */}
-                  <div className="p-3 rounded-xl bg-parish-bg/40 border border-parish-border/60 space-y-2">
-                    <h4 className="text-[11px] font-bold text-parish-text uppercase tracking-wider flex items-center justify-between">
-                      <span>Linked Scanned Documents (Web URLs)</span>
-                      <span className="text-[10px] font-normal text-parish-text-muted">
-                        Downloads into temporary storage with 8s timeout
-                      </span>
-                    </h4>
+                  {/* Document URLs & Caching Status (ONLY renders if documents are present) */}
+                  {activeDocs.length > 0 && (
+                    <div className="p-3 rounded-xl bg-parish-bg/40 border border-parish-border/60 space-y-2">
+                      <h4 className="text-[11px] font-bold text-parish-text uppercase tracking-wider">
+                        Attached Scanned Documents ({activeDocs.length})
+                      </h4>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                      {docEntries.map(([k, d]) => (
-                        <div key={k} className="p-2 rounded-lg bg-parish-surface border border-parish-border/60 space-y-1">
-                          <div className="flex items-center justify-between text-[11px]">
-                            <span className="font-bold text-parish-text">{d.label.replace(' URL', '')}</span>
-                            <span
-                              className={`text-[9px] font-bold px-1.5 py-0.2 rounded font-mono ${
-                                d.status === 'CACHED'
-                                  ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
-                                  : d.status === 'FAILED'
-                                  ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
-                                  : d.status === 'PENDING'
-                                  ? 'bg-blue-500/20 text-blue-700 dark:text-blue-300'
-                                  : 'text-parish-text-muted'
-                              }`}
-                            >
-                              {d.status}
-                            </span>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                        {activeDocs.map(([k, d]) => (
+                          <div key={k} className="p-2 rounded-lg bg-parish-surface border border-parish-border/60 space-y-1">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="font-bold text-parish-text">{d.label.replace(' URL', '')}</span>
+                              <span
+                                className={`text-[9px] font-bold px-1.5 py-0.2 rounded font-mono ${
+                                  d.status === 'CACHED'
+                                    ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                                    : d.status === 'FAILED'
+                                    ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
+                                    : d.status === 'PENDING'
+                                    ? 'bg-blue-500/20 text-blue-700 dark:text-blue-300'
+                                    : 'text-parish-text-muted'
+                                }`}
+                              >
+                                {d.status}
+                              </span>
+                            </div>
+                            <p className="text-[10px] font-mono text-parish-text-muted truncate" title={d.url || ''}>
+                              {d.url}
+                            </p>
+                            {d.error && (
+                              <p className="text-[10px] text-amber-600 font-medium truncate">{d.error}</p>
+                            )}
                           </div>
-                          <p className="text-[10px] font-mono text-parish-text-muted truncate" title={d.url || 'No URL'}>
-                            {d.url ? d.url : 'No link provided'}
-                          </p>
-                          {d.error && (
-                            <p className="text-[10px] text-amber-600 font-medium truncate">{d.error}</p>
-                          )}
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
             </div>
@@ -994,6 +1187,58 @@ export const OnboardingPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Pagination Bar (Bottom) */}
+      {!isShowAll && totalPages > 1 && (
+        <div className="flex items-center justify-between gap-3 flex-wrap p-3 rounded-2xl bg-parish-surface border border-parish-border shadow-xs text-xs text-parish-text-muted">
+          <div>
+            Showing <strong>{startIndex + 1}</strong> to <strong>{endIndex}</strong> of{' '}
+            <strong>{totalItems}</strong> families
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              disabled={effectivePage <= 1}
+              onClick={() => setCurrentPage(1)}
+              className="p-1.5 rounded-lg border border-parish-border hover:bg-parish-bg disabled:opacity-30 cursor-pointer"
+              title="First Page"
+            >
+              <ChevronsLeft className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              disabled={effectivePage <= 1}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              className="p-1.5 rounded-lg border border-parish-border hover:bg-parish-bg disabled:opacity-30 cursor-pointer"
+              title="Previous Page"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="px-3 text-xs font-bold font-mono">
+              Page {effectivePage} of {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={effectivePage >= totalPages}
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              className="p-1.5 rounded-lg border border-parish-border hover:bg-parish-bg disabled:opacity-30 cursor-pointer"
+              title="Next Page"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              disabled={effectivePage >= totalPages}
+              onClick={() => setCurrentPage(totalPages)}
+              className="p-1.5 rounded-lg border border-parish-border hover:bg-parish-bg disabled:opacity-30 cursor-pointer"
+              title="Last Page"
+            >
+              <ChevronsRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Confirm Discard Modal */}
       <ConfirmDialog

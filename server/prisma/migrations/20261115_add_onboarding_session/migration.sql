@@ -22,3 +22,4 @@ CREATE INDEX "OnboardingSession_parishId_idx" ON "OnboardingSession"("parishId")
 
 -- AddForeignKey
 ALTER TABLE "OnboardingSession" ADD CONSTRAINT "OnboardingSession_parishId_fkey" FOREIGN KEY ("parishId") REFERENCES "Parish"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
