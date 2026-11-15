@@ -53,7 +53,16 @@ onboardingRouter.get('/active-session', async (req: Request, res: Response) => {
       orderBy: { updatedAt: 'desc' },
     });
 
-    return res.json({ session: session || null });
+    const existingCodes = (
+      await prisma.family.findMany({
+        where: { parishId, familyCode: { not: null } },
+        select: { familyCode: true },
+      })
+    )
+      .map((f) => f.familyCode!)
+      .filter(Boolean);
+
+    return res.json({ session: session || null, existingCodes });
   } catch (err: any) {
     console.error('Error fetching active onboarding session:', err);
     return res.status(500).json({ error: 'Failed to fetch onboarding session.' });
@@ -81,6 +90,30 @@ onboardingRouter.post('/upload', upload.single('file'), async (req: Request, res
       where: { parishId, isActive: true },
       select: { id: true, unitName: true },
     });
+
+    // Fetch existing registered families for duplicate and code collision detection
+    const existingFamilies = await prisma.family.findMany({
+      where: { parishId },
+      select: {
+        id: true,
+        familyCode: true,
+        houseName: true,
+        headFullName: true,
+        members: {
+          where: { role: 'HEAD' },
+          select: { dateOfBirth: true },
+          take: 1,
+        },
+      },
+    });
+
+    const existingFamiliesFormatted = existingFamilies.map((f) => ({
+      id: f.id,
+      familyCode: f.familyCode,
+      houseName: f.houseName,
+      headFullName: f.headFullName,
+      headDobIso: f.members[0]?.dateOfBirth ? f.members[0].dateOfBirth.toISOString().split('T')[0] : null,
+    }));
 
     const rowsData: any[] = [];
 
@@ -132,9 +165,9 @@ onboardingRouter.post('/upload', upload.single('file'), async (req: Request, res
       return res.status(400).json({ error: 'The uploaded file contains no data rows.' });
     }
 
-    // Validate rows into staging structures
+    // Validate rows into staging structures with collision and duplicate detection
     const validatedRows: StagingRow[] = rowsData.map((raw, index) =>
-      validateStagingRow(raw, index + 1, parishUnits)
+      validateStagingRow(raw, index + 1, parishUnits, existingFamiliesFormatted)
     );
 
     const validRows = validatedRows.filter((r) => r.validationStatus === 'READY').length;
@@ -177,6 +210,7 @@ onboardingRouter.post('/upload', upload.single('file'), async (req: Request, res
     return res.json({
       success: true,
       session,
+      existingCodes: existingFamiliesFormatted.map((f) => f.familyCode!).filter(Boolean),
     });
   } catch (err: any) {
     console.error('Onboarding upload error:', err);

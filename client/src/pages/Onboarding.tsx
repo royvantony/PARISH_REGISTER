@@ -28,6 +28,7 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  Copy,
 } from 'lucide-react';
 
 interface StagingDocItem {
@@ -85,6 +86,14 @@ interface StagingRow {
   errors: string[];
   warnings: string[];
   isRectified?: boolean;
+  isDuplicate?: boolean;
+  duplicateMatch?: {
+    id: number;
+    familyCode: string | null;
+    headFullName: string | null;
+    houseName: string;
+  } | null;
+  isCodeCollision?: boolean;
 }
 
 function isValidDateString(s: string): boolean {
@@ -133,10 +142,14 @@ export const OnboardingPage: React.FC = () => {
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   // Staging Mediator Grid state & filters
-  const [filterTab, setFilterTab] = useState<'ALL' | 'ERRORS' | 'WARNINGS' | 'RECTIFIED' | 'READY' | 'ACTIVE' | 'INACTIVE'>('ALL');
+  const [filterTab, setFilterTab] = useState<'ALL' | 'ERRORS' | 'WARNINGS' | 'DUPLICATES' | 'RECTIFIED' | 'READY' | 'ACTIVE' | 'INACTIVE'>('ALL');
   const [wardFilter, setWardFilter] = useState<string>('ALL');
   const [customFilter, setCustomFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Collision & duplicate support
+  const [existingCodes, setExistingCodes] = useState<string[]>([]);
+  const [confirmDeleteRowId, setConfirmDeleteRowId] = useState<string | null>(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -176,9 +189,12 @@ export const OnboardingPage: React.FC = () => {
         setIsLoadingSession(true);
         const [wardsRes, sessionRes] = await Promise.all([
           api.get('/masters/units').catch(() => ({ data: [] })),
-          api.get('/onboarding/active-session').catch(() => ({ data: { session: null } })),
+          api.get('/onboarding/active-session').catch(() => ({ data: { session: null, existingCodes: [] } })),
         ]);
         setWards(wardsRes.data || []);
+        if (sessionRes.data?.existingCodes) {
+          setExistingCodes(sessionRes.data.existingCodes);
+        }
         if (sessionRes.data?.session) {
           const s = sessionRes.data.session;
           setSession(s);
@@ -242,6 +258,9 @@ export const OnboardingPage: React.FC = () => {
 
       if (res.data?.success && res.data?.session) {
         setSession(res.data.session);
+        if (res.data?.existingCodes) {
+          setExistingCodes(res.data.existingCodes);
+        }
         setSelectedFile(null);
       }
     } catch (err: any) {
@@ -310,6 +329,36 @@ export const OnboardingPage: React.FC = () => {
       }
     }
 
+    // Legacy Code collision check
+    if (field === 'legacyCode') {
+      const codeVal = String(value).trim().toLowerCase();
+      const codeCollisionIndex = updatedErrors.findIndex(
+        (e) => e.toLowerCase().includes('already in use') || e.toLowerCase().includes('already assigned') || e.toLowerCase().includes('duplicated in another row')
+      );
+
+      const collidesWithDb = Boolean(codeVal && existingCodes.some((c) => c.toLowerCase() === codeVal));
+      const collidesWithOther = Boolean(
+        codeVal && rows.some((other, idx) => idx !== index && other.legacyCode && other.legacyCode.trim().toLowerCase() === codeVal)
+      );
+
+      if (collidesWithDb || collidesWithOther) {
+        row.isCodeCollision = true;
+        const msg = collidesWithDb
+          ? `Family Code "${value.trim()}" is already assigned in the Parish Register. Please edit code.`
+          : `Family Code "${value.trim()}" is duplicated in another row. Please use unique codes.`;
+        if (codeCollisionIndex !== -1) {
+          updatedErrors[codeCollisionIndex] = msg;
+        } else {
+          updatedErrors.push(msg);
+        }
+      } else {
+        row.isCodeCollision = false;
+        if (codeCollisionIndex !== -1) {
+          updatedErrors.splice(codeCollisionIndex, 1);
+        }
+      }
+    }
+
     const hasMissingCore = !row.houseName.trim() || !row.headName.trim() || !row.headDob.trim();
     const hasRemainingErrors = updatedErrors.length > 0 || hasMissingCore;
     const hasRemainingWarnings = row.warnings.length > 0 || row.wardStatus === 'UNMATCHED';
@@ -341,6 +390,32 @@ export const OnboardingPage: React.FC = () => {
       warningRows: rows.filter((r) => r.validationStatus === 'WARNING').length,
       errorRows: rows.filter((r) => r.validationStatus === 'ERROR').length,
     });
+  };
+
+  // Remove a household record from staging
+  const handleRemoveRow = (rowId: string) => {
+    if (!session) return;
+    const targetRow = session.rows.find((r) => r.rowId === rowId);
+    const updatedRows = session.rows.filter((r) => r.rowId !== rowId);
+
+    const validRows = updatedRows.filter((r) => r.validationStatus === 'READY').length;
+    const warningRows = updatedRows.filter((r) => r.validationStatus === 'WARNING').length;
+    const errorRows = updatedRows.filter((r) => r.validationStatus === 'ERROR').length;
+
+    setSession({
+      ...session,
+      rows: updatedRows,
+      totalRows: updatedRows.length,
+      validRows,
+      warningRows,
+      errorRows,
+    });
+
+    setConfirmDeleteRowId(null);
+    setSaveFeedback(
+      `Household #${targetRow?.rowIndex || ''} (${targetRow?.houseName || 'Record'}) was removed from staging.`
+    );
+    setTimeout(() => setSaveFeedback(null), 4000);
   };
 
   // Toggle or mark a household card as rectified
@@ -506,6 +581,7 @@ export const OnboardingPage: React.FC = () => {
     // 1. Status Tab filter
     if (filterTab === 'ERRORS' && r.validationStatus !== 'ERROR') return false;
     if (filterTab === 'WARNINGS' && (r.validationStatus !== 'WARNING' || r.isRectified)) return false;
+    if (filterTab === 'DUPLICATES' && !r.isDuplicate) return false;
     if (filterTab === 'RECTIFIED' && !r.isRectified) return false;
     if (filterTab === 'READY' && r.validationStatus !== 'READY') return false;
     if (filterTab === 'ACTIVE' && r.membershipStatus !== 'ACTIVE') return false;
@@ -519,6 +595,8 @@ export const OnboardingPage: React.FC = () => {
     }
 
     // 3. Custom Issue filter
+    if (customFilter === 'DUPLICATES' && !r.isDuplicate) return false;
+    if (customFilter === 'CODE_COLLISIONS' && !r.isCodeCollision) return false;
     if (customFilter === 'RECTIFIED' && !r.isRectified) return false;
     if (customFilter === 'ERRORS' && r.validationStatus !== 'ERROR') return false;
     if (customFilter === 'WARNINGS' && r.validationStatus !== 'WARNING') return false;
@@ -798,6 +876,12 @@ export const OnboardingPage: React.FC = () => {
                 <span>Rectified: {(session.rows || []).filter((r) => Boolean(r.isRectified)).length}</span>
               </span>
             )}
+            {(session.rows || []).filter((r) => Boolean(r.isDuplicate)).length > 0 && (
+              <span className="text-purple-700 font-bold flex items-center gap-1">
+                <Copy className="w-3.5 h-3.5 text-purple-600" />
+                <span>Duplicates: {(session.rows || []).filter((r) => Boolean(r.isDuplicate)).length}</span>
+              </span>
+            )}
             <span className="text-amber-600 font-bold">Warnings: {session.warningRows}</span>
             <span className="text-rose-600 font-bold">Errors: {session.errorRows}</span>
           </div>
@@ -886,6 +970,17 @@ export const OnboardingPage: React.FC = () => {
             >
               Warnings ({session.warningRows})
             </button>
+            {(session.rows || []).filter((r) => Boolean(r.isDuplicate)).length > 0 && (
+              <button
+                onClick={() => setFilterTab('DUPLICATES')}
+                className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                  filterTab === 'DUPLICATES' ? 'bg-purple-600 text-white shadow-xs' : 'text-purple-700 hover:bg-purple-50/50'
+                }`}
+              >
+                <Copy className="w-3.5 h-3.5" />
+                <span>Duplicates ({(session.rows || []).filter((r) => Boolean(r.isDuplicate)).length})</span>
+              </button>
+            )}
             {(session.rows || []).filter((r) => Boolean(r.isRectified)).length > 0 && (
               <button
                 onClick={() => setFilterTab('RECTIFIED')}
@@ -965,6 +1060,12 @@ export const OnboardingPage: React.FC = () => {
               className="px-2.5 py-1 text-xs rounded-lg border border-parish-border bg-parish-bg/50 font-semibold cursor-pointer"
             >
               <option value="ALL">All Families</option>
+              {(session.rows || []).filter((r) => Boolean(r.isDuplicate)).length > 0 && (
+                <option value="DUPLICATES">⚠️ Duplicate Families in Register ({(session.rows || []).filter((r) => Boolean(r.isDuplicate)).length})</option>
+              )}
+              {(session.rows || []).filter((r) => Boolean(r.isCodeCollision)).length > 0 && (
+                <option value="CODE_COLLISIONS">⚠️ Code Collisions ({(session.rows || []).filter((r) => Boolean(r.isCodeCollision)).length})</option>
+              )}
               {(session.rows || []).filter((r) => Boolean(r.isRectified)).length > 0 && (
                 <option value="RECTIFIED">✓ Rectified Households ({(session.rows || []).filter((r) => Boolean(r.isRectified)).length})</option>
               )}
@@ -1081,7 +1182,12 @@ export const OnboardingPage: React.FC = () => {
             ? 'bg-white dark:bg-slate-900 border-slate-200/90 dark:border-slate-800'
             : 'bg-slate-50/90 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700/60';
 
-          if (row.isRectified) {
+          if (row.isDuplicate) {
+            // Distinct separate purple color for duplicates in register
+            cardBgClass = isEven
+              ? 'bg-purple-50/50 dark:bg-purple-950/25 border-purple-300 dark:border-purple-800 shadow-xs'
+              : 'bg-purple-50/30 dark:bg-purple-950/15 border-purple-300 dark:border-purple-800 shadow-xs';
+          } else if (row.isRectified) {
             // Keep default normal zebra color with a clean, reassuring green border
             cardBgClass = isEven
               ? 'bg-white dark:bg-slate-900 border-emerald-400 dark:border-emerald-700 shadow-xs'
@@ -1108,7 +1214,15 @@ export const OnboardingPage: React.FC = () => {
                   <span className="text-[11px] font-mono text-parish-text-muted font-bold">
                     #{row.rowIndex}
                   </span>
-                  {row.isRectified ? (
+                  {row.isDuplicate ? (
+                    <span
+                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-900 border border-purple-300 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-700 shadow-xs"
+                      title={`Matches existing registered family ${row.duplicateMatch?.familyCode || ''}`}
+                    >
+                      <Copy className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                      <span>Duplicate ({row.duplicateMatch?.familyCode || 'In Register'})</span>
+                    </span>
+                  ) : row.isRectified ? (
                     <span
                       className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-700 shadow-xs"
                       title="All issues rectified and verified"
@@ -1133,8 +1247,12 @@ export const OnboardingPage: React.FC = () => {
                     value={row.legacyCode}
                     onChange={(e) => handleUpdateRowField(row.rowId, 'legacyCode', e.target.value)}
                     placeholder="Auto Code"
-                    className="w-full px-2.5 py-1 text-xs font-mono font-bold rounded-lg border border-parish-border bg-parish-bg/40 focus:bg-white dark:focus:bg-slate-900"
-                    title="Family Registration Code"
+                    className={`w-full px-2.5 py-1 text-xs font-mono font-bold rounded-lg border ${
+                      row.isCodeCollision
+                        ? 'border-rose-500 bg-rose-50 dark:bg-rose-950/40 text-rose-900 dark:text-rose-200 ring-1 ring-rose-500'
+                        : 'border-parish-border bg-parish-bg/40 focus:bg-white dark:focus:bg-slate-900'
+                    }`}
+                    title={row.isCodeCollision ? 'Code already assigned in Register - edit required' : 'Family Registration Code'}
                   />
                 </div>
 
@@ -1282,6 +1400,16 @@ export const OnboardingPage: React.FC = () => {
                     <span>{row.isRectified ? 'Rectified' : 'Rectify'}</span>
                   </button>
 
+                  {/* Remove Record from Staging Option */}
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDeleteRowId(row.rowId)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                    title="Remove household from staging list"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => toggleRowExpansion(row.rowId)}
@@ -1292,6 +1420,28 @@ export const OnboardingPage: React.FC = () => {
                   </button>
                 </div>
               </div>
+
+              {/* Duplicate Detected Highlight Banner with Quick Remove Action */}
+              {row.isDuplicate && (
+                <div className="mt-2.5 p-2.5 rounded-xl bg-purple-100/70 dark:bg-purple-950/50 border border-purple-200 dark:border-purple-800 flex items-center justify-between gap-3 text-xs text-purple-950 dark:text-purple-200 animate-in fade-in flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <Copy className="w-4 h-4 text-purple-600 shrink-0" />
+                    <span>
+                      <strong>Duplicate Detected:</strong> Matches existing registered family{' '}
+                      <strong>{row.duplicateMatch?.familyCode}</strong> ({row.duplicateMatch?.headFullName} - {row.duplicateMatch?.houseName}) in Parish Register.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDeleteRowId(row.rowId)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-lg bg-rose-600 text-white hover:bg-rose-700 transition-colors cursor-pointer shadow-xs ml-auto shrink-0"
+                    title="Remove this duplicate household from onboarding"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Remove Duplicate</span>
+                  </button>
+                </div>
+              )}
 
               {/* Validation Errors & Warnings or Rectified Confirmation */}
               {row.isRectified ? (
@@ -1505,6 +1655,17 @@ export const OnboardingPage: React.FC = () => {
         title="Discard Onboarding Draft?"
         message="Are you sure you want to discard this onboarding session? All staged edits and downloaded temp files will be permanently deleted."
         confirmLabel="Yes, Discard Draft"
+        variant="danger"
+      />
+
+      {/* Confirm Remove Row Modal */}
+      <ConfirmDialog
+        isOpen={Boolean(confirmDeleteRowId)}
+        onClose={() => setConfirmDeleteRowId(null)}
+        onConfirm={() => confirmDeleteRowId && handleRemoveRow(confirmDeleteRowId)}
+        title="Remove Household from Staging?"
+        message="Are you sure you want to remove this household from the staging list? It will be excluded from the import and will not be added to the Parish Register."
+        confirmLabel="Yes, Remove Record"
         variant="danger"
       />
 

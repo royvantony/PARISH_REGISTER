@@ -59,6 +59,14 @@ export interface StagingRow {
   errors: string[];
   warnings: string[];
   isRectified?: boolean;
+  isDuplicate?: boolean;
+  duplicateMatch?: {
+    id: number;
+    familyCode: string | null;
+    headFullName: string | null;
+    houseName: string;
+  } | null;
+  isCodeCollision?: boolean;
 }
 
 export interface StagingSessionSummary {
@@ -286,7 +294,8 @@ export async function generateOnboardingExcel(): Promise<Buffer> {
 export function validateStagingRow(
   raw: any,
   rowIndex: number,
-  parishUnits: Array<{ id: number; unitName: string }>
+  parishUnits: Array<{ id: number; unitName: string }>,
+  existingFamilies?: Array<{ id: number; familyCode: string | null; headFullName: string | null; houseName: string; headDobIso?: string | null }>
 ): StagingRow {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -421,6 +430,50 @@ export function validateStagingRow(
     }
   }
 
+  // Code Collision Check with existing registered families in Parish Register
+  let isCodeCollision = false;
+  if (legacyCode && existingFamilies) {
+    const matched = existingFamilies.find(
+      (f) => f.familyCode && f.familyCode.trim().toLowerCase() === legacyCode.toLowerCase()
+    );
+    if (matched) {
+      isCodeCollision = true;
+      errors.push(`Family Code "${legacyCode}" is already assigned to "${matched.headFullName || 'another family'}" in the Parish Register. Please edit.`);
+    }
+  }
+
+  // Duplicate Family Check (Head Name + House Name OR Head Name + DOB)
+  let isDuplicate = false;
+  let duplicateMatch: { id: number; familyCode: string | null; headFullName: string | null; houseName: string } | null = null;
+
+  if (headName && existingFamilies) {
+    const matched = existingFamilies.find((f) => {
+      const nameMatch = f.headFullName && f.headFullName.trim().toLowerCase() === headName.toLowerCase();
+      if (!nameMatch) return false;
+
+      const houseMatch = houseName && f.houseName && f.houseName.trim().toLowerCase() === houseName.toLowerCase();
+      if (houseMatch) return true;
+
+      if (headDobParsed.isValid && headDobParsed.iso && f.headDobIso) {
+        if (f.headDobIso === headDobParsed.iso) return true;
+      }
+      return false;
+    });
+
+    if (matched) {
+      isDuplicate = true;
+      duplicateMatch = {
+        id: matched.id,
+        familyCode: matched.familyCode,
+        headFullName: matched.headFullName,
+        houseName: matched.houseName,
+      };
+      warnings.push(
+        `Duplicate Family Detected: Matches existing family "${matched.familyCode || 'Registered'}" (${matched.headFullName} - ${matched.houseName}) in Parish Register. You can remove this record from staging or edit.`
+      );
+    }
+  }
+
   // Validation Status calculation
   let validationStatus: 'READY' | 'WARNING' | 'ERROR' = 'READY';
   if (errors.length > 0) {
@@ -465,6 +518,10 @@ export function validateStagingRow(
     validationStatus,
     errors,
     warnings,
+    isRectified: Boolean(raw.isRectified),
+    isDuplicate,
+    duplicateMatch,
+    isCodeCollision,
   };
 }
 
