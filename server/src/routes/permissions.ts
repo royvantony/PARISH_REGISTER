@@ -13,6 +13,7 @@ export const SYSTEM_MODULES = [
   { key: 'REGISTER', name: 'Parish Register Directory', category: 'Core Register' },
   { key: 'REGISTER_NEW', name: 'Register New Family', category: 'Core Register' },
   { key: 'IMPORT_REGISTRATIONS', name: 'Import Online Registrations (CSV)', category: 'Core Register' },
+  { key: 'PARISH_ONBOARDING', name: 'Parish Onboarding (Excel)', category: 'Core Register' },
   { key: 'DOCUMENTS', name: 'Family Documents & Certificates', category: 'Core Register' },
   { key: 'DIRECT_DEBIT', name: 'Direct Debit', category: 'Finance' },
   { key: 'WARDS', name: 'Family Units / Wards', category: 'Masters' },
@@ -31,6 +32,7 @@ export const MODULE_TO_FEATURE_KEY: Record<string, string> = {
   REGISTER: 'PAGE_REGISTER',
   REGISTER_NEW: 'PAGE_REGISTER_NEW',
   IMPORT_REGISTRATIONS: 'PAGE_REGISTER_IMPORT',
+  PARISH_ONBOARDING: 'PAGE_ONBOARDING',
   DOCUMENTS: 'REGISTER_DOCUMENTS',
   DIRECT_DEBIT: 'REGISTER_DIRECT_DEBIT',
   WARDS: 'PAGE_UNITS',
@@ -53,6 +55,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, {
     REGISTER: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
     REGISTER_NEW: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
     IMPORT_REGISTRATIONS: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
+    PARISH_ONBOARDING: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
     DOCUMENTS: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
     DIRECT_DEBIT: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
     WARDS: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
@@ -65,6 +68,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, {
     REGISTER: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
     REGISTER_NEW: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
     IMPORT_REGISTRATIONS: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
+    PARISH_ONBOARDING: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
     DOCUMENTS: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
     DIRECT_DEBIT: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
     WARDS: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
@@ -77,6 +81,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, {
     REGISTER: { canView: true, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: true, canApprove: false },
     REGISTER_NEW: { canView: false, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: false, canApprove: false },
     IMPORT_REGISTRATIONS: { canView: false, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: false, canApprove: false },
+    PARISH_ONBOARDING: { canView: false, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: false, canApprove: false },
     DOCUMENTS: { canView: true, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: false, canApprove: false },
     DIRECT_DEBIT: { canView: false, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: false, canApprove: false },
     WARDS: { canView: true, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: true, canApprove: false },
@@ -89,6 +94,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, {
     REGISTER: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
     REGISTER_NEW: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
     IMPORT_REGISTRATIONS: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
+    PARISH_ONBOARDING: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
     DOCUMENTS: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
     DIRECT_DEBIT: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
     WARDS: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
@@ -101,6 +107,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, {
     REGISTER: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: false, canExport: true, canApprove: true },
     REGISTER_NEW: { canView: true, canCreate: true, canEdit: true, canArchive: false, canDelete: false, canExport: false, canApprove: true },
     IMPORT_REGISTRATIONS: { canView: true, canCreate: true, canEdit: true, canArchive: false, canDelete: false, canExport: true, canApprove: true },
+    PARISH_ONBOARDING: { canView: true, canCreate: true, canEdit: true, canArchive: false, canDelete: false, canExport: true, canApprove: true },
     DOCUMENTS: { canView: true, canCreate: true, canEdit: true, canArchive: false, canDelete: false, canExport: true, canApprove: true },
     DIRECT_DEBIT: { canView: true, canCreate: true, canEdit: true, canArchive: false, canDelete: false, canExport: true, canApprove: false },
     WARDS: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: false, canExport: true, canApprove: true },
@@ -113,6 +120,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, {
     REGISTER: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: false, canExport: true, canApprove: false },
     REGISTER_NEW: { canView: true, canCreate: true, canEdit: true, canArchive: false, canDelete: false, canExport: false, canApprove: false },
     IMPORT_REGISTRATIONS: { canView: true, canCreate: true, canEdit: true, canArchive: false, canDelete: false, canExport: false, canApprove: false },
+    PARISH_ONBOARDING: { canView: true, canCreate: true, canEdit: true, canArchive: false, canDelete: false, canExport: false, canApprove: false },
     DOCUMENTS: { canView: true, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: false, canApprove: false },
     DIRECT_DEBIT: { canView: false, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: false, canApprove: false },
     WARDS: { canView: true, canCreate: true, canEdit: true, canArchive: false, canDelete: false, canExport: true, canApprove: false },
@@ -155,8 +163,9 @@ permissionsRouter.get('/matrix', async (req: Request, res: Response) => {
   try {
     const parishId = req.activeParishId || 1;
 
-    // Only ensure defaults for Parish 1 (Brisbane) so unprovisioned parishes stay empty until setup
-    if (parishId === 1) {
+    // Ensure defaults for Parish 1 or any initialized parish missing new modules
+    const existingPermsCount = await prisma.rolePermission.count({ where: { parishId } });
+    if (parishId === 1 || existingPermsCount > 0) {
       await ensureDefaultPermissions(parishId);
     }
 
@@ -718,6 +727,77 @@ export async function canUserImportRegistrations(
     canApprove: Boolean(canApprove),
   };
 }
+
+// Helper: Check user's Parish Onboarding permissions (view, create, and approve)
+export async function canUserOnboardParish(
+  userId: number,
+  role: UserRole,
+  parishId?: number
+): Promise<{ canView: boolean; canCreate: boolean; canApprove: boolean }> {
+  // 1. Super Admin and Diocesan Admin always have full authority
+  if (role === UserRole.SUPER_ADMIN || role === UserRole.DIOCESAN_ADMIN) {
+    return { canView: true, canCreate: true, canApprove: true };
+  }
+
+  // 2. Check for explicit user permission override
+  const override = await prisma.userPermissionOverride.findUnique({
+    where: {
+      userId_module: {
+        userId,
+        module: 'PARISH_ONBOARDING',
+      },
+    },
+  });
+
+  let canView = override?.canView ?? null;
+  let canCreate = override?.canCreate ?? null;
+  let canApprove = (override as any)?.canApprove ?? null;
+
+  // 3. Check role permission from database if not overridden
+  const targetParishId = parishId || 1;
+  const rolePerm = await prisma.rolePermission.findUnique({
+    where: {
+      parishId_role_module: {
+        parishId: targetParishId,
+        role,
+        module: 'PARISH_ONBOARDING',
+      },
+    },
+  });
+
+  if (canView === null) {
+    canView = rolePerm?.canView ?? DEFAULT_ROLE_PERMISSIONS[role]?.PARISH_ONBOARDING?.canView ?? false;
+  }
+  if (!canView) {
+    return { canView: false, canCreate: false, canApprove: false };
+  }
+
+  if (canCreate === null) {
+    canCreate = rolePerm?.canCreate ?? DEFAULT_ROLE_PERMISSIONS[role]?.PARISH_ONBOARDING?.canCreate ?? false;
+  }
+  if (canApprove === null) {
+    canApprove = rolePerm?.canApprove ?? DEFAULT_ROLE_PERMISSIONS[role]?.PARISH_ONBOARDING?.canApprove ?? false;
+  }
+
+  return {
+    canView: true,
+    canCreate: Boolean(canCreate),
+    canApprove: Boolean(canApprove),
+  };
+}
+
+// GET /api/permissions/onboarding - Check current user's onboarding permissions
+permissionsRouter.get('/onboarding', async (req: Request, res: Response) => {
+  try {
+    const user = req.user;
+    if (!user) return res.json({ canView: false, canCreate: false, canApprove: false });
+    const perms = await canUserOnboardParish(user.userId, user.role, req.activeParishId);
+    return res.json(perms);
+  } catch (err: any) {
+    console.error('Error checking onboarding permissions:', err);
+    return res.status(500).json({ error: 'Failed to check onboarding permissions.' });
+  }
+});
 
 // GET /api/permissions/import - Check current user's import permissions
 permissionsRouter.get('/import', async (req: Request, res: Response) => {

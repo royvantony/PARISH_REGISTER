@@ -14,6 +14,7 @@ import {
   BookOpen,
   UserPlus,
   Upload,
+  FileSpreadsheet,
   MapPin,
   Palette,
   RotateCcw,
@@ -179,6 +180,14 @@ export const DeveloperControlsTab: React.FC = () => {
       pageKey: 'PAGE_REGISTER_IMPORT',
       icon: <Upload className="w-4 h-4 text-indigo-600" />,
       description: 'Control access to bulk CSV family registration import and onboarding queue.',
+    },
+    {
+      id: 'screen-onboarding',
+      title: 'Parish Onboarding (Excel)',
+      pageKey: 'PAGE_ONBOARDING',
+      routeBadge: '/onboarding',
+      icon: <FileSpreadsheet className="w-4 h-4 text-emerald-600" />,
+      description: 'Control access to bulk Excel parish onboarding staging, data validation, rectification, and Parish Register migration.',
     },
     {
       id: 'screen-units',

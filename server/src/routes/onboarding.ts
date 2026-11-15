@@ -14,10 +14,54 @@ import {
   DOCUMENT_COLUMNS,
   type StagingRow,
 } from '../services/onboardingService.js';
+import { getParishFeatures } from './features.js';
+import { canUserOnboardParish } from './permissions.js';
 
 export const onboardingRouter = Router();
 
 onboardingRouter.use(authenticateJWT);
+
+/**
+ * Access guard enforcing the platform integration pathway:
+ * Developer Approval (PAGE_ONBOARDING) -> Role & Rights (PARISH_ONBOARDING) -> Feature
+ */
+async function checkOnboardingAccess(
+  req: Request,
+  res: Response,
+  requiredAction: 'canView' | 'canCreate' | 'canApprove' = 'canView'
+): Promise<boolean> {
+  const user = req.user;
+  if (!user) {
+    res.status(401).json({ error: 'Unauthorized.' });
+    return false;
+  }
+
+  // Developer / Super Admin has full unrestricted access
+  if (user.role === UserRole.SUPER_ADMIN) {
+    return true;
+  }
+
+  const parishId = req.activeParishId || 1;
+
+  // 1. Developer Approval Check: Is PAGE_ONBOARDING enabled for this parish?
+  const features = await getParishFeatures(parishId);
+  const isFeatureEnabled = features.find((f) => f.key === 'PAGE_ONBOARDING')?.isEnabled ?? false;
+  if (!isFeatureEnabled) {
+    res.status(403).json({ error: 'Parish Onboarding is currently disabled by Developer Controls for this parish.' });
+    return false;
+  }
+
+  // 2. Role & Rights Check: Does this user have the required action permission?
+  const perms = await canUserOnboardParish(user.userId, user.role, parishId);
+  if (!perms[requiredAction]) {
+    res.status(403).json({
+      error: `Access denied: You do not have permission to perform this onboarding action (${requiredAction}).`,
+    });
+    return false;
+  }
+
+  return true;
+}
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -27,7 +71,8 @@ const upload = multer({
 /**
  * 1. GET /api/onboarding/template - Download standardized Excel template
  */
-onboardingRouter.get('/template', async (_req: Request, res: Response) => {
+onboardingRouter.get('/template', async (req: Request, res: Response) => {
+  if (!(await checkOnboardingAccess(req, res, 'canView'))) return;
   try {
     const buffer = await generateOnboardingExcel();
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -43,6 +88,7 @@ onboardingRouter.get('/template', async (_req: Request, res: Response) => {
  * 2. GET /api/onboarding/active-session - Check for existing in-progress draft session
  */
 onboardingRouter.get('/active-session', async (req: Request, res: Response) => {
+  if (!(await checkOnboardingAccess(req, res, 'canView'))) return;
   try {
     const parishId = req.activeParishId || 1;
     const session = await prisma.onboardingSession.findFirst({
@@ -73,6 +119,7 @@ onboardingRouter.get('/active-session', async (req: Request, res: Response) => {
  * 3. POST /api/onboarding/upload - Parse Excel/CSV and initialize Staging Session
  */
 onboardingRouter.post('/upload', upload.single('file'), async (req: Request, res: Response) => {
+  if (!(await checkOnboardingAccess(req, res, 'canCreate'))) return;
   try {
     const user = req.user!;
     const parishId = req.activeParishId || 1;
@@ -222,6 +269,7 @@ onboardingRouter.post('/upload', upload.single('file'), async (req: Request, res
  * 4. PUT /api/onboarding/session/:id/update-row - In-place editing of a single row in Staging
  */
 onboardingRouter.put('/session/:id/update-row', async (req: Request, res: Response) => {
+  if (!(await checkOnboardingAccess(req, res, 'canCreate'))) return;
   try {
     const parishId = req.activeParishId || 1;
     const sessionId = parseInt(String(req.params.id), 10);
@@ -287,6 +335,7 @@ onboardingRouter.put('/session/:id/update-row', async (req: Request, res: Respon
  * 5. POST /api/onboarding/session/:id/cache-docs - Background download of document URLs
  */
 onboardingRouter.post('/session/:id/cache-docs', async (req: Request, res: Response) => {
+  if (!(await checkOnboardingAccess(req, res, 'canCreate'))) return;
   try {
     const parishId = req.activeParishId || 1;
     const sessionId = parseInt(String(req.params.id), 10);
@@ -350,6 +399,7 @@ onboardingRouter.post('/session/:id/cache-docs', async (req: Request, res: Respo
  * 6. POST /api/onboarding/session/:id/save-draft - Save entire draft array
  */
 onboardingRouter.post('/session/:id/save-draft', async (req: Request, res: Response) => {
+  if (!(await checkOnboardingAccess(req, res, 'canCreate'))) return;
   try {
     const parishId = req.activeParishId || 1;
     const sessionId = parseInt(String(req.params.id), 10);
@@ -386,6 +436,7 @@ onboardingRouter.post('/session/:id/save-draft', async (req: Request, res: Respo
  * 7. DELETE /api/onboarding/session/:id - Cancel draft session & delete temp files
  */
 onboardingRouter.delete('/session/:id', async (req: Request, res: Response) => {
+  if (!(await checkOnboardingAccess(req, res, 'canCreate'))) return;
   try {
     const parishId = req.activeParishId || 1;
     const sessionId = parseInt(String(req.params.id), 10);
@@ -414,6 +465,7 @@ onboardingRouter.delete('/session/:id', async (req: Request, res: Response) => {
  * 8. POST /api/onboarding/session/:id/commit - Final atomic commit into Parish Register
  */
 onboardingRouter.post('/session/:id/commit', async (req: Request, res: Response) => {
+  if (!(await checkOnboardingAccess(req, res, 'canApprove'))) return;
   try {
     const user = req.user!;
     const parishId = req.activeParishId || 1;

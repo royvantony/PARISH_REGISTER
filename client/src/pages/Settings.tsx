@@ -1541,7 +1541,7 @@ export const SettingsPage: React.FC = () => {
                           className="text-xs"
                         />
                         <p className="text-[11px] text-parish-text-muted leading-relaxed">
-                          Leave blank to use the standard convention <code className="font-mono text-parish-primary bg-parish-surface px-1 py-0.5 rounded border border-parish-border">/branding/parishes/{parishFormData.parishCode?.toUpperCase() || 'CODE'}.png</code>. If no parish logo file is uploaded, the system automatically falls back to the diocese logo.
+                          Leave blank to use the standard convention <code className="font-mono text-parish-primary bg-parish-surface px-1 py-0.5 rounded border border-parish-border">/branding/parishes/{parishFormData.parishCode?.toUpperCase() || 'CODE'}.png</code>. If no parish logo file is uploaded, the system automatically falls back to the default logo.
                         </p>
                       </div>
                     </div>

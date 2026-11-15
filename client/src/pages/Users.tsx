@@ -59,6 +59,7 @@ const MODULE_TO_FEATURE_KEY: Record<string, string> = {
   REGISTER: 'PAGE_REGISTER',
   REGISTER_NEW: 'PAGE_REGISTER_NEW',
   IMPORT_REGISTRATIONS: 'PAGE_REGISTER_IMPORT',
+  PARISH_ONBOARDING: 'PAGE_ONBOARDING',
   DOCUMENTS: 'REGISTER_DOCUMENTS',
   DIRECT_DEBIT: 'REGISTER_DIRECT_DEBIT',
   WARDS: 'PAGE_UNITS',
@@ -832,6 +833,8 @@ export const UsersPage: React.FC = () => {
         return <UserPlus className="w-4 h-4 text-emerald-600" />;
       case 'IMPORT_REGISTRATIONS':
         return <FileSpreadsheet className="w-4 h-4 text-teal-600" />;
+      case 'PARISH_ONBOARDING':
+        return <FileSpreadsheet className="w-4 h-4 text-emerald-600" />;
       case 'DOCUMENTS':
         return <FileText className="w-4 h-4 text-rose-600" />;
       case 'DIRECT_DEBIT':
@@ -1551,7 +1554,7 @@ export const UsersPage: React.FC = () => {
 
                             {/* Approve Toggle */}
                             <td className="py-3.5 px-4 text-center">
-                              {['REGISTER_NEW', 'IMPORT_REGISTRATIONS'].includes(mod.key) ? (
+                              {['REGISTER_NEW', 'IMPORT_REGISTRATIONS', 'PARISH_ONBOARDING'].includes(mod.key) ? (
                                 <button
                                   type="button"
                                   disabled={isLockedRole || !canEditUsers || !rec.canView}
@@ -1821,7 +1824,7 @@ export const UsersPage: React.FC = () => {
 
                             {/* Approve Toggle */}
                             <td className="py-3.5 px-4 text-center">
-                              {['REGISTER_NEW', 'IMPORT_REGISTRATIONS'].includes(item.module) ? (
+                              {['REGISTER_NEW', 'IMPORT_REGISTRATIONS', 'PARISH_ONBOARDING'].includes(item.module) ? (
                                 <button
                                   type="button"
                                   disabled={!canEditUsers || !current.canView}

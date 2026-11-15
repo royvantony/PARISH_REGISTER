@@ -77,7 +77,7 @@ export function App() {
                 <Route
                   path="onboarding"
                   element={
-                    <PermissionRoute module="REGISTER" action="canCreate" featureKey="PAGE_REGISTER">
+                    <PermissionRoute module="PARISH_ONBOARDING" action="canCreate" featureKey="PAGE_ONBOARDING">
                       <OnboardingPage />
                     </PermissionRoute>
                   }

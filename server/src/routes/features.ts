@@ -42,6 +42,14 @@ export const SYSTEM_FEATURES: FeatureDefinition[] = [
     defaultEnabled: false,
   },
   {
+    key: 'PAGE_ONBOARDING',
+    name: 'Parish Onboarding (Excel)',
+    category: 'PAGE',
+    description: 'Bulk Excel parish onboarding staging, data validation, rectification, and Parish Register migration',
+    route: '/onboarding',
+    defaultEnabled: false,
+  },
+  {
     key: 'PAGE_UNITS',
     name: 'Family Units / Wards',
     category: 'PAGE',
