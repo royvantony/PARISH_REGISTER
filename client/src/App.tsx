@@ -18,6 +18,7 @@ import { UnitsPage } from './pages/Units';
 import { UsersPage } from './pages/Users';
 import { SettingsPage } from './pages/Settings';
 import { ImportRegistrationsPage } from './pages/ImportRegistrations';
+import { OnboardingPage } from './pages/Onboarding';
 
 export function App() {
   const [isOffline, setIsOffline] = useState<boolean>(getIsOffline);
@@ -70,6 +71,14 @@ export function App() {
                   element={
                     <PermissionRoute module="IMPORT_REGISTRATIONS" action="canCreate" featureKey="PAGE_REGISTER_IMPORT">
                       <ImportRegistrationsPage />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="onboarding"
+                  element={
+                    <PermissionRoute module="REGISTER" action="canCreate" featureKey="PAGE_REGISTER">
+                      <OnboardingPage />
                     </PermissionRoute>
                   }
                 />

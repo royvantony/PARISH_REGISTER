@@ -79,6 +79,7 @@ export const AppLayout: React.FC = () => {
     const path = location.pathname;
     if (path.startsWith('/register/new')) return 'register-family';
     if (path.startsWith('/register/import')) return 'import-registrations';
+    if (path.startsWith('/onboarding')) return 'onboarding';
     if (path.startsWith('/register')) return 'register';
     if (path.startsWith('/units')) return 'units';
     if (path.startsWith('/users')) return 'users';
@@ -102,6 +103,9 @@ export const AppLayout: React.FC = () => {
         break;
       case 'import-registrations':
         navigate('/register/import');
+        break;
+      case 'onboarding':
+        navigate('/onboarding');
         break;
       case 'units':
         navigate('/units');
@@ -134,6 +138,7 @@ export const AppLayout: React.FC = () => {
     { id: 'register', label: 'Parish Register', icon: <Users className="w-5 h-5" />, module: 'REGISTER', featureKey: 'PAGE_REGISTER' },
     { id: 'register-family', label: 'Register New Family', icon: <UserPlus className="w-5 h-5" />, module: 'REGISTER_NEW', featureKey: 'PAGE_REGISTER_NEW', action: 'canCreate' },
     { id: 'import-registrations', label: 'Import Registrations', icon: <FileSpreadsheet className="w-5 h-5" />, module: 'IMPORT_REGISTRATIONS', featureKey: 'PAGE_REGISTER_IMPORT', action: 'canCreate' },
+    { id: 'onboarding', label: 'Parish Onboarding', icon: <FileSpreadsheet className="w-5 h-5 text-emerald-600" />, module: 'REGISTER', featureKey: 'PAGE_REGISTER', action: 'canCreate' },
     { id: 'units', label: 'Wards & Units', icon: <MapPin className="w-5 h-5" />, module: 'WARDS', featureKey: 'PAGE_UNITS' },
     { id: 'users', label: 'Users & Roles', icon: <Shield className="w-5 h-5" />, module: 'USERS', featureKey: 'PAGE_USERS' },
     { id: 'settings', label: 'Settings', icon: <Settings className="w-5 h-5" />, module: 'SETTINGS', featureKey: 'PAGE_SETTINGS' },

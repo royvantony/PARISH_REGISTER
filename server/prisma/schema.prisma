@@ -106,6 +106,7 @@ model Parish {
   activityLoggingEnabled Boolean   @default(true)
   hideInactiveUsers      Boolean   @default(false)
   systemActivityLogs SystemActivityLog[]
+  onboardingSessions OnboardingSession[]
 
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
@@ -407,6 +408,25 @@ model SystemActivityLog {
   @@index([parishId, actionType])
   @@index([parishId, category])
   @@index([userId])
+}
+
+model OnboardingSession {
+  id                  Int       @id @default(autoincrement())
+  parishId            Int
+  parish              Parish    @relation(fields: [parishId], references: [id], onDelete: Cascade)
+  status              String    @default("DRAFT") // "DRAFT" | "COMMITTED" | "CANCELLED"
+  fileName            String?
+  hasExistingCodes    Boolean   @default(false)
+  unmatchedWardAction String    @default("MANUAL") // "MANUAL" | "AUTO_CREATE"
+  totalRows           Int       @default(0)
+  validRows           Int       @default(0)
+  warningRows         Int       @default(0)
+  errorRows           Int       @default(0)
+  rows                Json      // Array of staging family rows
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([parishId])
 }
 
 

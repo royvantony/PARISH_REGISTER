@@ -13,6 +13,7 @@ import { featuresRouter, ensureDefaultFeatures } from './routes/features.js';
 import { settingsRouter } from './routes/settings.js';
 import { activityRouter } from './routes/activity.js';
 import { backupRouter } from './routes/backup.js';
+import { onboardingRouter } from './routes/onboarding.js';
 import { prisma, getActiveDatabaseUrl } from './lib/prisma.js';
 import { assertProductionSecretsConfigured } from './lib/crypto.js';
 
@@ -85,6 +86,7 @@ app.use('/api/features', featuresRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/activity', activityRouter);
 app.use('/api/backup', backupRouter);
+app.use('/api/onboarding', onboardingRouter);
 
 // ---------------------------------------------------------------------------
 // Single-Server Frontend Delivery:
