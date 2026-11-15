@@ -58,6 +58,7 @@ export interface StagingRow {
   validationStatus: 'READY' | 'WARNING' | 'ERROR';
   errors: string[];
   warnings: string[];
+  isRectified?: boolean;
 }
 
 export interface StagingSessionSummary {

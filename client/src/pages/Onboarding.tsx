@@ -83,6 +83,18 @@ interface StagingRow {
   validationStatus: 'READY' | 'WARNING' | 'ERROR';
   errors: string[];
   warnings: string[];
+  isRectified?: boolean;
+}
+
+function isValidDateString(s: string): boolean {
+  if (!s || !s.trim()) return false;
+  const str = s.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    const [y, m, d] = str.split('-').map((v) => parseInt(v, 10));
+    return y >= 1900 && y <= 2099 && m >= 1 && m <= 12 && d >= 1 && d <= 31;
+  }
+  const date = new Date(str);
+  return !isNaN(date.getTime()) && date.getFullYear() >= 1900 && date.getFullYear() <= 2099;
 }
 
 interface StagingSession {
@@ -119,7 +131,7 @@ export const OnboardingPage: React.FC = () => {
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   // Staging Mediator Grid state & filters
-  const [filterTab, setFilterTab] = useState<'ALL' | 'ERRORS' | 'WARNINGS' | 'READY' | 'ACTIVE' | 'INACTIVE'>('ALL');
+  const [filterTab, setFilterTab] = useState<'ALL' | 'ERRORS' | 'WARNINGS' | 'RECTIFIED' | 'READY' | 'ACTIVE' | 'INACTIVE'>('ALL');
   const [wardFilter, setWardFilter] = useState<string>('ALL');
   const [customFilter, setCustomFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -205,7 +217,7 @@ export const OnboardingPage: React.FC = () => {
     }
   };
 
-  // Inline row update
+  // Inline row update with dynamic validation and auto-rectification
   const handleUpdateRowField = (rowId: string, field: string, value: any) => {
     if (!session) return;
     const rows = [...session.rows];
@@ -221,14 +233,115 @@ export const OnboardingPage: React.FC = () => {
         row.wardId = selectedUnit.id;
         row.wardName = selectedUnit.unitName;
         row.wardStatus = 'MATCHED';
-        row.warnings = row.warnings.filter((w) => !w.includes('Ward'));
+        row.warnings = row.warnings.filter((w) => !w.toLowerCase().includes('ward'));
       }
     }
 
-    // Recompute validation status
-    const hasErrors = row.errors.length > 0 || !row.houseName.trim() || !row.headName.trim() || !row.headDob.trim();
-    const hasWarnings = row.warnings.length > 0 || row.wardStatus === 'UNMATCHED';
-    row.validationStatus = hasErrors ? 'ERROR' : hasWarnings ? 'WARNING' : 'READY';
+    // Dynamic error re-evaluation
+    const updatedErrors = [...row.errors];
+
+    // House name check
+    if (field === 'houseName') {
+      if (String(value).trim()) {
+        const i = updatedErrors.findIndex((e) => e.toLowerCase().includes('house name'));
+        if (i !== -1) updatedErrors.splice(i, 1);
+      } else {
+        if (!updatedErrors.some((e) => e.toLowerCase().includes('house name'))) {
+          updatedErrors.push('House Name is required');
+        }
+      }
+    }
+
+    // Head name check
+    if (field === 'headName') {
+      if (String(value).trim()) {
+        const i = updatedErrors.findIndex((e) => e.toLowerCase().includes('head full name') || e.toLowerCase().includes('head name'));
+        if (i !== -1) updatedErrors.splice(i, 1);
+      } else {
+        if (!updatedErrors.some((e) => e.toLowerCase().includes('head name'))) {
+          updatedErrors.push('Head Full Name is required');
+        }
+      }
+    }
+
+    // Head DOB check
+    if (field === 'headDob') {
+      if (String(value).trim() && isValidDateString(String(value))) {
+        const i = updatedErrors.findIndex((e) => e.toLowerCase().includes('date of birth') || e.toLowerCase().includes('dob'));
+        if (i !== -1) updatedErrors.splice(i, 1);
+      } else {
+        if (!updatedErrors.some((e) => e.toLowerCase().includes('date of birth'))) {
+          updatedErrors.push('Head Date of Birth is required (YYYY-MM-DD)');
+        }
+      }
+    }
+
+    const hasMissingCore = !row.houseName.trim() || !row.headName.trim() || !row.headDob.trim();
+    const hasRemainingErrors = updatedErrors.length > 0 || hasMissingCore;
+    const hasRemainingWarnings = row.warnings.length > 0 || row.wardStatus === 'UNMATCHED';
+
+    row.errors = updatedErrors;
+
+    if (!hasRemainingErrors) {
+      if (hasRemainingWarnings && !row.isRectified) {
+        row.validationStatus = 'WARNING';
+      } else {
+        // If the row originally had errors or was marked rectified, mark as rectified
+        if (rows[index].validationStatus === 'ERROR' || rows[index].validationStatus === 'WARNING' || row.isRectified) {
+          row.isRectified = true;
+          row.warnings = [];
+        }
+        row.validationStatus = 'READY';
+      }
+    } else {
+      row.isRectified = false;
+      row.validationStatus = 'ERROR';
+    }
+
+    rows[index] = row;
+
+    setSession({
+      ...session,
+      rows,
+      validRows: rows.filter((r) => r.validationStatus === 'READY').length,
+      warningRows: rows.filter((r) => r.validationStatus === 'WARNING').length,
+      errorRows: rows.filter((r) => r.validationStatus === 'ERROR').length,
+    });
+  };
+
+  // Toggle or mark a household card as rectified
+  const handleToggleRectified = (rowId: string) => {
+    if (!session) return;
+    const rows = [...session.rows];
+    const index = rows.findIndex((r) => r.rowId === rowId);
+    if (index === -1) return;
+
+    const row = { ...rows[index] };
+    const nextRectified = !row.isRectified;
+
+    if (nextRectified) {
+      if (!row.houseName.trim() || !row.headName.trim() || !row.headDob.trim()) {
+        alert('Please provide House Name, Head Full Name, and Date of Birth before marking this household as rectified.');
+        return;
+      }
+      row.isRectified = true;
+      row.errors = [];
+      row.warnings = [];
+      row.validationStatus = 'READY';
+    } else {
+      row.isRectified = false;
+      const errs: string[] = [];
+      if (!row.houseName.trim()) errs.push('House Name is required');
+      if (!row.headName.trim()) errs.push('Head Full Name is required');
+      if (!row.headDob.trim() || !isValidDateString(row.headDob)) errs.push('Head Date of Birth is required (YYYY-MM-DD)');
+      row.errors = errs;
+
+      const warns: string[] = [];
+      if (row.wardStatus === 'UNMATCHED' || !row.wardId) warns.push('Ward not assigned or unmatched');
+      row.warnings = warns;
+
+      row.validationStatus = errs.length > 0 ? 'ERROR' : warns.length > 0 ? 'WARNING' : 'READY';
+    }
 
     rows[index] = row;
 
@@ -326,7 +439,8 @@ export const OnboardingPage: React.FC = () => {
   const filteredRows = (session?.rows || []).filter((r) => {
     // 1. Status Tab filter
     if (filterTab === 'ERRORS' && r.validationStatus !== 'ERROR') return false;
-    if (filterTab === 'WARNINGS' && r.validationStatus !== 'WARNING') return false;
+    if (filterTab === 'WARNINGS' && (r.validationStatus !== 'WARNING' || r.isRectified)) return false;
+    if (filterTab === 'RECTIFIED' && !r.isRectified) return false;
     if (filterTab === 'READY' && r.validationStatus !== 'READY') return false;
     if (filterTab === 'ACTIVE' && r.membershipStatus !== 'ACTIVE') return false;
     if (filterTab === 'INACTIVE' && r.membershipStatus !== 'INACTIVE') return false;
@@ -339,6 +453,7 @@ export const OnboardingPage: React.FC = () => {
     }
 
     // 3. Custom Issue filter
+    if (customFilter === 'RECTIFIED' && !r.isRectified) return false;
     if (customFilter === 'ERRORS' && r.validationStatus !== 'ERROR') return false;
     if (customFilter === 'WARNINGS' && r.validationStatus !== 'WARNING') return false;
     if (customFilter === 'READY' && r.validationStatus !== 'READY') return false;
@@ -611,6 +726,12 @@ export const OnboardingPage: React.FC = () => {
           <div className="flex items-center gap-3 text-xs text-parish-text-muted flex-wrap">
             <span>Total: <strong>{session.totalRows}</strong></span>
             <span className="text-emerald-600 font-bold">Ready: {session.validRows}</span>
+            {(session.rows || []).filter((r) => Boolean(r.isRectified)).length > 0 && (
+              <span className="text-emerald-700 font-bold flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Rectified: {(session.rows || []).filter((r) => Boolean(r.isRectified)).length}</span>
+              </span>
+            )}
             <span className="text-amber-600 font-bold">Warnings: {session.warningRows}</span>
             <span className="text-rose-600 font-bold">Errors: {session.errorRows}</span>
           </div>
@@ -699,6 +820,17 @@ export const OnboardingPage: React.FC = () => {
             >
               Warnings ({session.warningRows})
             </button>
+            {(session.rows || []).filter((r) => Boolean(r.isRectified)).length > 0 && (
+              <button
+                onClick={() => setFilterTab('RECTIFIED')}
+                className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                  filterTab === 'RECTIFIED' ? 'bg-emerald-600 text-white shadow-xs' : 'text-emerald-700 hover:bg-emerald-50/50'
+                }`}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Rectified ({(session.rows || []).filter((r) => Boolean(r.isRectified)).length})</span>
+              </button>
+            )}
             <button
               onClick={() => setFilterTab('READY')}
               className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer shrink-0 ${
@@ -767,6 +899,9 @@ export const OnboardingPage: React.FC = () => {
               className="px-2.5 py-1 text-xs rounded-lg border border-parish-border bg-parish-bg/50 font-semibold cursor-pointer"
             >
               <option value="ALL">All Families</option>
+              {(session.rows || []).filter((r) => Boolean(r.isRectified)).length > 0 && (
+                <option value="RECTIFIED">✓ Rectified Households ({(session.rows || []).filter((r) => Boolean(r.isRectified)).length})</option>
+              )}
               <option value="ERRORS">Only Rows with Critical Errors</option>
               <option value="WARNINGS">Only Rows with Warnings</option>
               <option value="READY">Only Ready / Valid Rows</option>
@@ -880,7 +1015,12 @@ export const OnboardingPage: React.FC = () => {
             ? 'bg-white dark:bg-slate-900 border-slate-200/90 dark:border-slate-800'
             : 'bg-slate-50/90 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700/60';
 
-          if (row.validationStatus === 'ERROR') {
+          if (row.isRectified) {
+            // Keep default normal zebra color with a clean, reassuring green border
+            cardBgClass = isEven
+              ? 'bg-white dark:bg-slate-900 border-emerald-400 dark:border-emerald-700 shadow-xs'
+              : 'bg-slate-50/90 dark:bg-slate-800/40 border-emerald-400 dark:border-emerald-700 shadow-xs';
+          } else if (row.validationStatus === 'ERROR') {
             cardBgClass = isEven
               ? 'border-rose-300 dark:border-rose-900/70 bg-rose-50/40 dark:bg-rose-950/20'
               : 'border-rose-300 dark:border-rose-900/70 bg-rose-50/20 dark:bg-rose-950/10';
@@ -902,12 +1042,22 @@ export const OnboardingPage: React.FC = () => {
                   <span className="text-[11px] font-mono text-parish-text-muted font-bold">
                     #{row.rowIndex}
                   </span>
-                  <Badge
-                    variant={row.validationStatus === 'ERROR' ? 'danger' : row.validationStatus === 'WARNING' ? 'warning' : 'success'}
-                    size="sm"
-                  >
-                    {row.validationStatus === 'ERROR' ? 'Needs Fix' : row.validationStatus === 'WARNING' ? 'Warning' : 'Ready'}
-                  </Badge>
+                  {row.isRectified ? (
+                    <span
+                      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-700 shadow-xs"
+                      title="All issues rectified and verified"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 fill-emerald-200 dark:fill-emerald-800 shrink-0" />
+                      <span>Rectified</span>
+                    </span>
+                  ) : (
+                    <Badge
+                      variant={row.validationStatus === 'ERROR' ? 'danger' : row.validationStatus === 'WARNING' ? 'warning' : 'success'}
+                      size="sm"
+                    >
+                      {row.validationStatus === 'ERROR' ? 'Needs Fix' : row.validationStatus === 'WARNING' ? 'Warning' : 'Ready'}
+                    </Badge>
+                  )}
                 </div>
 
                 {/* Legacy Family Code */}
@@ -1023,7 +1173,7 @@ export const OnboardingPage: React.FC = () => {
                   </span>
                 </div>
 
-                {/* Documents Cached summary + Toggle Details Button */}
+                {/* Documents Cached summary + Rectify Toggle Option + Toggle Details Button */}
                 <div className="md:col-span-3 flex items-center justify-end gap-2">
                   {totalDocsCount > 0 ? (
                     <span
@@ -1039,6 +1189,33 @@ export const OnboardingPage: React.FC = () => {
                     <span className="text-[10px] text-parish-text-muted italic">0 Docs</span>
                   )}
 
+                  {/* Rectify Action Option Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleToggleRectified(row.rowId)}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs ${
+                      row.isRectified
+                        ? 'bg-emerald-100/90 text-emerald-800 border border-emerald-400 hover:bg-emerald-200/80 dark:bg-emerald-950/60 dark:border-emerald-700 dark:text-emerald-300'
+                        : row.validationStatus === 'ERROR' || row.validationStatus === 'WARNING'
+                        ? 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 hover:border-emerald-500 hover:text-emerald-700 hover:bg-emerald-50/50'
+                        : 'hidden'
+                    }`}
+                    title={
+                      row.isRectified
+                        ? 'Household marked as rectified (Click to undo)'
+                        : 'Click to mark this household as verified & rectified'
+                    }
+                  >
+                    <CheckCircle2
+                      className={`w-3.5 h-3.5 ${
+                        row.isRectified
+                          ? 'text-emerald-600 fill-emerald-200 dark:fill-emerald-800'
+                          : 'text-slate-400 group-hover:text-emerald-600'
+                      }`}
+                    />
+                    <span>{row.isRectified ? 'Rectified' : 'Rectify'}</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => toggleRowExpansion(row.rowId)}
@@ -1050,8 +1227,22 @@ export const OnboardingPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Validation Errors & Warnings Alert Bar */}
-              {(row.errors.length > 0 || row.warnings.length > 0) && (
+              {/* Validation Errors & Warnings or Rectified Confirmation */}
+              {row.isRectified ? (
+                <div className="mt-2 pt-2 border-t border-emerald-200/80 dark:border-emerald-800/60 flex items-center justify-between gap-2 text-[11px] text-emerald-700 dark:text-emerald-300 font-semibold animate-in fade-in">
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 fill-emerald-100 dark:fill-emerald-900" />
+                    <span>All issues rectified & verified. Ready for canonical register.</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleRectified(row.rowId)}
+                    className="text-[10px] text-emerald-700 dark:text-emerald-400 underline font-normal hover:text-emerald-900 cursor-pointer"
+                  >
+                    Undo
+                  </button>
+                </div>
+              ) : (row.errors.length > 0 || row.warnings.length > 0) ? (
                 <div className="mt-2 pt-2 border-t border-parish-border/40 space-y-1">
                   {row.errors.map((err, i) => (
                     <p key={i} className="text-[11px] text-rose-600 font-semibold flex items-center gap-1">
@@ -1066,7 +1257,7 @@ export const OnboardingPage: React.FC = () => {
                     </p>
                   ))}
                 </div>
-              )}
+              ) : null}
 
               {/* EXPANDABLE DRAWER: ADDRESS, CONTACTS, CHILDREN & DOCUMENT LINKS */}
               {isExpanded && (
