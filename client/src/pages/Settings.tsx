@@ -1801,7 +1801,7 @@ export const SettingsPage: React.FC = () => {
             description={
               editingDiocese
                 ? 'Update diocese name, Indian state, or ecclesiastical rite in the master reference table.'
-                : 'Register a canonical Catholic diocese to the master reference table for onboarding and verification.'
+                : 'Register a Catholic diocese to the master reference table for onboarding and verification.'
             }
             maxWidth="md"
           >

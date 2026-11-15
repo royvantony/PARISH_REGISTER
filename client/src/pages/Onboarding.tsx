@@ -554,7 +554,7 @@ export const OnboardingPage: React.FC = () => {
         <div className="space-y-2">
           <h2 className="text-2xl font-extrabold text-parish-text">Parish Onboarding Completed!</h2>
           <p className="text-sm text-parish-text-muted">
-            All families, members, and documents have been successfully committed to the canonical Parish Register.
+            All families, members, and documents have been successfully committed to the Parish Register.
           </p>
         </div>
 
@@ -1270,7 +1270,7 @@ export const OnboardingPage: React.FC = () => {
                 <div className="mt-2 pt-2 border-t border-emerald-200/80 dark:border-emerald-800/60 flex items-center justify-between gap-2 text-[11px] text-emerald-700 dark:text-emerald-300 font-semibold animate-in fade-in">
                   <div className="flex items-center gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 fill-emerald-100 dark:fill-emerald-900" />
-                    <span>All issues rectified & verified. Ready for canonical register.</span>
+                    <span>All issues rectified & verified. Ready for Parish Register.</span>
                   </div>
                   <button
                     type="button"

@@ -274,7 +274,7 @@ export async function generateOnboardingExcel(): Promise<Buffer> {
     headPob: 'Pala',
     headPhone: '0434567890',
     headEmail: '',
-    notes: 'Relocated to Sydney in 2024. Maintained for canonical history.',
+    notes: 'Relocated to Sydney in 2024. Maintained for parish history.',
   });
 
   return (await workbook.xlsx.writeBuffer()) as unknown as Buffer;

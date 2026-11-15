@@ -869,7 +869,7 @@ export const RegisterFamilyPage: React.FC = () => {
                 <span>Approval Cycle Active</span>
               </div>
               <p className="text-[11px] text-amber-800 leading-relaxed">
-                As a general user ({user?.role || 'Parish Staff'}), new registrations are submitted in <strong>PENDING</strong> status. An authorized Parish Priest or Trustee will verify and approve the registration before canonical family codes are issued.
+                As a general user ({user?.role || 'Parish Staff'}), new registrations are submitted in <strong>PENDING</strong> status. An authorized Parish Priest or Trustee will verify and approve the registration before official family codes are issued.
               </p>
             </div>
           )}

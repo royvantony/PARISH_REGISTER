@@ -503,7 +503,7 @@ The entire frontend is engineered following strict reactive design guidelines ac
 - **Slide-Over Detail Drawer ([`Drawer.tsx`](file:///c:/Dev/PARISH_REGISTER/client/src/components/ui/Drawer.tsx))**:
   - Residential address & Australian contact card (Street, Suburb, Phone, Email).
   - Ecclesiastical roots in India (Native diocese and home parish).
-  - Family members breakdown with role badges (Head, Spouse, Child), birth dates, calculated ages, and canonical change trail.
+  - Family members breakdown with role badges (Head, Spouse, Child), birth dates, calculated ages, and historical change trail.
   - **Dedicated Direct Debit Area**: Integrated pledge view with multiple active schedules, contributor reference labels, amounts, payment frequencies, and combined monthly contribution average. Strictly visible to users with `DIRECT_DEBIT:canView` permissions; masked for unauthorized roles.
 
 ### 9.5 Role Permissions Matrix, Granular User Overrides & Ward Isolation (`/users`)

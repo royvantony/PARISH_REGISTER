@@ -1425,7 +1425,7 @@ familiesRouter.post('/:id/approve', async (req: Request, res: Response) => {
       headName = houseName.trim();
     }
 
-    // Allocate canonical family code if not already assigned
+    // Allocate parish family code if not already assigned
     let familyCode = family.familyCode;
     const parish = await prisma.parish.findUnique({ where: { id: parishId } });
 

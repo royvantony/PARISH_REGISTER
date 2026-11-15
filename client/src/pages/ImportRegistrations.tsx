@@ -444,7 +444,7 @@ export const ImportRegistrationsPage: React.FC = () => {
               </div>
 
               <div className="text-[11px] text-parish-text-muted font-medium italic">
-                * Bulk approval is disabled to ensure canonical data accuracy
+                * Bulk approval is disabled to ensure parish register data accuracy
               </div>
             </div>
 

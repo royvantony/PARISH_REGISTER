@@ -199,7 +199,7 @@ model Family {
   familyCode         String?           @unique // e.g. "SABN100398"
   registrationType   RegistrationType  @default(FAMILY)
   houseName          String            // Veettuperu / Family Name
-  headFullName       String?           // Head of Family Full Name for canonical alphabetical listing
+  headFullName       String?           // Head of Family Full Name for alphabetical listing
 
   unitId             Int?
   unit               FamilyUnit?       @relation(fields: [unitId], references: [id])

@@ -15,7 +15,7 @@ interface RejectFamilyModalProps {
 
 const REJECT_REASONS = [
   'Duplicate registration submission',
-  'Resides outside parish canonical boundaries / jurisdiction',
+  'Resides outside parish boundaries / jurisdiction',
   'Registration withdrawn upon applicant request',
   'Incomplete details / unable to verify baptismal or catholic records',
   'Other administrative reason',
