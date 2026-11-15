@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
+import { AlertDialog } from '../components/ui/AlertDialog';
 import {
   FileSpreadsheet,
   Download,
@@ -148,6 +149,25 @@ export const OnboardingPage: React.FC = () => {
   const [isCommitting, setIsCommitting] = useState<boolean>(false);
   const [commitSuccessData, setCommitSuccessData] = useState<any | null>(null);
   const [confirmDiscardOpen, setConfirmDiscardOpen] = useState<boolean>(false);
+  const [alertDialog, setAlertDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    variant?: 'warning' | 'danger' | 'info' | 'success';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    variant: 'warning',
+  });
+
+  const showAlert = (
+    message: string,
+    title = 'Notice',
+    variant: 'warning' | 'danger' | 'info' | 'success' = 'warning'
+  ) => {
+    setAlertDialog({ isOpen: true, title, message, variant });
+  };
 
   // Load existing session and wards
   useEffect(() => {
@@ -197,7 +217,7 @@ export const OnboardingPage: React.FC = () => {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (err) {
-      alert('Failed to download template.');
+      showAlert('Failed to download template. Please check your network connection and try again.', 'Download Error', 'danger');
     }
   };
 
@@ -335,7 +355,11 @@ export const OnboardingPage: React.FC = () => {
 
     if (nextRectified) {
       if (!row.houseName.trim() || !row.headName.trim() || !row.headDob.trim()) {
-        alert('Please provide House Name, Head Full Name, and Date of Birth before marking this household as rectified.');
+        showAlert(
+          'Please provide House Name, Head Full Name, and Date of Birth before marking this household as rectified.',
+          'Missing Mandatory Information',
+          'warning'
+        );
         return;
       }
       row.isRectified = true;
@@ -385,7 +409,7 @@ export const OnboardingPage: React.FC = () => {
         setTimeout(() => setSaveFeedback(null), 5000);
       }
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to save draft.');
+      showAlert(err.response?.data?.error || 'Failed to save draft.', 'Save Draft Failed', 'danger');
     } finally {
       setIsSavingDraft(false);
     }
@@ -403,7 +427,7 @@ export const OnboardingPage: React.FC = () => {
         setTimeout(() => setSaveFeedback(null), 5000);
       }
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to cache documents.');
+      showAlert(err.response?.data?.error || 'Failed to cache documents.', 'Document Download Error', 'danger');
     } finally {
       setIsCachingDocs(false);
     }
@@ -418,7 +442,7 @@ export const OnboardingPage: React.FC = () => {
       setSession(null);
       setConfirmDiscardOpen(false);
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to discard draft.');
+      showAlert(err.response?.data?.error || 'Failed to discard draft.', 'Discard Failed', 'danger');
     }
   };
 
@@ -426,7 +450,11 @@ export const OnboardingPage: React.FC = () => {
   const handleCommit = async () => {
     if (!session) return;
     if (session.errorRows > 0) {
-      alert(`Cannot commit onboarding while there are ${session.errorRows} rows with errors. Please resolve all red errors first.`);
+      showAlert(
+        `Cannot commit onboarding while there are ${session.errorRows} rows with errors. Please resolve all red errors first.`,
+        'Validation Errors Detected',
+        'danger'
+      );
       return;
     }
     try {
@@ -438,7 +466,7 @@ export const OnboardingPage: React.FC = () => {
         setSession(null);
       }
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to commit onboarding.');
+      showAlert(err.response?.data?.error || 'Failed to commit onboarding.', 'Commit Failed', 'danger');
     } finally {
       setIsCommitting(false);
     }
@@ -1478,6 +1506,16 @@ export const OnboardingPage: React.FC = () => {
         message="Are you sure you want to discard this onboarding session? All staged edits and downloaded temp files will be permanently deleted."
         confirmLabel="Yes, Discard Draft"
         variant="danger"
+      />
+
+      {/* Application Styled Alert Modal */}
+      <AlertDialog
+        isOpen={alertDialog.isOpen}
+        onClose={() => setAlertDialog((prev) => ({ ...prev, isOpen: false }))}
+        title={alertDialog.title}
+        message={alertDialog.message}
+        variant={alertDialog.variant}
+        confirmLabel="Understood"
       />
     </div>
   );
