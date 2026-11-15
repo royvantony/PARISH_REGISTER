@@ -19,9 +19,11 @@ import {
 
 export const BackupRestoreTab: React.FC = () => {
   const { activeParish, user } = useAuth();
-  const { getStoredFlag, isSimulatingClient, isFeatureEnabled } = useFeatures();
+  const { getStoredFlag, isSimulatingClient, isDeveloper, isFeatureEnabled } = useFeatures();
 
-  // Each card strictly and independently adheres to its own Developer Controls toggle.
+  const isDev = (isDeveloper || user?.role === 'SUPER_ADMIN') && !isSimulatingClient;
+
+  // Feature flag status in Developer Controls
   const isExportFlagActive = isSimulatingClient
     ? isFeatureEnabled('SETTING_BACKUP_EXPORT')
     : getStoredFlag('SETTING_BACKUP_EXPORT');
@@ -30,8 +32,10 @@ export const BackupRestoreTab: React.FC = () => {
     ? isFeatureEnabled('SETTING_BACKUP_IMPORT')
     : getStoredFlag('SETTING_BACKUP_IMPORT');
 
-  const showExport = Boolean(isExportFlagActive);
-  const showImport = Boolean(isImportFlagActive);
+  // Platform Developer has full access to both cards (with a "Disabled for Users" warning badge if toggle is OFF).
+  // Regular parish users (or Developer in "Simulate Client View") strictly follow the toggle states.
+  const showExport = isDev || Boolean(isExportFlagActive);
+  const showImport = isDev || Boolean(isImportFlagActive);
 
   const canExport = showExport;
   const canImport = showImport;
@@ -254,7 +258,12 @@ export const BackupRestoreTab: React.FC = () => {
                   <Download className="w-4 h-4 text-parish-primary" />
                   <span>Export Parish Archive</span>
                 </div>
-                <Badge variant="default" size="sm">Active Parish</Badge>
+                <div className="flex items-center gap-1.5">
+                  <Badge variant="default" size="sm">Active Parish</Badge>
+                  {isDev && !isExportFlagActive && (
+                    <Badge variant="warning" size="sm">Disabled for Users</Badge>
+                  )}
+                </div>
               </div>
               <p className="text-xs text-parish-text-muted leading-relaxed">
                 Generates an encrypted package containing:
@@ -306,7 +315,12 @@ export const BackupRestoreTab: React.FC = () => {
                 <Upload className="w-4 h-4 text-indigo-600" />
                 <span>Import Archive with OTP Verification</span>
               </div>
-              <Badge variant="warning" size="sm">2FA Protected</Badge>
+              <div className="flex items-center gap-1.5">
+                <Badge variant="warning" size="sm">2FA Protected</Badge>
+                {isDev && !isImportFlagActive && (
+                  <Badge variant="warning" size="sm">Disabled for Users</Badge>
+                )}
+              </div>
             </div>
 
           {importStep === 'IDLE' && (
