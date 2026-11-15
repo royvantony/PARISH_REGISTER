@@ -128,8 +128,8 @@ export const LoginPage: React.FC = () => {
 
   const visibleDevAccounts = availableDevEmails
     ? DEV_SHORTCUT_ACCOUNTS.filter((acct) =>
-        availableDevEmails.includes(acct.email.toLowerCase())
-      )
+      availableDevEmails.includes(acct.email.toLowerCase())
+    )
     : [];
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -360,11 +360,10 @@ export const LoginPage: React.FC = () => {
                       key={acct.email}
                       type="button"
                       onClick={() => handleDevBypass(acct.email)}
-                      className={`w-full text-left p-2.5 rounded-xl border hover:border-parish-primary hover:bg-parish-surface-subtle transition-all flex items-center justify-between text-xs group cursor-pointer ${
-                        acct.dashed
+                      className={`w-full text-left p-2.5 rounded-xl border hover:border-parish-primary hover:bg-parish-surface-subtle transition-all flex items-center justify-between text-xs group cursor-pointer ${acct.dashed
                           ? 'border-dashed border-amber-500/40 opacity-85 hover:opacity-100'
                           : 'border-amber-500/30'
-                      }`}
+                        }`}
                     >
                       <div>
                         <div className="font-bold text-parish-text flex items-center gap-1.5">
@@ -392,7 +391,7 @@ export const LoginPage: React.FC = () => {
         <div className="mt-6 text-center text-xs text-parish-text-muted space-y-1">
           <div className="flex items-center justify-center gap-1.5 text-[11px] text-emerald-800 dark:text-emerald-400">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            <span>🔒 Official Diocesan Parish Register System • Protected with JWT & Bcrypt</span>
+            <span>🔒 Official Parish Register System • Protected with JWT & Bcrypt</span>
           </div>
         </div>
       </div>
