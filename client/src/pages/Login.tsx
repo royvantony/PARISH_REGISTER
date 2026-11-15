@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
@@ -96,16 +96,6 @@ export const LoginPage: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Triple-click logo trigger for fast access without keyboard shortcut collisions
-  const logoClicksRef = useRef(0);
-  const handleLogoClick = () => {
-    logoClicksRef.current += 1;
-    if (logoClicksRef.current >= 3) {
-      setIsDevRevealed((prev) => !prev);
-      logoClicksRef.current = 0;
-    }
-  };
-
   // Check which dev shortcut emails actually exist (and are active) when shortcut is triggered
   useEffect(() => {
     if (!isDevRevealed || DEV_SHORTCUT_ACCOUNTS.length === 0) return;
@@ -189,13 +179,12 @@ export const LoginPage: React.FC = () => {
       </div>
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10 space-y-3 text-center">
-        {/* Neutral Diocesan Brand Icon & Heading (Triple-click toggles Fast Access) */}
+        {/* Neutral Diocesan Brand Icon & Heading */}
         <div
-          onClick={handleLogoClick}
-          className="inline-flex items-center justify-center p-3 rounded-2xl bg-white border border-parish-border shadow-soft mx-auto text-parish-primary cursor-pointer select-none active:scale-95 transition-transform"
+          className="inline-flex items-center justify-center p-3 rounded-2xl bg-white border border-parish-border shadow-soft mx-auto text-parish-primary select-none"
           title="Parish Register"
         >
-          <Church className="w-8 h-8 text-parish-primary pointer-events-none" />
+          <Church className="w-8 h-8 text-parish-primary" />
         </div>
 
         <div>
