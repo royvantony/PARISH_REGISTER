@@ -108,6 +108,7 @@ interface StagingSession {
   validRows: number;
   warningRows: number;
   errorRows: number;
+  activePage?: number;
   rows: StagingRow[];
   createdAt: string;
   updatedAt: string;
@@ -159,7 +160,20 @@ export const OnboardingPage: React.FC = () => {
         ]);
         setWards(wardsRes.data || []);
         if (sessionRes.data?.session) {
-          setSession(sessionRes.data.session);
+          const s = sessionRes.data.session;
+          setSession(s);
+
+          // Restore saved page position (URL query -> session DB -> localStorage)
+          const urlParams = new URLSearchParams(window.location.search);
+          const qPage = urlParams.get('page');
+          const savedLocal = localStorage.getItem(`onboarding_page_${s.id}`);
+          const targetPage = qPage && !isNaN(Number(qPage))
+            ? Number(qPage)
+            : s.activePage || (savedLocal ? parseInt(savedLocal, 10) : 1);
+
+          if (targetPage > 1) {
+            setCurrentPage(targetPage);
+          }
         }
       } catch (err: any) {
         console.error('Failed to init onboarding:', err);
@@ -354,17 +368,20 @@ export const OnboardingPage: React.FC = () => {
     });
   };
 
-  // Save draft
+  // Save draft with page position preservation
   const handleSaveDraft = async () => {
     if (!session) return;
     try {
       setIsSavingDraft(true);
       setSaveFeedback(null);
+      localStorage.setItem(`onboarding_page_${session.id}`, String(currentPage));
+
       const res = await api.post(`/onboarding/session/${session.id}/save-draft`, {
         rows: session.rows,
+        activePage: currentPage,
       });
       if (res.data?.success) {
-        setSaveFeedback('Draft saved successfully! You can close your browser and resume anytime.');
+        setSaveFeedback(`Draft saved successfully at Page ${currentPage}! You can close your browser and resume anytime.`);
         setTimeout(() => setSaveFeedback(null), 5000);
       }
     } catch (err: any) {
@@ -396,6 +413,7 @@ export const OnboardingPage: React.FC = () => {
   const handleDiscardDraft = async () => {
     if (!session) return;
     try {
+      localStorage.removeItem(`onboarding_page_${session.id}`);
       await api.delete(`/onboarding/session/${session.id}`);
       setSession(null);
       setConfirmDiscardOpen(false);
@@ -415,6 +433,7 @@ export const OnboardingPage: React.FC = () => {
       setIsCommitting(true);
       const res = await api.post(`/onboarding/session/${session.id}/commit`);
       if (res.data?.success) {
+        localStorage.removeItem(`onboarding_page_${session.id}`);
         setCommitSuccessData(res.data);
         setSession(null);
       }
@@ -430,8 +449,27 @@ export const OnboardingPage: React.FC = () => {
     setExpandedRows((prev) => ({ ...prev, [rowId]: !prev[rowId] }));
   };
 
-  // Reset page when any filter changes
+  // Sync page changes to localStorage & URL search params
   useEffect(() => {
+    if (session?.id && currentPage >= 1) {
+      localStorage.setItem(`onboarding_page_${session.id}`, String(currentPage));
+      const url = new URL(window.location.href);
+      if (currentPage > 1) {
+        url.searchParams.set('page', String(currentPage));
+      } else {
+        url.searchParams.delete('page');
+      }
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, [currentPage, session?.id]);
+
+  // Reset page when any filter actually changes (guarded against initial mount clobbering)
+  const isFilterMounted = React.useRef(false);
+  useEffect(() => {
+    if (!isFilterMounted.current) {
+      isFilterMounted.current = true;
+      return;
+    }
     setCurrentPage(1);
   }, [filterTab, wardFilter, customFilter, searchQuery, pageSize]);
 

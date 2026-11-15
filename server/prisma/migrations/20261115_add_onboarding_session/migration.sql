@@ -10,6 +10,7 @@ CREATE TABLE "OnboardingSession" (
     "validRows" INTEGER NOT NULL DEFAULT 0,
     "warningRows" INTEGER NOT NULL DEFAULT 0,
     "errorRows" INTEGER NOT NULL DEFAULT 0,
+    "activePage" INTEGER NOT NULL DEFAULT 1,
     "rows" JSONB NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,

@@ -319,7 +319,7 @@ onboardingRouter.post('/session/:id/save-draft', async (req: Request, res: Respo
   try {
     const parishId = req.activeParishId || 1;
     const sessionId = parseInt(String(req.params.id), 10);
-    const { rows } = req.body;
+    const { rows, activePage } = req.body;
 
     if (!Array.isArray(rows)) {
       return res.status(400).json({ error: 'Rows array required.' });
@@ -337,6 +337,7 @@ onboardingRouter.post('/session/:id/save-draft', async (req: Request, res: Respo
         validRows,
         warningRows,
         errorRows,
+        ...(activePage ? { activePage: Math.max(1, parseInt(String(activePage), 10)) } : {}),
       },
     });
 
