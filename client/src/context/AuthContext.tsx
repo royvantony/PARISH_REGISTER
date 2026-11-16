@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { api } from '../lib/api';
-import { getStoredDeviceSecret, getBrowserMetadata, collectHardwareTelemetry } from '../lib/deviceAuth';
+import { getStoredDeviceSecret, getBrowserMetadata, collectHardwareTelemetry, verifyTerminalAuthorization } from '../lib/deviceAuth';
 
 export type UserRole =
   | 'SUPER_ADMIN'
@@ -171,6 +171,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (dioceseRes.data) {
           setDiocese(dioceseRes.data);
         }
+
+        const savedParishId = localStorage.getItem('parish_active_id');
+        verifyTerminalAuthorization(Number(savedParishId) || 1).then((devRes) => {
+          if (devRes.deviceId) {
+            sessionStorage.setItem('parish_current_device_id', String(devRes.deviceId));
+            localStorage.setItem('parish_current_device_id', String(devRes.deviceId));
+          }
+        }).catch(() => {});
       } catch (e) {
         // Fall back to cached or empty state
       }
@@ -593,10 +601,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       sessionStorage.setItem('parish_session_id', sessionId);
     }
 
+    const devId =
+      sessionStorage.getItem('parish_current_device_id') ||
+      localStorage.getItem('parish_current_device_id') ||
+      '';
     let es: EventSource | null = null;
     try {
       es = new EventSource(
-        `/api/realtime/user-stream?token=${encodeURIComponent(token)}&sessionId=${encodeURIComponent(sessionId)}`
+        `/api/realtime/user-stream?token=${encodeURIComponent(token)}&sessionId=${encodeURIComponent(sessionId)}&deviceId=${encodeURIComponent(devId)}`
       );
 
       es.onmessage = (e) => {

@@ -161,6 +161,7 @@ authRouter.post('/login', async (req: Request, res: Response) => {
         device = await prisma.parishAuthorizedDevice.update({
           where: { id: device.id },
           data: {
+            deviceName: autoDeviceName,
             registeredUserId: user.id,
             registeredByName: user.fullName,
             registeredByEmail: user.email,

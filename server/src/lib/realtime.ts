@@ -10,6 +10,7 @@ export interface UserSessionInfo {
   userRole: string;
   parishId: number | null;
   parishName?: string;
+  deviceId?: number;
   ipAddress?: string;
   userAgent?: string;
   platformSummary?: string;
@@ -108,7 +109,20 @@ class RealtimeHub {
       }
     }
 
-    // 2. Broadcast to all active user sessions that this terminal was revoked
+    // 2. Forcibly terminate all active authenticated sessions on this revoked hardware
+    for (const [sessId, session] of this.activeSessions.entries()) {
+      if (session.deviceId === deviceId) {
+        if (session.res) {
+          try {
+            session.res.write(`data: ${JSON.stringify({ event: 'FORCE_LOGOUT', reason: 'Workstation access was revoked by parish administration.' })}\n\n`);
+            session.res.end();
+          } catch (_) {}
+        }
+        this.activeSessions.delete(sessId);
+      }
+    }
+
+    // 3. Broadcast to all active user sessions that this terminal was revoked
     this.broadcastToAll('TERMINAL_REVOKED', { deviceId });
   }
 

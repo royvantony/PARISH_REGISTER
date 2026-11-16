@@ -41,6 +41,8 @@ realtimeRouter.get('/user-stream', authenticateJWT, (req: Request, res: Response
 
   // Resolve session identity
   const clientSessionId = (req.query.sessionId as string) || (req.headers['x-session-id'] as string) || `sess_${user.userId}_${Date.now()}`;
+  const rawDevId = req.query.deviceId ? Number(req.query.deviceId) : undefined;
+  const deviceId = rawDevId && !isNaN(rawDevId) ? rawDevId : undefined;
   const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '127.0.0.1';
   const ua = req.headers['user-agent'] || 'Web Browser';
 
@@ -59,6 +61,7 @@ realtimeRouter.get('/user-stream', authenticateJWT, (req: Request, res: Response
     userEmail: user.email,
     userRole: user.role,
     parishId: req.activeParishId || user.parishId || null,
+    deviceId,
     ipAddress: ip.replace(/^::ffff:/, ''),
     userAgent: ua,
     platformSummary,
