@@ -105,6 +105,8 @@ export interface AuthContextType {
     needsParishSelection?: boolean;
     needsDeviceApproval?: boolean;
     deviceApprovalData?: any;
+    isRevokedTerminal?: boolean;
+    revokedData?: any;
     error?: string;
   }>;
   devLogin: (
@@ -281,6 +283,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     needsParishSelection?: boolean;
     needsDeviceApproval?: boolean;
     deviceApprovalData?: any;
+    isRevokedTerminal?: boolean;
+    revokedData?: any;
     error?: string;
   }> => {
     try {
@@ -349,6 +353,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           needsDeviceApproval: true,
           deviceApprovalData: err.response.data,
           error: err.response.data.message,
+        };
+      }
+      if (err.response?.data?.isRevokedTerminal) {
+        return {
+          success: false,
+          isRevokedTerminal: true,
+          revokedData: err.response.data,
+          error: err.response.data.error,
         };
       }
       const errorMsg = err.response?.data?.error || 'Invalid email or password. Please try again.';

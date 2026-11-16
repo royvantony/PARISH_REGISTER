@@ -473,6 +473,11 @@ model ParishAuthorizedDevice {
   revokedAt         DateTime?
   revokedBy         String?
 
+  reviewRequestedAt DateTime?
+  reviewRequestedBy String?
+  reviewReason      String?
+  reviewStatus      String?   // "PENDING_REVIEW" or null
+
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 

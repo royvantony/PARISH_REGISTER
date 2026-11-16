@@ -45,6 +45,10 @@ interface TerminalDevice {
   approvedBy: string | null;
   revokedAt: string | null;
   revokedBy: string | null;
+  reviewRequestedAt?: string | null;
+  reviewRequestedBy?: string | null;
+  reviewReason?: string | null;
+  reviewStatus?: string | null;
   createdAt: string;
 }
 
@@ -509,47 +513,76 @@ export const AuthorizedTerminalsTab: React.FC = () => {
           </div>
 
           <div className="divide-y divide-parish-border">
-            {revokedDevices.map((d) => (
-              <div
-                key={d.id}
-                className="py-3 first:pt-1 last:pb-1 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 opacity-85"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="p-2 rounded-lg bg-rose-50 dark:bg-rose-950/30 text-rose-600 shrink-0 mt-0.5">
-                    {getDeviceIcon(d.deviceFingerprint)}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-sm text-parish-text line-through">{d.deviceName}</span>
-                      <Badge variant="subtle" size="sm" className="text-rose-700 bg-rose-100/60">Revoked</Badge>
+            {revokedDevices.map((d) => {
+              const hasReviewRequest = d.reviewStatus === 'PENDING_REVIEW' || Boolean(d.reviewRequestedAt);
+              return (
+                <div
+                  key={d.id}
+                  className={`py-3.5 px-3 first:pt-2.5 last:pb-2.5 rounded-xl transition-colors flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
+                    hasReviewRequest
+                      ? 'bg-amber-500/10 border border-amber-300 dark:border-amber-700/80 shadow-2xs'
+                      : 'opacity-85'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={`p-2 rounded-lg shrink-0 mt-0.5 ${
+                        hasReviewRequest
+                          ? 'bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300'
+                          : 'bg-rose-50 dark:bg-rose-950/30 text-rose-600'
+                      }`}
+                    >
+                      {getDeviceIcon(d.deviceFingerprint)}
                     </div>
-                    <p className="text-xs text-parish-text-muted mt-0.5">
-                      Platform: {d.deviceFingerprint || 'Web Browser'} • Revoked by: {d.revokedBy || 'Administrator'} on {formatDate(d.revokedAt)}
-                    </p>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-sm text-parish-text line-through">{d.deviceName}</span>
+                        <Badge variant="subtle" size="sm" className="text-rose-700 bg-rose-100/60">Revoked</Badge>
+
+                        {/* Indication in the same row: Access Requested */}
+                        {hasReviewRequest && (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-500 text-white dark:bg-amber-600 shadow-2xs animate-pulse">
+                            <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                            <span>Access Requested</span>
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-parish-text-muted mt-0.5">
+                        Platform: {d.deviceFingerprint || 'Web Browser'} • Revoked by: {d.revokedBy || 'Administrator'} on {formatDate(d.revokedAt)}
+                      </p>
+                      {hasReviewRequest && (
+                        <div className="flex items-center gap-2 mt-1.5 text-xs text-amber-900 dark:text-amber-200 font-semibold bg-amber-100/80 dark:bg-amber-900/40 px-2.5 py-1 rounded-lg">
+                          <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                          <span>
+                            Access review requested {d.reviewRequestedBy ? `by ${d.reviewRequestedBy}` : ''} on {formatDate(d.reviewRequestedAt)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                    <Button
+                      variant={hasReviewRequest ? 'primary' : 'outline'}
+                      size="sm"
+                      onClick={() => handleApprove(d.id, d.deviceName)}
+                      isLoading={actionInProgressId === d.id}
+                      icon={<RotateCcw className="w-3.5 h-3.5" />}
+                    >
+                      {hasReviewRequest ? 'Review & Re-Authorize' : 'Re-Authorize'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => requestDelete(d.id, d.deviceName)}
+                      disabled={actionInProgressId === d.id}
+                      icon={<Trash2 className="w-3.5 h-3.5 text-slate-400" />}
+                      title="Delete permanently"
+                    />
                   </div>
                 </div>
-
-                <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleApprove(d.id, d.deviceName)}
-                    isLoading={actionInProgressId === d.id}
-                    icon={<RotateCcw className="w-3.5 h-3.5 text-emerald-600" />}
-                  >
-                    Re-Authorize
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => requestDelete(d.id, d.deviceName)}
-                    disabled={actionInProgressId === d.id}
-                    icon={<Trash2 className="w-3.5 h-3.5 text-slate-400" />}
-                    title="Delete permanently"
-                  />
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

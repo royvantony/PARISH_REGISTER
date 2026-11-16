@@ -267,6 +267,66 @@ devicesRouter.post('/register', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/devices/request-review - User submits an access review request for a revoked/blocked terminal
+devicesRouter.post('/request-review', async (req: Request, res: Response) => {
+  try {
+    const { deviceId, deviceToken, hardwareHash, email, reason, parishId } = req.body;
+
+    let device = null;
+    if (deviceId) {
+      device = await prisma.parishAuthorizedDevice.findUnique({
+        where: { id: Number(deviceId) },
+      });
+    }
+
+    if (!device && deviceToken) {
+      const tokenHash = hashDeviceSecret(deviceToken);
+      device = await prisma.parishAuthorizedDevice.findFirst({
+        where: { deviceTokenHash: tokenHash },
+      });
+    }
+
+    if (!device && hardwareHash) {
+      device = await prisma.parishAuthorizedDevice.findFirst({
+        where: { hardwareHash },
+      });
+    }
+
+    if (!device) {
+      return res.status(404).json({ error: 'Workstation registration not found.' });
+    }
+
+    const requesterIdentifier = (email || '').trim() || device.lastUsedUser || 'User';
+
+    const updated = await prisma.parishAuthorizedDevice.update({
+      where: { id: device.id },
+      data: {
+        reviewRequestedAt: new Date(),
+        reviewRequestedBy: requesterIdentifier,
+        reviewReason: (reason || '').trim() || 'Workstation access review requested after revocation.',
+        reviewStatus: 'PENDING_REVIEW',
+      },
+    });
+
+    await logSystemActivity({
+      parishId: device.parishId,
+      actionType: 'TERMINAL_CHANGE',
+      category: 'SECURITY',
+      description: `Access review requested for revoked workstation "${device.deviceName}" by ${requesterIdentifier}.`,
+      req,
+    });
+
+    return res.json({
+      success: true,
+      message: 'Access review request sent to Administrator.',
+      device: updated,
+    });
+  } catch (err: any) {
+    console.error('Request review error:', err);
+    return res.status(500).json({ error: 'Failed to submit access review request.' });
+  }
+});
+
 // POST /api/devices/authorize-direct - In-place terminal authorization using Administrator credentials
 devicesRouter.post('/authorize-direct', async (req: Request, res: Response) => {
   try {
@@ -451,6 +511,10 @@ devicesRouter.get('/list', authenticateJWT, async (req: Request, res: Response) 
         approvedBy: true,
         revokedAt: true,
         revokedBy: true,
+        reviewRequestedAt: true,
+        reviewRequestedBy: true,
+        reviewReason: true,
+        reviewStatus: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -506,6 +570,10 @@ devicesRouter.post('/:id/approve', authenticateJWT, async (req: Request, res: Re
         approvedBy: req.user.fullName || 'Parish Administration',
         revokedAt: null,
         revokedBy: null,
+        reviewRequestedAt: null,
+        reviewRequestedBy: null,
+        reviewReason: null,
+        reviewStatus: null,
       },
     });
 

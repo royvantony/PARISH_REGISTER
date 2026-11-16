@@ -17,6 +17,7 @@ import {
   RotateCcw,
   KeyRound,
   Loader2,
+  Send,
 } from 'lucide-react';
 import { ForgotPasswordModal } from '../components/auth/ForgotPasswordModal';
 import { api } from '../lib/api';
@@ -24,6 +25,7 @@ import {
   verifyTerminalAuthorization,
   authorizeTerminalDirectly,
   getBrowserMetadata,
+  collectHardwareTelemetry,
   type DeviceVerifyResult,
 } from '../lib/deviceAuth';
 
@@ -99,6 +101,16 @@ export const LoginPage: React.FC = () => {
   const [directAuthPassword, setDirectAuthPassword] = useState('');
   const [directAuthLoading, setDirectAuthLoading] = useState(false);
   const [directAuthError, setDirectAuthError] = useState<string | null>(null);
+
+  // Revoked Workstation Review State
+  const [revokedTerminalInfo, setRevokedTerminalInfo] = useState<{
+    deviceId: number;
+    deviceName: string;
+    reviewRequestedAt?: string | null;
+    reviewStatus?: string | null;
+  } | null>(null);
+  const [isRequestingReview, setIsRequestingReview] = useState(false);
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
 
   // Background check on load: If already approved, show green trust badge on form
   const runTerminalCheck = async () => {
@@ -290,8 +302,37 @@ export const LoginPage: React.FC = () => {
     } else if (res.needsDeviceApproval) {
       setPendingApprovalData(res.deviceApprovalData);
       setTerminalStatus('PENDING');
+    } else if (res.isRevokedTerminal) {
+      setRevokedTerminalInfo(res.revokedData);
+      setErrorMessage(res.error || 'Workstation access revoked by parish administration.');
+      if (res.revokedData?.reviewStatus === 'PENDING_REVIEW' || res.revokedData?.reviewRequestedAt) {
+        setReviewSubmitted(true);
+      }
     } else {
       setErrorMessage(res.error || 'Authentication failed. Please verify credentials.');
+    }
+  };
+
+  const handleRequestReview = async () => {
+    if (!revokedTerminalInfo?.deviceId) return;
+    setIsRequestingReview(true);
+    try {
+      const telemetry = collectHardwareTelemetry();
+      await api.post('/devices/request-review', {
+        deviceId: revokedTerminalInfo.deviceId,
+        email,
+        hardwareHash: telemetry.hardwareHash,
+      });
+      setReviewSubmitted(true);
+      setRevokedTerminalInfo((prev: any) => ({
+        ...prev,
+        reviewRequestedAt: new Date().toISOString(),
+        reviewStatus: 'PENDING_REVIEW',
+      }));
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to submit review request.');
+    } finally {
+      setIsRequestingReview(false);
     }
   };
 
@@ -646,11 +687,41 @@ export const LoginPage: React.FC = () => {
               </div>
             )}
 
-            {/* Error Message Alert */}
+            {/* Error Message Alert with Review Request Action */}
             {errorMessage && (
-              <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2.5 animate-in fade-in duration-200">
-                <ShieldAlert className="w-4 h-4 shrink-0 text-red-600" />
-                <span>{errorMessage}</span>
+              <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex flex-col gap-2.5 animate-in fade-in duration-200">
+                <div className="flex items-start gap-2.5">
+                  <ShieldAlert className="w-4 h-4 shrink-0 text-red-600 mt-0.5" />
+                  <span className="leading-relaxed flex-1">{errorMessage}</span>
+                </div>
+
+                {revokedTerminalInfo && (
+                  <div className="pt-2 border-t border-red-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+                    {reviewSubmitted || revokedTerminalInfo.reviewRequestedAt ? (
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-100 text-amber-900 font-semibold text-[11px]">
+                        <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+                        <span>Access Review Requested — Awaiting Administrator Re-Evaluation</span>
+                      </div>
+                    ) : (
+                      <>
+                        <span className="text-[11px] text-red-800">
+                          Need access restored? You can submit a review request to the Administrator.
+                        </span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleRequestReview}
+                          isLoading={isRequestingReview}
+                          className="text-xs bg-white hover:bg-rose-50 border-rose-300 text-rose-800 shrink-0 shadow-2xs"
+                          icon={<Send className="w-3 h-3 text-rose-600" />}
+                        >
+                          Send Review Request
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
