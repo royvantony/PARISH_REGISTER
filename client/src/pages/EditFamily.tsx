@@ -33,6 +33,7 @@ import {
   ChevronDown,
   ChevronUp,
   Edit2,
+  Eye,
   Trash2,
   Tag,
   AlertTriangle,
@@ -156,6 +157,32 @@ export const EditFamilyPage: React.FC = () => {
   const [isAllAuditNotesShown, setIsAllAuditNotesShown] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [activeConcurrentEditors, setActiveConcurrentEditors] = useState<{ userId: number; userName: string; userRole: string }[]>([]);
+
+  // Real-Time Collision Guard: Announce viewing/editing and check for other editors
+  useEffect(() => {
+    if (!id) return;
+    const familyId = Number(id);
+
+    const pingEditing = () => {
+      api
+        .post(`/realtime/families/${familyId}/editing`)
+        .then((res) => {
+          if (Array.isArray(res.data?.activeEditors)) {
+            setActiveConcurrentEditors(res.data.activeEditors);
+          }
+        })
+        .catch(() => {});
+    };
+
+    pingEditing();
+    const interval = setInterval(pingEditing, 12000);
+
+    return () => {
+      clearInterval(interval);
+      api.delete(`/realtime/families/${familyId}/editing`).catch(() => {});
+    };
+  }, [id]);
 
   const activeDirectDebitsCount = directDebits.filter((d) => d.active).length;
   const totalMonthlyDirectDebit = directDebits
@@ -782,6 +809,21 @@ export const EditFamilyPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Real-Time Concurrent Viewing / Editing Warning */}
+      {activeConcurrentEditors.length > 0 && (
+        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs flex items-center gap-3 animate-in fade-in shadow-xs">
+          <div className="w-8 h-8 rounded-xl bg-amber-500/20 flex items-center justify-center shrink-0 text-amber-600 dark:text-amber-400">
+            <Eye className="w-4 h-4 animate-pulse" />
+          </div>
+          <div>
+            <div className="font-bold text-sm">Concurrent Editing Alert</div>
+            <div className="text-xs text-amber-800/90 dark:text-amber-300/90 mt-0.5">
+              <strong>{activeConcurrentEditors.map((e) => `${e.userName} (${e.userRole})`).join(', ')}</strong> is also viewing or editing this household record right now. Take care to avoid overwriting each other's changes.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Inactive Household Banner */}
       {status === 'INACTIVE' && (

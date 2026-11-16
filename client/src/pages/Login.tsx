@@ -134,16 +134,48 @@ export const LoginPage: React.FC = () => {
     runTerminalCheck();
   }, []);
 
-  // Live auto-polling when terminal is PENDING approval
+  // Live Real-Time SSE Stream (0ms instant approval) + fallback polling when terminal is PENDING
   useEffect(() => {
     if (terminalStatus !== 'PENDING') return;
+
+    const deviceId = pendingApprovalData?.deviceId;
+    let eventSource: EventSource | null = null;
+
+    if (deviceId) {
+      try {
+        eventSource = new EventSource(`/api/realtime/terminal/${deviceId}`);
+        eventSource.onmessage = (e) => {
+          try {
+            const data = JSON.parse(e.data);
+            if (data.event === 'APPROVED') {
+              eventSource?.close();
+              setTerminalData((prev) => ({ ...prev, status: 'APPROVED', deviceName: data.deviceName } as any));
+              setTerminalStatus('APPROVED');
+              if (email && password) {
+                login(email, password).then((loginRes) => {
+                  if (loginRes.success) {
+                    if (loginRes.needsParishSelection) setIsChoosingParish(true);
+                    else navigate('/dashboard');
+                  }
+                });
+              }
+            } else if (data.event === 'REVOKED') {
+              eventSource?.close();
+              setTerminalStatus('REVOKED');
+            }
+          } catch (_) {}
+        };
+      } catch (_) {}
+    }
+
+    // Fallback polling in case of restrictive network proxies
     const interval = setInterval(async () => {
       try {
         const res = await verifyTerminalAuthorization(1);
         if (res.status === 'APPROVED') {
+          if (eventSource) eventSource.close();
           setTerminalData(res);
           setTerminalStatus('APPROVED');
-          // Automatically complete login once approved!
           if (email && password) {
             login(email, password).then((loginRes) => {
               if (loginRes.success) {
@@ -153,15 +185,18 @@ export const LoginPage: React.FC = () => {
             });
           }
         } else if (res.status === 'REVOKED') {
+          if (eventSource) eventSource.close();
           setTerminalData(res);
           setTerminalStatus('REVOKED');
         }
-      } catch {
-        // Ignore network glitches during poll
-      }
-    }, 3500);
-    return () => clearInterval(interval);
-  }, [terminalStatus, email, password]);
+      } catch (_) {}
+    }, 5000);
+
+    return () => {
+      if (eventSource) eventSource.close();
+      clearInterval(interval);
+    };
+  }, [terminalStatus, pendingApprovalData?.deviceId, email, password]);
 
   const handleSendBootstrapOtp = async () => {
     if (!pendingApprovalData?.deviceId) return;

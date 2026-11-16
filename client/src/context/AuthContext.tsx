@@ -309,6 +309,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } = res.data;
 
       // Persist auth
+      sessionStorage.setItem('parish_token', receivedToken);
+      sessionStorage.setItem('parish_user', JSON.stringify(receivedUser));
       localStorage.setItem('parish_token', receivedToken);
       localStorage.setItem('parish_user', JSON.stringify(receivedUser));
       localStorage.setItem('parish_last_activity', String(Date.now()));
@@ -461,6 +463,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     // 1. Remove all authentication tokens and stored keys completely
+    sessionStorage.removeItem('parish_token');
+    sessionStorage.removeItem('parish_user');
+    sessionStorage.removeItem('parish_session_id');
     localStorage.removeItem('parish_token');
     localStorage.removeItem('parish_user');
     localStorage.removeItem('parish_last_activity');
@@ -565,6 +570,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (throttleTimer) clearTimeout(throttleTimer);
     };
   }, [token, user, isWarningOpen]);
+
+  // --------------------------------------------------------------------------
+  // Real-Time SSE User Stream (Instant Kill Switch & Terminal Revocation)
+  // --------------------------------------------------------------------------
+  useEffect(() => {
+    if (!token || !user) return;
+
+    let sessionId = sessionStorage.getItem('parish_session_id');
+    if (!sessionId) {
+      sessionId = `sess_${user.id}_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`;
+      sessionStorage.setItem('parish_session_id', sessionId);
+    }
+
+    let es: EventSource | null = null;
+    try {
+      es = new EventSource(
+        `/api/realtime/user-stream?token=${encodeURIComponent(token)}&sessionId=${encodeURIComponent(sessionId)}`
+      );
+
+      es.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.event === 'FORCE_LOGOUT') {
+            sessionStorage.setItem(
+              'inactivity_logout_notice',
+              data.reason || 'Your session was terminated by an administrator.'
+            );
+            logout();
+          } else if (data.event === 'TERMINAL_REVOKED') {
+            sessionStorage.setItem(
+              'inactivity_logout_notice',
+              'Workstation access was revoked by parish administration.'
+            );
+            logout();
+          }
+        } catch (_) {}
+      };
+    } catch (_) {}
+
+    return () => {
+      if (es) es.close();
+    };
+  }, [token, user?.id]);
 
   const setActiveParishById = (parishId: number) => {
     const matched = availableParishes.find((p) => p.id === parishId);

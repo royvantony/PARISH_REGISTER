@@ -7,6 +7,7 @@ import { authenticateJWT } from '../middleware/auth.js';
 import { checkUserPermission } from './permissions.js';
 import { logSystemActivity } from '../lib/activityLogger.js';
 import { sendParishEmail } from '../lib/email.js';
+import { realtimeHub } from '../lib/realtime.js';
 import { UserRole } from '@prisma/client';
 
 export const devicesRouter = Router();
@@ -694,6 +695,9 @@ devicesRouter.post('/:id/approve', authenticateJWT, async (req: Request, res: Re
       req,
     });
 
+    // Real-Time SSE Notification: Push instant 0ms approval to pending login screen
+    realtimeHub.emitTerminalApproved(deviceId, device.deviceName);
+
     return res.json({
       success: true,
       message: `Terminal "${device.deviceName}" has been approved for access.`,
@@ -759,6 +763,9 @@ devicesRouter.post('/:id/revoke', authenticateJWT, async (req: Request, res: Res
       description: `${req.user.fullName || 'Administrator'} revoked terminal: "${device.deviceName}".`,
       req,
     });
+
+    // Real-Time SSE Notification: Push instant 0ms revocation & kill-switch
+    realtimeHub.emitTerminalRevoked(deviceId);
 
     return res.json({
       success: true,
