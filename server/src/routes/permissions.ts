@@ -20,6 +20,7 @@ export const SYSTEM_MODULES = [
   { key: 'USERS', name: 'Users & Roles Management', category: 'Administration' },
   { key: 'DASHBOARD_ACTIVITY', name: 'Dashboard Pastoral Notes', category: 'Dashboard' },
   { key: 'SETTINGS', name: 'System Settings & Masters', category: 'Administration' },
+  { key: 'TERMINALS', name: 'Workstations & Terminal Security', category: 'Administration' },
   { key: 'AUDIT_LOGS', name: 'Security & System Activity Logs', category: 'Administration' },
 ];
 
@@ -62,6 +63,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, {
     USERS: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
     DASHBOARD_ACTIVITY: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
     SETTINGS: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
+    TERMINALS: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
     AUDIT_LOGS: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
   },
   [UserRole.DIOCESAN_ADMIN]: { // Bishop / Chancellor (Full diocese-wide authority)
@@ -75,6 +77,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, {
     USERS: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
     DASHBOARD_ACTIVITY: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
     SETTINGS: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
+    TERMINALS: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
     AUDIT_LOGS: { canView: true, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: true, canApprove: false },
   },
   [UserRole.DIOCESAN_USER]: { // Diocesan Staff / Accountant (Read-only / Roster Export)
@@ -88,6 +91,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, {
     USERS: { canView: true, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: false, canApprove: false },
     DASHBOARD_ACTIVITY: { canView: true, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: false, canApprove: false },
     SETTINGS: { canView: false, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: false, canApprove: false },
+    TERMINALS: { canView: true, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: false, canApprove: false },
     AUDIT_LOGS: { canView: false, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: false, canApprove: false },
   },
   [UserRole.PARISH_PRIEST]: { // Parish Priest (Supreme Parish Authority - approvals, block admins, full finance)
@@ -101,6 +105,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, {
     USERS: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
     DASHBOARD_ACTIVITY: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
     SETTINGS: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: false, canExport: true, canApprove: true },
+    TERMINALS: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
     AUDIT_LOGS: { canView: true, canCreate: false, canEdit: true, canArchive: false, canDelete: false, canExport: true, canApprove: false },
   },
   [UserRole.PARISH_ADMIN]: { // Parish Trustees / Executive Committee (Parish Management & Approvals)
@@ -114,6 +119,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, {
     USERS: { canView: true, canCreate: true, canEdit: true, canArchive: false, canDelete: false, canExport: false, canApprove: false },
     DASHBOARD_ACTIVITY: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: false, canExport: true, canApprove: true },
     SETTINGS: { canView: true, canCreate: false, canEdit: true, canArchive: false, canDelete: false, canExport: false, canApprove: false },
+    TERMINALS: { canView: true, canCreate: true, canEdit: true, canArchive: true, canDelete: true, canExport: true, canApprove: true },
     AUDIT_LOGS: { canView: true, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: true, canApprove: false },
   },
   [UserRole.PARISH_USER]: { // Parish Secretary / Office Volunteer (Daily tasks, submit registrations for approval)
@@ -127,6 +133,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Record<string, {
     USERS: { canView: false, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: false, canApprove: false },
     DASHBOARD_ACTIVITY: { canView: true, canCreate: true, canEdit: true, canArchive: false, canDelete: false, canExport: false, canApprove: false },
     SETTINGS: { canView: false, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: false, canApprove: false },
+    TERMINALS: { canView: false, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: false, canApprove: false },
     AUDIT_LOGS: { canView: false, canCreate: false, canEdit: false, canArchive: false, canDelete: false, canExport: false, canApprove: false },
   },
 };

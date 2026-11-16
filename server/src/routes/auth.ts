@@ -73,7 +73,7 @@ authRouter.post('/login', async (req: Request, res: Response) => {
       where: { parishId: activeParishId, status: 'APPROVED' },
     });
 
-    const isParishLeader = user.role === 'PARISH_PRIEST' || user.role === 'SUPER_ADMIN';
+    const isParishLeader = user.role === 'PARISH_PRIEST' || user.role === 'PARISH_ADMIN' || user.role === 'SUPER_ADMIN' || user.role === 'DIOCESAN_ADMIN';
 
     // Find existing device by token OR by deterministic hardware signature
     let device = null;
@@ -175,7 +175,7 @@ authRouter.post('/login', async (req: Request, res: Response) => {
       });
     }
 
-    // 3. Unapproved Device: Needs Pastoral Approval!
+    // 3. Unapproved Device: Needs Administrator Approval!
     if (!device || device.status !== 'APPROVED') {
       const autoDeviceName = (deviceName || '').trim() || `${user.fullName}'s ${telemetry?.platformSummary || 'Workstation'}`;
       const finalTokenHash = tokenHash || hashDeviceSecret(`dev_${Date.now()}_${Math.random()}`);
@@ -246,7 +246,7 @@ authRouter.post('/login', async (req: Request, res: Response) => {
         networkScope: net.networkScope,
         locationName: net.locationName,
         ipAddress: net.ipAddress,
-        message: 'This workstation requires pastoral authorization. An enrollment request has been submitted to the Parish Priest with your credentials verified.',
+        message: 'This workstation requires administrator authorization. An enrollment request has been submitted to an Authorized Administrator with your credentials verified.',
       });
     }
 
@@ -740,7 +740,7 @@ async function sendTempLoginOtp(user: { id: number; fullName: string; email: str
       </div>
 
       <p style="color: #dc2626; font-size: 12px; line-height: 1.6; margin-top: 20px; font-weight: 600;">
-        ⚠️ If you did not initiate this sign-in attempt, someone may be attempting to access your account. Please notify your Parish Priest or Administrator immediately.
+        ⚠️ If you did not initiate this sign-in attempt, someone may be attempting to access your account. Please notify your Parish Administrator immediately.
       </p>
 
       <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 24px 0;" />

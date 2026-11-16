@@ -38,7 +38,7 @@ interface DevShortcutAccount {
 // Fast access accounts (shown only if APP_ENV is Dev/Demo or ALLOW_DEV_LOGIN="true", triggered via Ctrl+Shift+D, and validated against the database)
 const DEV_SHORTCUT_ACCOUNTS: DevShortcutAccount[] = [
   {
-    label: '⛪ Parish Priest',
+    label: '🏛️ Parish Administrator',
     roleHint: '(PARISH_PRIEST)',
     email: 'royvadakumpadan@gmail.com',
     badgeVariant: 'default',
@@ -93,7 +93,7 @@ export const LoginPage: React.FC = () => {
   });
   const [redirectProgress, setRedirectProgress] = useState(30);
 
-  // In-person Priest/Admin Direct Authorization
+  // In-person Administrator Direct Authorization
   const [showDirectAuth, setShowDirectAuth] = useState(false);
   const [directAuthEmail, setDirectAuthEmail] = useState('');
   const [directAuthPassword, setDirectAuthPassword] = useState('');
@@ -444,7 +444,7 @@ export const LoginPage: React.FC = () => {
           </div>
         ) : terminalStatus === 'PENDING' && !isDevRevealed ? (
           /* ================================================================= */
-          /* 1. WORKSTATION PASTORAL APPROVAL REQUIRED FOR USER                */
+          /* 1. WORKSTATION ADMINISTRATOR APPROVAL REQUIRED FOR USER           */
           /* ================================================================= */
           <div className="bg-parish-surface border border-parish-border py-8 px-6 sm:px-10 shadow-soft rounded-3xl text-center space-y-6 animate-in fade-in">
             <div className="w-14 h-14 rounded-2xl bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 flex items-center justify-center mx-auto border border-amber-300/80">
@@ -456,9 +456,9 @@ export const LoginPage: React.FC = () => {
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-ping" />
                 <span>Workstation Approval Pending</span>
               </div>
-              <h2 className="text-xl font-extrabold text-parish-text">Awaiting Pastoral Authorization</h2>
+              <h2 className="text-xl font-extrabold text-parish-text">Awaiting Administrator Authorization</h2>
               <p className="text-xs text-parish-text-muted max-w-sm mx-auto leading-relaxed">
-                Welcome, <strong className="text-parish-text">{pendingApprovalData?.userName || 'Parish Staff'}</strong>. Your credentials are valid. Because this computer is not yet authorized for St. Alphonsa Parish, an enrollment request has been submitted to the Parish Priest.
+                Welcome, <strong className="text-parish-text">{pendingApprovalData?.userName || 'Parish Staff'}</strong>. Your credentials are valid. Because this computer is not yet authorized for this parish, an enrollment request has been submitted to an Authorized Administrator.
               </p>
             </div>
 
@@ -496,14 +496,14 @@ export const LoginPage: React.FC = () => {
                 className="w-full justify-center text-xs"
                 icon={<RotateCcw className="w-3.5 h-3.5" />}
               >
-                Check Pastoral Approval Status
+                Check Approval Status
               </Button>
               <p className="text-[10px] text-parish-text-muted">
-                Auto-polling every 3.5 seconds. Once Father approves, you will log in automatically.
+                Auto-polling every 3.5 seconds. Once an authorized administrator approves, you will log in automatically.
               </p>
             </div>
 
-            {/* In-Person Direct Priest/Admin Authorization Accordion */}
+            {/* In-Person Direct Administrator Authorization Accordion */}
             <div className="pt-3 border-t border-parish-border/60 space-y-2">
               <button
                 type="button"
@@ -514,13 +514,13 @@ export const LoginPage: React.FC = () => {
                 className="w-full text-center text-xs text-parish-primary hover:text-parish-primary-dark font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer py-1"
               >
                 <KeyRound className="w-3.5 h-3.5" />
-                <span>{showDirectAuth ? 'Hide Priest In-Person Auth' : 'Authorize in-person with Priest credentials'}</span>
+                <span>{showDirectAuth ? 'Hide In-Person Administrator Auth' : 'Authorize in-person as an Administrator'}</span>
               </button>
 
               {showDirectAuth && (
                 <form onSubmit={handleDirectAuth} className="mt-3 p-4 rounded-2xl bg-parish-surface-subtle border border-parish-border space-y-3 animate-in fade-in duration-200 text-left">
                   <p className="text-[11px] text-parish-text-muted leading-tight">
-                    If you are the Parish Priest standing at this machine, sign in below to authorize it immediately:
+                    If you are an Authorized Administrator standing at this machine, sign in below to authorize it immediately:
                   </p>
                   {directAuthError && (
                     <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-[11px] text-rose-700">
@@ -528,12 +528,12 @@ export const LoginPage: React.FC = () => {
                     </div>
                   )}
                   <div>
-                    <label className="block text-[11px] font-semibold text-parish-text mb-1">Priest / Admin Email</label>
+                    <label className="block text-[11px] font-semibold text-parish-text mb-1">Administrator Email</label>
                     <Input
                       type="text"
                       value={directAuthEmail}
                       onChange={(e) => setDirectAuthEmail(e.target.value)}
-                      placeholder="e.g. royvadakumpadan@gmail.com"
+                      placeholder="e.g. admin@parish.org.au"
                       required
                       className="text-xs"
                     />
@@ -660,7 +660,7 @@ export const LoginPage: React.FC = () => {
                 label="Email or Username"
                 type="text"
                 required
-                placeholder="e.g. fr.abraham or priest@stalphonsabrisbane.org.au"
+                placeholder="e.g. admin or user@parish.org.au"
                 value={email}
                 onChange={(e) => {
                   setEmail(e.target.value);

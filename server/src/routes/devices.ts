@@ -259,7 +259,7 @@ devicesRouter.post('/register', async (req: Request, res: Response) => {
       isFirstDevice: isFirstApproved,
       message: isFirstApproved
         ? 'Primary terminal auto-authorized as the initial administrative workstation.'
-        : 'Terminal registration submitted. Awaiting Parish Priest or Administrator approval.',
+        : 'Terminal registration submitted. Awaiting Administrator approval.',
     });
   } catch (err: any) {
     console.error('Device register error:', err);
@@ -267,7 +267,7 @@ devicesRouter.post('/register', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/devices/authorize-direct - In-place terminal authorization using Priest / Admin credentials
+// POST /api/devices/authorize-direct - In-place terminal authorization using Administrator credentials
 devicesRouter.post('/authorize-direct', async (req: Request, res: Response) => {
   try {
     const { parishId, deviceToken, email, username, password, terminalName, browserInfo, telemetry } = req.body;
@@ -300,10 +300,14 @@ devicesRouter.post('/authorize-direct', async (req: Request, res: Response) => {
 
     const isAuthorizedRole =
       user.role === 'SUPER_ADMIN' ||
-      ((user.role === 'PARISH_PRIEST' || user.role === 'PARISH_ADMIN') && user.parishId === pid);
+      user.role === 'DIOCESAN_ADMIN' ||
+      ((user.role === 'PARISH_PRIEST' || user.role === 'PARISH_ADMIN') && user.parishId === pid) ||
+      (await checkUserPermission(user.id, user.role, pid, 'TERMINALS', 'canApprove')) ||
+      (await checkUserPermission(user.id, user.role, pid, 'SETTINGS', 'canApprove')) ||
+      (await checkUserPermission(user.id, user.role, pid, 'SETTINGS', 'canEdit'));
 
     if (!isAuthorizedRole) {
-      return res.status(403).json({ error: 'Only a Parish Priest or Administrator can authorize terminals.' });
+      return res.status(403).json({ error: 'Only an authorized Administrator can authorize terminals.' });
     }
 
     const tokenHash = hashDeviceSecret(deviceToken);
@@ -405,8 +409,11 @@ devicesRouter.get('/list', authenticateJWT, async (req: Request, res: Response) 
 
     const isAuthorized =
       callerRole === 'SUPER_ADMIN' ||
+      callerRole === 'DIOCESAN_ADMIN' ||
       callerRole === 'PARISH_PRIEST' ||
       callerRole === 'PARISH_ADMIN' ||
+      (await checkUserPermission(req.user.userId, callerRole, parishId, 'TERMINALS', 'canView')) ||
+      (await checkUserPermission(req.user.userId, callerRole, parishId, 'SETTINGS', 'canView')) ||
       (await checkUserPermission(req.user.userId, callerRole, parishId, 'SETTINGS', 'canEdit'));
 
     if (!isAuthorized) {
@@ -472,12 +479,15 @@ devicesRouter.post('/:id/approve', authenticateJWT, async (req: Request, res: Re
 
     const isAuthorized =
       callerRole === 'SUPER_ADMIN' ||
+      callerRole === 'DIOCESAN_ADMIN' ||
       callerRole === 'PARISH_PRIEST' ||
       callerRole === 'PARISH_ADMIN' ||
+      (await checkUserPermission(req.user.userId, callerRole, parishId, 'TERMINALS', 'canApprove')) ||
+      (await checkUserPermission(req.user.userId, callerRole, parishId, 'SETTINGS', 'canApprove')) ||
       (await checkUserPermission(req.user.userId, callerRole, parishId, 'SETTINGS', 'canEdit'));
 
     if (!isAuthorized) {
-      return res.status(403).json({ error: 'Only the Parish Priest or authorized Administrators can approve terminals.' });
+      return res.status(403).json({ error: 'Only an authorized Administrator can approve terminals.' });
     }
 
     const device = await prisma.parishAuthorizedDevice.findUnique({
@@ -537,12 +547,15 @@ devicesRouter.post('/:id/revoke', authenticateJWT, async (req: Request, res: Res
 
     const isAuthorized =
       callerRole === 'SUPER_ADMIN' ||
+      callerRole === 'DIOCESAN_ADMIN' ||
       callerRole === 'PARISH_PRIEST' ||
       callerRole === 'PARISH_ADMIN' ||
+      (await checkUserPermission(req.user.userId, callerRole, parishId, 'TERMINALS', 'canApprove')) ||
+      (await checkUserPermission(req.user.userId, callerRole, parishId, 'SETTINGS', 'canApprove')) ||
       (await checkUserPermission(req.user.userId, callerRole, parishId, 'SETTINGS', 'canEdit'));
 
     if (!isAuthorized) {
-      return res.status(403).json({ error: 'Only the Parish Priest or authorized Administrators can revoke terminals.' });
+      return res.status(403).json({ error: 'Only an authorized Administrator can revoke terminals.' });
     }
 
     const device = await prisma.parishAuthorizedDevice.findUnique({
@@ -600,11 +613,15 @@ devicesRouter.delete('/:id', authenticateJWT, async (req: Request, res: Response
 
     const isAuthorized =
       callerRole === 'SUPER_ADMIN' ||
+      callerRole === 'DIOCESAN_ADMIN' ||
       callerRole === 'PARISH_PRIEST' ||
+      callerRole === 'PARISH_ADMIN' ||
+      (await checkUserPermission(req.user.userId, callerRole, parishId, 'TERMINALS', 'canDelete')) ||
+      (await checkUserPermission(req.user.userId, callerRole, parishId, 'SETTINGS', 'canDelete')) ||
       (await checkUserPermission(req.user.userId, callerRole, parishId, 'SETTINGS', 'canEdit'));
 
     if (!isAuthorized) {
-      return res.status(403).json({ error: 'Only the Parish Priest or Super Admin can remove terminal records.' });
+      return res.status(403).json({ error: 'Only an authorized Administrator can remove terminal records.' });
     }
 
     const device = await prisma.parishAuthorizedDevice.findUnique({

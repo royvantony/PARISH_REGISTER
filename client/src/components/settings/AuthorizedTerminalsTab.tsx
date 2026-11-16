@@ -218,7 +218,7 @@ export const AuthorizedTerminalsTab: React.FC = () => {
               <Badge variant="success" size="sm">Core Hardware Security</Badge>
             </h3>
             <p className="text-xs text-parish-text-muted mt-1 leading-relaxed max-w-2xl">
-              Only physical computers and mobile devices authorized by the Parish Priest can load this parish’s software.
+              Only physical computers and mobile devices authorized by an Administrator can load this parish’s software.
               Every login and sensitive action is automatically tagged with the physical terminal name.
             </p>
           </div>
@@ -270,7 +270,7 @@ export const AuthorizedTerminalsTab: React.FC = () => {
           <div className={`text-2xl font-black mt-2 ${pendingDevices.length > 0 ? 'text-amber-600' : 'text-parish-text'}`}>
             {pendingDevices.length}
           </div>
-          <p className="text-[11px] text-parish-text-muted mt-0.5">Awaiting pastoral review</p>
+          <p className="text-[11px] text-parish-text-muted mt-0.5">Awaiting administrator review</p>
         </div>
 
         <div className="p-4 rounded-xl bg-parish-surface border border-parish-border shadow-2xs">
@@ -314,7 +314,7 @@ export const AuthorizedTerminalsTab: React.FC = () => {
                   <div className="space-y-2 w-full">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-extrabold text-sm text-parish-text">{d.deviceName}</span>
-                      <Badge variant="warning" size="sm">Pending Pastoral Approval</Badge>
+                      <Badge variant="warning" size="sm">Pending Administrator Approval</Badge>
 
                       {/* Network & Location Badge */}
                       {d.networkScope === 'REMOTE_WAN' ? (
@@ -430,7 +430,7 @@ export const AuthorizedTerminalsTab: React.FC = () => {
 
         {approvedDevices.length === 0 ? (
           <div className="py-8 text-center text-xs text-parish-text-muted border border-dashed border-parish-border rounded-xl">
-            No active workstations currently authorized. When an office computer or pastoral device enrolls, it will appear here.
+            No active workstations currently authorized. When an office computer or authorized device enrolls, it will appear here.
           </div>
         ) : (
           <div className="divide-y divide-parish-border">
@@ -524,7 +524,7 @@ export const AuthorizedTerminalsTab: React.FC = () => {
                       <Badge variant="subtle" size="sm" className="text-rose-700 bg-rose-100/60">Revoked</Badge>
                     </div>
                     <p className="text-xs text-parish-text-muted mt-0.5">
-                      Platform: {d.deviceFingerprint || 'Web Browser'} • Revoked by: {d.revokedBy || 'Parish Priest'} on {formatDate(d.revokedAt)}
+                      Platform: {d.deviceFingerprint || 'Web Browser'} • Revoked by: {d.revokedBy || 'Administrator'} on {formatDate(d.revokedAt)}
                     </p>
                   </div>
                 </div>
@@ -558,7 +558,7 @@ export const AuthorizedTerminalsTab: React.FC = () => {
       <div className="p-4 rounded-xl bg-parish-surface-subtle border border-parish-border text-xs text-parish-text-muted flex items-start gap-3">
         <Info className="w-4 h-4 text-parish-primary shrink-0 mt-0.5" />
         <div className="leading-relaxed">
-          <strong>How Terminal Security Works:</strong> When an office desktop, pastoral laptop, or tablet accesses this portal for the first time, it registers a cryptographic hardware token with the parish. Once approved by the Parish Priest, the machine is authorized for all staff members who have valid user accounts. Revoking a terminal blocks all access from that physical machine across Google Chrome, Microsoft Edge, and all other browsers immediately.
+          <strong>How Terminal Security Works:</strong> When an office desktop, laptop, or mobile device accesses this portal for the first time, it registers a cryptographic hardware token with the parish. Once approved by an Authorized Administrator, the machine is authorized for all staff members who have valid user accounts. Revoking a terminal blocks all access from that physical machine across Google Chrome, Microsoft Edge, and all other browsers immediately.
         </div>
       </div>
 
