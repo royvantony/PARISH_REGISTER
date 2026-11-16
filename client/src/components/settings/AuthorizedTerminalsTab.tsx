@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import {
   Monitor,
   Smartphone,
@@ -53,6 +54,23 @@ export const AuthorizedTerminalsTab: React.FC = () => {
   const [actionInProgressId, setActionInProgressId] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
+  // Modern in-app Confirmation Dialog State
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmLabel: string;
+    variant: 'danger' | 'primary';
+    action: () => Promise<void>;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmLabel: 'Confirm',
+    variant: 'danger',
+    action: async () => {},
+  });
+
   const fetchDevices = async () => {
     try {
       setIsLoading(true);
@@ -90,11 +108,18 @@ export const AuthorizedTerminalsTab: React.FC = () => {
     }
   };
 
-  const handleRevoke = async (deviceId: number, name: string) => {
-    if (!window.confirm(`Are you sure you want to revoke "${name}"? This machine will immediately be blocked from accessing parish records.`)) {
-      return;
-    }
+  const requestRevoke = (deviceId: number, name: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Revoke Workstation Access',
+      message: `Are you sure you want to revoke "${name}"? This physical machine will immediately be blocked from accessing parish records across all accounts.`,
+      confirmLabel: 'Revoke Access',
+      variant: 'danger',
+      action: () => executeRevoke(deviceId, name),
+    });
+  };
 
+  const executeRevoke = async (deviceId: number, name: string) => {
     setActionInProgressId(deviceId);
     setFeedback(null);
     try {
@@ -108,14 +133,33 @@ export const AuthorizedTerminalsTab: React.FC = () => {
       });
     } finally {
       setActionInProgressId(null);
+      setConfirmModal((prev) => ({ ...prev, isOpen: false }));
     }
   };
 
-  const handleDelete = async (deviceId: number, name: string) => {
-    if (!window.confirm(`Permanently remove terminal "${name}"?`)) {
-      return;
-    }
+  const requestReject = (deviceId: number, name: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Reject Access Request',
+      message: `Reject authorization request for "${name}"? The user will not be allowed to access the parish portal from this device.`,
+      confirmLabel: 'Reject Request',
+      variant: 'danger',
+      action: () => executeDelete(deviceId, name),
+    });
+  };
 
+  const requestDelete = (deviceId: number, name: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Permanently Remove Workstation',
+      message: `Permanently delete registration records for "${name}"? If this machine reconnects in the future, it will be treated as an unknown device requiring re-authorization.`,
+      confirmLabel: 'Remove Terminal',
+      variant: 'danger',
+      action: () => executeDelete(deviceId, name),
+    });
+  };
+
+  const executeDelete = async (deviceId: number, name: string) => {
     setActionInProgressId(deviceId);
     setFeedback(null);
     try {
@@ -129,6 +173,7 @@ export const AuthorizedTerminalsTab: React.FC = () => {
       });
     } finally {
       setActionInProgressId(null);
+      setConfirmModal((prev) => ({ ...prev, isOpen: false }));
     }
   };
 
@@ -358,7 +403,7 @@ export const AuthorizedTerminalsTab: React.FC = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleDelete(d.id, d.deviceName)}
+                    onClick={() => requestReject(d.id, d.deviceName)}
                     disabled={actionInProgressId === d.id}
                     className="text-rose-600 hover:text-rose-700 hover:border-rose-300"
                   >
@@ -436,7 +481,7 @@ export const AuthorizedTerminalsTab: React.FC = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleRevoke(d.id, d.deviceName)}
+                    onClick={() => requestRevoke(d.id, d.deviceName)}
                     isLoading={actionInProgressId === d.id}
                     icon={<ShieldAlert className="w-3.5 h-3.5 text-rose-600" />}
                     className="text-xs hover:border-rose-300 hover:text-rose-600"
@@ -497,7 +542,7 @@ export const AuthorizedTerminalsTab: React.FC = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleDelete(d.id, d.deviceName)}
+                    onClick={() => requestDelete(d.id, d.deviceName)}
                     disabled={actionInProgressId === d.id}
                     icon={<Trash2 className="w-3.5 h-3.5 text-slate-400" />}
                     title="Delete permanently"
@@ -516,6 +561,18 @@ export const AuthorizedTerminalsTab: React.FC = () => {
           <strong>How Terminal Security Works:</strong> When an office desktop, pastoral laptop, or tablet accesses this portal for the first time, it registers a cryptographic hardware token with the parish. Once approved by the Parish Priest, the machine is authorized for all staff members who have valid user accounts. Revoking a terminal blocks all access from that physical machine across Google Chrome, Microsoft Edge, and all other browsers immediately.
         </div>
       </div>
+
+      {/* In-App Confirmation Modal */}
+      <ConfirmDialog
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.action}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmLabel={confirmModal.confirmLabel}
+        variant={confirmModal.variant}
+        isLoading={actionInProgressId !== null}
+      />
     </div>
   );
 };

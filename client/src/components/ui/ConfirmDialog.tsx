@@ -1,7 +1,7 @@
 import React from 'react';
 import { Modal } from './Modal';
 import { Button } from './Button';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, ShieldAlert } from 'lucide-react';
 
 export interface ConfirmDialogProps {
   isOpen: boolean;
@@ -26,11 +26,18 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   variant = 'primary',
   isLoading,
 }) => {
+  const isDanger = variant === 'danger';
   return (
     <Modal isOpen={isOpen} onClose={onClose} maxWidth="sm">
       <div className="text-center space-y-4 py-2">
-        <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 border border-amber-200/60 mx-auto flex items-center justify-center">
-          <AlertTriangle className="w-6 h-6" />
+        <div
+          className={`w-12 h-12 rounded-full mx-auto flex items-center justify-center border ${
+            isDanger
+              ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 border-rose-200/80 dark:border-rose-900/60'
+              : 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 border-amber-200/80 dark:border-amber-900/60'
+          }`}
+        >
+          {isDanger ? <ShieldAlert className="w-6 h-6" /> : <AlertTriangle className="w-6 h-6" />}
         </div>
         <div className="space-y-1.5">
           <h4 className="text-base font-bold text-parish-text">{title}</h4>
@@ -41,7 +48,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             {cancelLabel}
           </Button>
           <Button
-            variant={variant === 'danger' ? 'danger' : 'primary'}
+            variant={isDanger ? 'danger' : 'primary'}
             size="sm"
             onClick={onConfirm}
             isLoading={isLoading}
