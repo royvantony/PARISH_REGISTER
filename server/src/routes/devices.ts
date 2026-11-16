@@ -285,6 +285,8 @@ devicesRouter.post('/register', async (req: Request, res: Response) => {
       req,
     });
 
+    realtimeHub.emitTerminalListChanged(pid);
+
     return res.json({
       success: true,
       status: initialStatus,
@@ -349,6 +351,8 @@ devicesRouter.post('/request-review', async (req: Request, res: Response) => {
       description: `Access review requested for revoked workstation "${device.deviceName}" by ${requesterIdentifier}.`,
       req,
     });
+
+    realtimeHub.emitTerminalListChanged(device.parishId);
 
     return res.json({
       success: true,
@@ -538,6 +542,7 @@ devicesRouter.post('/bootstrap-otp/verify', async (req: Request, res: Response) 
     });
 
     realtimeHub.emitTerminalApproved(approvedDevice.id, approvedDevice.deviceName);
+    realtimeHub.emitTerminalListChanged(pid);
 
     await logSystemActivity({
       parishId: pid,
@@ -699,6 +704,7 @@ devicesRouter.post('/:id/approve', authenticateJWT, async (req: Request, res: Re
 
     // Real-Time SSE Notification: Push instant 0ms approval to pending login screen
     realtimeHub.emitTerminalApproved(deviceId, device.deviceName);
+    realtimeHub.emitTerminalListChanged(parishId);
 
     return res.json({
       success: true,
@@ -768,6 +774,7 @@ devicesRouter.post('/:id/revoke', authenticateJWT, async (req: Request, res: Res
 
     // Real-Time SSE Notification: Push instant 0ms revocation & kill-switch
     realtimeHub.emitTerminalRevoked(deviceId);
+    realtimeHub.emitTerminalListChanged(parishId);
 
     return res.json({
       success: true,
@@ -829,6 +836,8 @@ devicesRouter.delete('/:id', authenticateJWT, async (req: Request, res: Response
       description: `${req.user.fullName || 'Administrator'} permanently deleted terminal record: "${device.deviceName}".`,
       req,
     });
+
+    realtimeHub.emitTerminalListChanged(parishId);
 
     return res.json({
       success: true,

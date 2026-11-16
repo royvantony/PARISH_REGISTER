@@ -9,6 +9,7 @@ import { sendParishEmail } from '../lib/email.js';
 import { logSystemActivity } from '../lib/activityLogger.js';
 import { getJwtSecret, JWT_EXPIRES_IN } from '../lib/crypto.js';
 import { hashDeviceSecret, resolveNetworkInfo } from './devices.js';
+import { realtimeHub } from '../lib/realtime.js';
 
 export const authRouter = Router();
 
@@ -185,6 +186,8 @@ authRouter.post('/login', async (req: Request, res: Response) => {
         req,
       });
 
+      realtimeHub.emitTerminalListChanged(activeParishId);
+
       const isBootstrap = approvedDevicesCount === 0 && isParishLeader;
       const maskedEmail = user.email ? `${user.email.slice(0, 3)}***@${user.email.split('@')[1]}` : undefined;
 
@@ -316,6 +319,7 @@ authRouter.post('/login', async (req: Request, res: Response) => {
       },
       availableParishes,
       defaultParishId: user.parishId || (availableParishes[0]?.id ?? 1),
+      deviceId: device?.id,
     });
   } catch (err: any) {
     console.error('Login error:', err);

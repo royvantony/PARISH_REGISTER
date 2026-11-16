@@ -313,6 +313,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       sessionStorage.setItem('parish_user', JSON.stringify(receivedUser));
       localStorage.setItem('parish_token', receivedToken);
       localStorage.setItem('parish_user', JSON.stringify(receivedUser));
+      if (res.data?.deviceId) {
+        sessionStorage.setItem('parish_current_device_id', String(res.data.deviceId));
+        localStorage.setItem('parish_current_device_id', String(res.data.deviceId));
+      }
       localStorage.setItem('parish_last_activity', String(Date.now()));
       setToken(receivedToken);
       setUser(receivedUser);
@@ -384,9 +388,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } = res.data;
 
       // Persist auth tokens & last activity for standard session lifecycle
+      sessionStorage.setItem('parish_token', receivedToken);
+      sessionStorage.setItem('parish_user', JSON.stringify(receivedUser));
       localStorage.setItem('parish_token', receivedToken);
       localStorage.setItem('parish_user', JSON.stringify(receivedUser));
       localStorage.setItem('parish_last_activity', String(Date.now()));
+      if (res.data?.deviceId) {
+        sessionStorage.setItem('parish_current_device_id', String(res.data.deviceId));
+        localStorage.setItem('parish_current_device_id', String(res.data.deviceId));
+      }
       setToken(receivedToken);
       setUser(receivedUser);
 
@@ -599,11 +609,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             );
             logout();
           } else if (data.event === 'TERMINAL_REVOKED') {
-            sessionStorage.setItem(
-              'inactivity_logout_notice',
-              'Workstation access was revoked by parish administration.'
+            const currentDevId =
+              sessionStorage.getItem('parish_current_device_id') ||
+              localStorage.getItem('parish_current_device_id');
+            // Only terminate the session if THIS physical device is the one that was revoked!
+            if (currentDevId && Number(currentDevId) === Number(data.deviceId)) {
+              sessionStorage.setItem(
+                'inactivity_logout_notice',
+                'Workstation access was revoked by parish administration.'
+              );
+              logout();
+            }
+          } else if (data.event === 'TERMINAL_LIST_CHANGED') {
+            window.dispatchEvent(
+              new CustomEvent('parish:terminal_list_changed', { detail: data })
             );
-            logout();
           }
         } catch (_) {}
       };

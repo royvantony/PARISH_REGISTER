@@ -134,39 +134,45 @@ export const LoginPage: React.FC = () => {
     runTerminalCheck();
   }, []);
 
-  // Live Real-Time SSE Stream (0ms instant approval) + fallback polling when terminal is PENDING
+  // Live Real-Time SSE Stream (0ms instant approval / re-authorization) + fallback polling
   useEffect(() => {
-    if (terminalStatus !== 'PENDING') return;
+    const activeDeviceId =
+      pendingApprovalData?.deviceId ||
+      revokedTerminalInfo?.deviceId ||
+      terminalData?.deviceId;
 
-    const deviceId = pendingApprovalData?.deviceId;
+    if (!activeDeviceId || terminalStatus === 'APPROVED') return;
+
     let eventSource: EventSource | null = null;
 
-    if (deviceId) {
-      try {
-        eventSource = new EventSource(`/api/realtime/terminal/${deviceId}`);
-        eventSource.onmessage = (e) => {
-          try {
-            const data = JSON.parse(e.data);
-            if (data.event === 'APPROVED') {
-              eventSource?.close();
-              setTerminalData((prev) => ({ ...prev, status: 'APPROVED', deviceName: data.deviceName } as any));
-              setTerminalStatus('APPROVED');
-              if (email && password) {
-                login(email, password).then((loginRes) => {
-                  if (loginRes.success) {
-                    if (loginRes.needsParishSelection) setIsChoosingParish(true);
-                    else navigate('/dashboard');
-                  }
-                });
-              }
-            } else if (data.event === 'REVOKED') {
-              eventSource?.close();
-              setTerminalStatus('REVOKED');
+    try {
+      eventSource = new EventSource(`/api/realtime/terminal/${activeDeviceId}`);
+      eventSource.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.event === 'APPROVED') {
+            eventSource?.close();
+            setTerminalData((prev) => ({ ...prev, status: 'APPROVED', deviceName: data.deviceName } as any));
+            setTerminalStatus('APPROVED');
+            setRevokedTerminalInfo(null);
+            setErrorMessage('');
+            setSuccessNotice(`Workstation "${data.deviceName || 'Device'}" has been authorized. You may now sign in.`);
+            if (email && password) {
+              login(email, password).then((loginRes) => {
+                if (loginRes.success) {
+                  if (loginRes.needsParishSelection) setIsChoosingParish(true);
+                  else navigate('/dashboard');
+                }
+              });
             }
-          } catch (_) {}
-        };
-      } catch (_) {}
-    }
+          } else if (data.event === 'REVOKED') {
+            setTerminalStatus('REVOKED');
+            setSuccessNotice(null);
+            setErrorMessage('Workstation access was revoked by parish administration.');
+          }
+        } catch (_) {}
+      };
+    } catch (_) {}
 
     // Fallback polling in case of restrictive network proxies
     const interval = setInterval(async () => {
@@ -176,6 +182,9 @@ export const LoginPage: React.FC = () => {
           if (eventSource) eventSource.close();
           setTerminalData(res);
           setTerminalStatus('APPROVED');
+          setRevokedTerminalInfo(null);
+          setErrorMessage('');
+          setSuccessNotice(`Workstation "${res.deviceName || 'Device'}" has been authorized. You may now sign in.`);
           if (email && password) {
             login(email, password).then((loginRes) => {
               if (loginRes.success) {
@@ -185,7 +194,6 @@ export const LoginPage: React.FC = () => {
             });
           }
         } else if (res.status === 'REVOKED') {
-          if (eventSource) eventSource.close();
           setTerminalData(res);
           setTerminalStatus('REVOKED');
         }
@@ -196,7 +204,7 @@ export const LoginPage: React.FC = () => {
       if (eventSource) eventSource.close();
       clearInterval(interval);
     };
-  }, [terminalStatus, pendingApprovalData?.deviceId, email, password]);
+  }, [terminalStatus, pendingApprovalData?.deviceId, revokedTerminalInfo?.deviceId, terminalData?.deviceId, email, password]);
 
   const handleSendBootstrapOtp = async () => {
     if (!pendingApprovalData?.deviceId) return;

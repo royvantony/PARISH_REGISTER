@@ -112,6 +112,10 @@ class RealtimeHub {
     this.broadcastToAll('TERMINAL_REVOKED', { deviceId });
   }
 
+  public emitTerminalListChanged(parishId?: number) {
+    this.broadcastToAll('TERMINAL_LIST_CHANGED', { parishId: parishId || 1 });
+  }
+
   // ==========================================================================
   // AUTHENTICATED USER SESSIONS & INSTANT KILL SWITCH
   // ==========================================================================

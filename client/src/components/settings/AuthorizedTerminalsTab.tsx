@@ -93,6 +93,11 @@ export const AuthorizedTerminalsTab: React.FC = () => {
 
   useEffect(() => {
     fetchDevices();
+    const handleUpdate = () => {
+      fetchDevices();
+    };
+    window.addEventListener('parish:terminal_list_changed', handleUpdate);
+    return () => window.removeEventListener('parish:terminal_list_changed', handleUpdate);
   }, []);
 
   const handleApprove = async (deviceId: number, name: string) => {
@@ -144,9 +149,9 @@ export const AuthorizedTerminalsTab: React.FC = () => {
   const requestReject = (deviceId: number, name: string) => {
     setConfirmModal({
       isOpen: true,
-      title: 'Reject Access Request',
-      message: `Reject authorization request for "${name}"? The user will not be allowed to access the parish portal from this device.`,
-      confirmLabel: 'Reject Request',
+      title: 'Decline Access Request',
+      message: `Decline authorization request for "${name}"? This will dismiss the pending request without blacklisting the device. The user will be able to request access again if needed.`,
+      confirmLabel: 'Decline Request',
       variant: 'danger',
       action: () => executeDelete(deviceId, name),
     });
@@ -411,7 +416,7 @@ export const AuthorizedTerminalsTab: React.FC = () => {
                     disabled={actionInProgressId === d.id}
                     className="text-rose-600 hover:text-rose-700 hover:border-rose-300"
                   >
-                    Reject
+                    Decline
                   </Button>
                 </div>
               </div>

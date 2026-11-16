@@ -222,6 +222,13 @@ export async function verifyTerminalAuthorization(parishId: number): Promise<Dev
       }
     }
 
+    if (res.data?.deviceId) {
+      try {
+        sessionStorage.setItem('parish_current_device_id', String(res.data.deviceId));
+        localStorage.setItem('parish_current_device_id', String(res.data.deviceId));
+      } catch {}
+    }
+
     return res.data;
   } catch (err) {
     console.error('Terminal authorization verification failed:', err);
