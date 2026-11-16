@@ -185,7 +185,7 @@ export const BackupRestoreTab: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Overview & Security Banner */}
-      <div className="p-5 rounded-2xl bg-parish-surface border border-parish-border shadow-xs flex flex-col sm:flex-row items-start justify-between gap-4">
+      <div className="p-5 rounded-2xl bg-parish-surface border border-parish-border shadow-xs">
         <div className="flex items-start gap-3">
           <div className="p-2.5 rounded-xl bg-parish-primary-light text-parish-primary shrink-0">
             <Archive className="w-5 h-5" />
@@ -201,22 +201,6 @@ export const BackupRestoreTab: React.FC = () => {
             </p>
           </div>
         </div>
-
-        {showExport && (
-          <div className="flex items-center gap-2 shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExport}
-              isLoading={isExporting}
-              disabled={!canExport}
-              icon={<Download className="w-4 h-4 text-parish-primary" />}
-              title="Export complete encrypted archive of active parish"
-            >
-              Export .parishpack
-            </Button>
-          </div>
-        )}
       </div>
 
       {exportFeedback && (
