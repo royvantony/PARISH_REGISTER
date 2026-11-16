@@ -111,6 +111,22 @@ devicesRouter.post('/verify', async (req: Request, res: Response) => {
       });
     }
 
+    // 3. Fallback: match by physical GPU + CPU Cores + Timezone
+    if (!device && telemetry?.gpuRenderer && telemetry?.cpuCores && telemetry.gpuRenderer !== 'Standard Display Adapter') {
+      device = await prisma.parishAuthorizedDevice.findFirst({
+        where: {
+          parishId: pid,
+          gpuRenderer: telemetry.gpuRenderer,
+          cpuCores: telemetry.cpuCores,
+          timezone: telemetry.timezone || undefined,
+          status: 'APPROVED',
+        },
+        include: {
+          parish: { select: { parishName: true, parishCode: true } },
+        },
+      });
+    }
+
     if (!device) {
       return res.json({
         status: 'UNREGISTERED',
@@ -206,6 +222,13 @@ devicesRouter.post('/register', async (req: Request, res: Response) => {
         OR: [
           { deviceTokenHash: tokenHash },
           ...(telemetry?.hardwareHash ? [{ hardwareHash: telemetry.hardwareHash }] : []),
+          ...(telemetry?.gpuRenderer && telemetry?.cpuCores && telemetry.gpuRenderer !== 'Standard Display Adapter'
+            ? [{
+                gpuRenderer: telemetry.gpuRenderer,
+                cpuCores: telemetry.cpuCores,
+                timezone: telemetry.timezone || undefined,
+              }]
+            : []),
         ],
       },
     });
@@ -386,6 +409,13 @@ devicesRouter.post('/authorize-direct', async (req: Request, res: Response) => {
         OR: [
           { deviceTokenHash: tokenHash },
           ...(telemetry?.hardwareHash ? [{ hardwareHash: telemetry.hardwareHash }] : []),
+          ...(telemetry?.gpuRenderer && telemetry?.cpuCores && telemetry.gpuRenderer !== 'Standard Display Adapter'
+            ? [{
+                gpuRenderer: telemetry.gpuRenderer,
+                cpuCores: telemetry.cpuCores,
+                timezone: telemetry.timezone || undefined,
+              }]
+            : []),
         ],
       },
     });

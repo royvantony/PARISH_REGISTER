@@ -89,6 +89,18 @@ authRouter.post('/login', async (req: Request, res: Response) => {
       });
     }
 
+    // Fallback: match by physical hardware profile (GPU + Cores + Timezone) to bridge browser zoom differences
+    if (!device && telemetry?.gpuRenderer && telemetry?.cpuCores && telemetry.gpuRenderer !== 'Standard Display Adapter') {
+      device = await prisma.parishAuthorizedDevice.findFirst({
+        where: {
+          parishId: activeParishId,
+          gpuRenderer: telemetry.gpuRenderer,
+          cpuCores: telemetry.cpuCores,
+          timezone: telemetry.timezone || undefined,
+        },
+      });
+    }
+
     // 1. Genesis Bootstrap: 0 approved terminals exist & logging in as Priest / Super Admin
     if (approvedDevicesCount === 0 && isParishLeader) {
       const defaultDeviceName = (deviceName || '').trim() || `${user.fullName}'s Primary Workstation`;

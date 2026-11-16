@@ -167,12 +167,11 @@ export function collectHardwareTelemetry(): HardwareTelemetry {
   // 5. Physical Machine / OS Platform Summary (Strictly hardware-oriented, no browser branding)
   const platformSummary = getHardwarePlatform();
 
-  // 6. Fast deterministic 64-bit FNV-1a hardware signature
+  // 6. Fast deterministic 64-bit FNV-1a hardware signature (Zoom-invariant, browser-invariant)
   const rawFingerprint = [
     gpuRenderer,
     width,
     height,
-    dpr,
     colorDepth,
     cpuCores,
     timezone,
