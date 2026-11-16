@@ -18,12 +18,14 @@ import {
   Shield,
   RotateCcw,
   AlertCircle,
+  KeyRound,
 } from 'lucide-react';
 import { ForgotPasswordModal } from '../components/auth/ForgotPasswordModal';
 import { api } from '../lib/api';
 import {
   verifyTerminalAuthorization,
   registerTerminal,
+  authorizeTerminalDirectly,
   getBrowserMetadata,
   type DeviceVerifyResult,
 } from '../lib/deviceAuth';
@@ -87,6 +89,13 @@ export const LoginPage: React.FC = () => {
   const [isRegisteringTerminal, setIsRegisteringTerminal] = useState(false);
   const [registerError, setRegisterError] = useState<string | null>(null);
 
+  // In-person Priest/Admin Direct Authorization
+  const [showDirectAuth, setShowDirectAuth] = useState(false);
+  const [directAuthEmail, setDirectAuthEmail] = useState('');
+  const [directAuthPassword, setDirectAuthPassword] = useState('');
+  const [directAuthLoading, setDirectAuthLoading] = useState(false);
+  const [directAuthError, setDirectAuthError] = useState<string | null>(null);
+
   // Check terminal authorization on load
   const runTerminalCheck = async () => {
     try {
@@ -135,17 +144,56 @@ export const LoginPage: React.FC = () => {
 
     try {
       setIsRegisteringTerminal(true);
-      await registerTerminal(1, cleanName);
-      setTerminalData({
-        status: 'PENDING',
-        deviceName: cleanName,
-        requestedAt: new Date().toISOString(),
-      });
-      setTerminalStatus('PENDING');
+      const res = await registerTerminal(1, cleanName);
+      if (res.status === 'APPROVED') {
+        setTerminalData({
+          status: 'APPROVED',
+          deviceName: res.deviceName || cleanName,
+        });
+        setTerminalStatus('APPROVED');
+      } else {
+        setTerminalData({
+          status: 'PENDING',
+          deviceName: cleanName,
+          requestedAt: new Date().toISOString(),
+        });
+        setTerminalStatus('PENDING');
+      }
     } catch (err: any) {
       setRegisterError(err.response?.data?.error || 'Failed to submit terminal registration.');
     } finally {
       setIsRegisteringTerminal(false);
+    }
+  };
+
+  const handleDirectAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setDirectAuthError(null);
+
+    if (!directAuthEmail.trim() || !directAuthPassword) {
+      setDirectAuthError('Please enter administrator email and password.');
+      return;
+    }
+
+    try {
+      setDirectAuthLoading(true);
+      const res = await authorizeTerminalDirectly(
+        1,
+        directAuthEmail.trim(),
+        directAuthPassword,
+        newTerminalName.trim() || undefined
+      );
+
+      setTerminalData({
+        status: 'APPROVED',
+        deviceName: res.deviceName,
+      });
+      setTerminalStatus('APPROVED');
+      setShowDirectAuth(false);
+    } catch (err: any) {
+      setDirectAuthError(err.response?.data?.error || 'Direct authorization failed. Please check credentials.');
+    } finally {
+      setDirectAuthLoading(false);
     }
   };
 
@@ -350,16 +398,28 @@ export const LoginPage: React.FC = () => {
           </div>
         ) : terminalStatus === 'UNREGISTERED' && !isDevRevealed ? (
           /* ================================================================= */
-          /* 2. TERMINAL REGISTRATION REQUIRED                                 */
+          /* 2. TERMINAL REGISTRATION / FIRST WORKSTATION BOOTSTRAP            */
           /* ================================================================= */
           <div className="bg-parish-surface border border-parish-border py-8 px-6 sm:px-10 shadow-soft rounded-3xl space-y-6 animate-in fade-in">
             <div className="text-center space-y-2">
-              <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-amber-500/10 text-amber-600 border border-amber-200/60 mx-auto">
-                <Monitor className="w-7 h-7 text-amber-600" />
+              <div className={`inline-flex items-center justify-center p-3 rounded-2xl border mx-auto ${
+                terminalData?.isFirstDeviceSetup
+                  ? 'bg-emerald-500/10 text-emerald-600 border-emerald-200/60'
+                  : 'bg-amber-500/10 text-amber-600 border-amber-200/60'
+              }`}>
+                {terminalData?.isFirstDeviceSetup ? (
+                  <ShieldCheck className="w-7 h-7 text-emerald-600" />
+                ) : (
+                  <Monitor className="w-7 h-7 text-amber-600" />
+                )}
               </div>
-              <h2 className="text-xl font-extrabold text-parish-text">Terminal Authorization Required</h2>
+              <h2 className="text-xl font-extrabold text-parish-text">
+                {terminalData?.isFirstDeviceSetup ? 'Primary Workstation Setup' : 'Terminal Authorization Required'}
+              </h2>
               <p className="text-xs text-parish-text-muted leading-relaxed">
-                This workstation is not yet registered for St. Alphonsa Parish. Please provide a descriptive name to submit an authorization request to the Parish Priest.
+                {terminalData?.isFirstDeviceSetup
+                  ? 'No workstations are registered for this parish yet. As the Parish Priest or Administrator initializing this registry, register this computer to automatically authorize it as your Primary Authorized Workstation.'
+                  : 'This workstation is not yet registered for St. Alphonsa Parish. Please provide a descriptive name to submit an authorization request to the Parish Priest.'}
               </p>
             </div>
 
@@ -379,7 +439,7 @@ export const LoginPage: React.FC = () => {
                   type="text"
                   value={newTerminalName}
                   onChange={(e) => setNewTerminalName(e.target.value)}
-                  placeholder="e.g. Office Front Desk PC, Fr. Sebastian Laptop"
+                  placeholder={terminalData?.isFirstDeviceSetup ? 'e.g. Parish Priest Office Desktop' : 'e.g. Office Front Desk PC'}
                   required
                   className="text-xs"
                 />
@@ -397,9 +457,68 @@ export const LoginPage: React.FC = () => {
                 className="w-full justify-center text-xs font-bold"
                 icon={<ShieldCheck className="w-4 h-4" />}
               >
-                Request Terminal Authorization
+                {terminalData?.isFirstDeviceSetup ? 'Authorize Primary Workstation' : 'Request Terminal Authorization'}
               </Button>
             </form>
+
+            {/* In-Person Direct Priest/Admin Authorization Accordion */}
+            <div className="pt-3 border-t border-parish-border/60">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDirectAuth(!showDirectAuth);
+                  setDirectAuthError(null);
+                }}
+                className="w-full text-center text-xs text-parish-primary hover:text-parish-primary-dark font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer py-1"
+              >
+                <KeyRound className="w-3.5 h-3.5" />
+                <span>{showDirectAuth ? 'Hide Priest Direct Authorization' : 'Authorize in-person with Priest credentials'}</span>
+              </button>
+
+              {showDirectAuth && (
+                <form onSubmit={handleDirectAuth} className="mt-3 p-4 rounded-2xl bg-parish-surface-subtle border border-parish-border space-y-3 animate-in fade-in duration-200">
+                  <p className="text-[11px] text-parish-text-muted leading-tight">
+                    Are you the Parish Priest or Administrator? Enter your credentials below to authorize this terminal directly without going to another machine.
+                  </p>
+                  {directAuthError && (
+                    <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-[11px] text-rose-700">
+                      {directAuthError}
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-parish-text mb-1">Priest / Admin Email</label>
+                    <Input
+                      type="text"
+                      value={directAuthEmail}
+                      onChange={(e) => setDirectAuthEmail(e.target.value)}
+                      placeholder="e.g. royvadakumpadan@gmail.com"
+                      required
+                      className="text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-parish-text mb-1">Password</label>
+                    <Input
+                      type="password"
+                      value={directAuthPassword}
+                      onChange={(e) => setDirectAuthPassword(e.target.value)}
+                      placeholder="••••••••"
+                      required
+                      className="text-xs"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="sm"
+                    isLoading={directAuthLoading}
+                    className="w-full justify-center text-xs font-bold"
+                  >
+                    Authorize This Machine Now
+                  </Button>
+                </form>
+              )}
+            </div>
           </div>
         ) : terminalStatus === 'PENDING' && !isDevRevealed ? (
           /* ================================================================= */
@@ -446,6 +565,65 @@ export const LoginPage: React.FC = () => {
               <p className="text-[10px] text-parish-text-muted">
                 Auto-refreshing every few seconds...
               </p>
+            </div>
+
+            {/* In-Person Direct Priest/Admin Authorization Accordion */}
+            <div className="pt-3 border-t border-parish-border/60">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDirectAuth(!showDirectAuth);
+                  setDirectAuthError(null);
+                }}
+                className="w-full text-center text-xs text-parish-primary hover:text-parish-primary-dark font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer py-1"
+              >
+                <KeyRound className="w-3.5 h-3.5" />
+                <span>{showDirectAuth ? 'Hide Priest Direct Authorization' : 'Authorize in-person with Priest credentials'}</span>
+              </button>
+
+              {showDirectAuth && (
+                <form onSubmit={handleDirectAuth} className="mt-3 p-4 rounded-2xl bg-parish-surface-subtle border border-parish-border space-y-3 animate-in fade-in duration-200 text-left">
+                  <p className="text-[11px] text-parish-text-muted leading-tight">
+                    If you are the Parish Priest standing at this machine, sign in below to approve it immediately:
+                  </p>
+                  {directAuthError && (
+                    <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-[11px] text-rose-700">
+                      {directAuthError}
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-parish-text mb-1">Priest / Admin Email</label>
+                    <Input
+                      type="text"
+                      value={directAuthEmail}
+                      onChange={(e) => setDirectAuthEmail(e.target.value)}
+                      placeholder="e.g. royvadakumpadan@gmail.com"
+                      required
+                      className="text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-parish-text mb-1">Password</label>
+                    <Input
+                      type="password"
+                      value={directAuthPassword}
+                      onChange={(e) => setDirectAuthPassword(e.target.value)}
+                      placeholder="••••••••"
+                      required
+                      className="text-xs"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="sm"
+                    isLoading={directAuthLoading}
+                    className="w-full justify-center text-xs font-bold"
+                  >
+                    Authorize This Machine Now
+                  </Button>
+                </form>
+              )}
             </div>
           </div>
         ) : terminalStatus === 'REVOKED' && !isDevRevealed ? (

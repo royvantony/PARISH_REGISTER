@@ -10,6 +10,7 @@ export interface DeviceVerifyResult {
   requestedAt?: string;
   revokedAt?: string;
   revokedBy?: string;
+  isFirstDeviceSetup?: boolean;
 }
 
 /**
@@ -132,4 +133,29 @@ export async function registerTerminal(
 
   return res.data;
 }
+
+/**
+ * Direct in-person terminal authorization by a Parish Priest or Admin typing their credentials.
+ */
+export async function authorizeTerminalDirectly(
+  parishId: number,
+  identifier: string,
+  password: string,
+  terminalName?: string
+): Promise<{ success: boolean; status: string; deviceName: string; message: string }> {
+  const deviceToken = ensureDeviceSecret(parishId);
+  const browserInfo = getBrowserMetadata();
+
+  const res = await api.post('/devices/authorize-direct', {
+    parishId,
+    deviceToken,
+    email: identifier,
+    password,
+    terminalName,
+    browserInfo,
+  });
+
+  return res.data;
+}
+
 

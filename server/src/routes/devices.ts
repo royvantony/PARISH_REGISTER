@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
+import bcrypt from 'bcrypt';
 import { prisma } from '../lib/prisma.js';
 import { authenticateJWT } from '../middleware/auth.js';
 import { checkUserPermission } from './permissions.js';
@@ -19,8 +20,17 @@ devicesRouter.post('/verify', async (req: Request, res: Response) => {
     const { parishId, deviceToken, browserInfo } = req.body;
 
     const pid = parseInt(parishId, 10);
+    const approvedCount = !isNaN(pid)
+      ? await prisma.parishAuthorizedDevice.count({
+          where: { parishId: pid, status: 'APPROVED' },
+        })
+      : 0;
+
     if (!parishId || isNaN(pid) || !deviceToken) {
-      return res.json({ status: 'UNREGISTERED' });
+      return res.json({
+        status: 'UNREGISTERED',
+        isFirstDeviceSetup: approvedCount === 0,
+      });
     }
 
     const tokenHash = hashDeviceSecret(deviceToken);
@@ -35,7 +45,10 @@ devicesRouter.post('/verify', async (req: Request, res: Response) => {
     });
 
     if (!device) {
-      return res.json({ status: 'UNREGISTERED' });
+      return res.json({
+        status: 'UNREGISTERED',
+        isFirstDeviceSetup: approvedCount === 0,
+      });
     }
 
     if (device.status === 'APPROVED') {
@@ -90,6 +103,7 @@ devicesRouter.post('/register', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Valid Parish ID is required.' });
     }
 
+    const pid = Number(parishId);
     const cleanName = (deviceName || '').trim();
     if (!cleanName || cleanName.length < 2) {
       return res.status(400).json({ error: 'Please provide a descriptive terminal name (at least 2 characters).' });
@@ -101,7 +115,7 @@ devicesRouter.post('/register', async (req: Request, res: Response) => {
     }
 
     const parish = await prisma.parish.findUnique({
-      where: { id: Number(parishId) },
+      where: { id: pid },
     });
 
     if (!parish) {
@@ -123,37 +137,153 @@ devicesRouter.post('/register', async (req: Request, res: Response) => {
       });
     }
 
+    // Bootstrap check: If this parish has ZERO approved devices, auto-approve this first workstation as primary
+    const approvedCount = await prisma.parishAuthorizedDevice.count({
+      where: { parishId: pid, status: 'APPROVED' },
+    });
+    const isFirstApproved = approvedCount === 0;
+    const initialStatus = isFirstApproved ? 'APPROVED' : 'PENDING';
+
     const clientIp = req.headers['x-forwarded-for']?.toString().split(',')[0].trim() || req.socket.remoteAddress || req.ip;
     const device = await prisma.parishAuthorizedDevice.create({
       data: {
-        parishId: Number(parishId),
+        parishId: pid,
         deviceName: cleanName,
         deviceFingerprint: browserInfo || req.headers['user-agent'] || 'Web Browser',
         deviceTokenHash: tokenHash,
-        status: 'PENDING',
+        status: initialStatus,
+        approvedAt: isFirstApproved ? new Date() : null,
+        approvedBy: isFirstApproved ? 'Initial Setup (Primary Workstation)' : null,
         ipAddress: clientIp,
+        lastUsedAt: isFirstApproved ? new Date() : null,
         lastUsedBrowser: browserInfo || req.headers['user-agent'] || 'Web Browser',
       },
     });
 
     await logSystemActivity({
-      parishId: Number(parishId),
+      parishId: pid,
       actionType: 'TERMINAL_CHANGE',
       category: 'SECURITY',
-      description: `New terminal authorization request submitted: "${cleanName}" (${browserInfo || 'Web Browser'}).`,
+      description: isFirstApproved
+        ? `Primary parish terminal "${cleanName}" initialized and auto-authorized (${browserInfo || 'Web Browser'}).`
+        : `New terminal authorization request submitted: "${cleanName}" (${browserInfo || 'Web Browser'}).`,
       req,
     });
 
     return res.json({
       success: true,
-      status: 'PENDING',
+      status: initialStatus,
       deviceId: device.id,
       deviceName: device.deviceName,
-      message: 'Terminal registration submitted. Awaiting Parish Priest or Administrator approval.',
+      isFirstDevice: isFirstApproved,
+      message: isFirstApproved
+        ? 'Primary terminal auto-authorized as the initial administrative workstation.'
+        : 'Terminal registration submitted. Awaiting Parish Priest or Administrator approval.',
     });
   } catch (err: any) {
     console.error('Device register error:', err);
     return res.status(500).json({ error: 'Failed to submit terminal registration.' });
+  }
+});
+
+// POST /api/devices/authorize-direct - In-place terminal authorization using Priest / Admin credentials
+devicesRouter.post('/authorize-direct', async (req: Request, res: Response) => {
+  try {
+    const { parishId, deviceToken, email, username, password, terminalName, browserInfo } = req.body;
+    const identifier = ((email || username || '') as string).trim().toLowerCase();
+
+    if (!identifier || !password) {
+      return res.status(400).json({ error: 'Administrator email and password are required.' });
+    }
+
+    if (!parishId || !deviceToken) {
+      return res.status(400).json({ error: 'Parish ID and terminal security token are required.' });
+    }
+
+    const pid = Number(parishId);
+    const user = await prisma.parishUser.findFirst({
+      where: {
+        OR: [{ email: identifier }, { username: identifier }],
+      },
+      include: { parish: true },
+    });
+
+    if (!user || !user.isActive) {
+      return res.status(401).json({ error: 'Invalid administrator credentials.' });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.passwordHash);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Invalid administrator credentials.' });
+    }
+
+    const isAuthorizedRole =
+      user.role === 'SUPER_ADMIN' ||
+      ((user.role === 'PARISH_PRIEST' || user.role === 'PARISH_ADMIN') && user.parishId === pid);
+
+    if (!isAuthorizedRole) {
+      return res.status(403).json({ error: 'Only a Parish Priest or Administrator can authorize terminals.' });
+    }
+
+    const tokenHash = hashDeviceSecret(deviceToken);
+    let device = await prisma.parishAuthorizedDevice.findFirst({
+      where: { parishId: pid, deviceTokenHash: tokenHash },
+    });
+
+    const clientIp = req.headers['x-forwarded-for']?.toString().split(',')[0].trim() || req.socket.remoteAddress || req.ip;
+    const finalDeviceName = (terminalName || '').trim() || device?.deviceName || `${user.fullName}'s Workstation`;
+
+    if (!device) {
+      device = await prisma.parishAuthorizedDevice.create({
+        data: {
+          parishId: pid,
+          deviceName: finalDeviceName,
+          deviceFingerprint: browserInfo || req.headers['user-agent'] || 'Web Browser',
+          deviceTokenHash: tokenHash,
+          status: 'APPROVED',
+          approvedAt: new Date(),
+          approvedBy: `${user.fullName} (${user.role})`,
+          ipAddress: clientIp,
+          lastUsedAt: new Date(),
+          lastUsedBrowser: browserInfo || req.headers['user-agent'] || 'Web Browser',
+        },
+      });
+    } else {
+      device = await prisma.parishAuthorizedDevice.update({
+        where: { id: device.id },
+        data: {
+          status: 'APPROVED',
+          deviceName: finalDeviceName,
+          approvedAt: new Date(),
+          approvedBy: `${user.fullName} (${user.role})`,
+          revokedAt: null,
+          revokedBy: null,
+          ipAddress: clientIp,
+          lastUsedAt: new Date(),
+          lastUsedBrowser: browserInfo || req.headers['user-agent'] || 'Web Browser',
+        },
+      });
+    }
+
+    await logSystemActivity({
+      parishId: pid,
+      userId: user.id,
+      actionType: 'TERMINAL_CHANGE',
+      category: 'SECURITY',
+      description: `Terminal "${device.deviceName}" authorized in-person by ${user.fullName} (${user.role}).`,
+      req,
+    });
+
+    return res.json({
+      success: true,
+      status: 'APPROVED',
+      deviceId: device.id,
+      deviceName: device.deviceName,
+      message: `Terminal authorized successfully by ${user.fullName}.`,
+    });
+  } catch (err: any) {
+    console.error('Direct terminal authorize error:', err);
+    return res.status(500).json({ error: 'Failed to authorize terminal directly.' });
   }
 });
 
