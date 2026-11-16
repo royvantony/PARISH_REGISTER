@@ -14,6 +14,20 @@ export interface DeviceVerifyResult {
 }
 
 /**
+ * Returns a human-friendly string identifying the physical device / OS platform (without browser branding).
+ */
+export function getHardwarePlatform(): string {
+  if (typeof window === 'undefined') return 'Workstation';
+  const ua = navigator.userAgent;
+  if (ua.includes('iPhone') || ua.includes('iPad')) return 'Apple iOS Device';
+  if (ua.includes('Android')) return 'Android Mobile Device';
+  if (ua.includes('Macintosh') || ua.includes('Mac OS')) return 'Apple Mac Workstation';
+  if (ua.includes('Win')) return 'Windows Workstation';
+  if (ua.includes('Linux')) return 'Linux Workstation';
+  return 'Physical Workstation';
+}
+
+/**
  * Returns a human-friendly string identifying the OS, device platform, and browser.
  */
 export function getBrowserMetadata(): string {
@@ -150,8 +164,8 @@ export function collectHardwareTelemetry(): HardwareTelemetry {
   // 4. Timezone & Locale
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
-  // 5. Browser & OS Platform Summary
-  const platformSummary = getBrowserMetadata();
+  // 5. Physical Machine / OS Platform Summary (Strictly hardware-oriented, no browser branding)
+  const platformSummary = getHardwarePlatform();
 
   // 6. Fast deterministic 64-bit FNV-1a hardware signature
   const rawFingerprint = [

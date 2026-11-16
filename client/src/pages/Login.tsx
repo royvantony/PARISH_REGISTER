@@ -24,7 +24,7 @@ import { api } from '../lib/api';
 import {
   verifyTerminalAuthorization,
   authorizeTerminalDirectly,
-  getBrowserMetadata,
+  getHardwarePlatform,
   collectHardwareTelemetry,
   type DeviceVerifyResult,
 } from '../lib/deviceAuth';
@@ -130,7 +130,7 @@ export const LoginPage: React.FC = () => {
   };
 
   useEffect(() => {
-    setNewTerminalName(`${getBrowserMetadata()} Terminal`);
+    setNewTerminalName(getHardwarePlatform());
     runTerminalCheck();
   }, []);
 
@@ -655,9 +655,9 @@ export const LoginPage: React.FC = () => {
               <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200/80 text-[11px] text-emerald-800 dark:text-emerald-300">
                 <div className="flex items-center gap-1.5 font-bold">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>Authorized Terminal: {terminalData.deviceName}</span>
+                  <span>Authorized Workstation: {terminalData.deviceName}</span>
                 </div>
-                <span className="font-mono text-[10px] opacity-80">{getBrowserMetadata()}</span>
+                <span className="font-mono text-[10px] opacity-80">{getHardwarePlatform()}</span>
               </div>
             )}
 

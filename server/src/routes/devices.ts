@@ -15,6 +15,15 @@ export function hashDeviceSecret(secret: string): string {
   return crypto.createHash('sha256').update(secret.trim()).digest('hex');
 }
 
+// Helper: Sanitize device name to eliminate browser branding from physical workstation records
+export function sanitizeDeviceName(name?: string | null, fallback = 'Workstation'): string {
+  if (!name) return fallback;
+  const stripped = name
+    .replace(/(Google Chrome|Apple Safari|Microsoft Edge|Mozilla Firefox)\s*(on\s*)?/gi, '')
+    .trim();
+  return stripped || fallback;
+}
+
 // Helper: Determine private vs public IP and resolve location
 function isPrivateIp(ip: string): boolean {
   if (!ip) return true;
@@ -169,9 +178,9 @@ devicesRouter.post('/register', async (req: Request, res: Response) => {
     }
 
     const pid = Number(parishId);
-    const cleanName = (deviceName || '').trim();
+    const cleanName = sanitizeDeviceName(deviceName, telemetry?.platformSummary || 'Workstation');
     if (!cleanName || cleanName.length < 2) {
-      return res.status(400).json({ error: 'Please provide a descriptive terminal name (at least 2 characters).' });
+      return res.status(400).json({ error: 'Please provide a descriptive workstation name (at least 2 characters).' });
     }
 
     const cleanSecret = (deviceSecret || '').trim();
@@ -382,7 +391,7 @@ devicesRouter.post('/authorize-direct', async (req: Request, res: Response) => {
     });
 
     const net = resolveNetworkInfo(req);
-    const finalDeviceName = (terminalName || '').trim() || device?.deviceName || `${user.fullName}'s Workstation`;
+    const finalDeviceName = sanitizeDeviceName((terminalName || '').trim() || device?.deviceName, `${user.fullName}'s Workstation`);
 
     if (!device) {
       device = await prisma.parishAuthorizedDevice.create({

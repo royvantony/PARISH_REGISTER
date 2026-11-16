@@ -170,7 +170,7 @@ authRouter.post('/login', async (req: Request, res: Response) => {
       });
 
       return res.status(403).json({
-        error: `Terminal Access Blocked: This workstation ("${device.deviceName}") was revoked by parish administration. Access is denied.`,
+        error: `Terminal Access Blocked: This workstation was revoked by parish administration. Access is denied.`,
         isRevokedTerminal: true,
         deviceId: device.id,
         deviceName: device.deviceName,
