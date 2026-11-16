@@ -101,74 +101,7 @@ authRouter.post('/login', async (req: Request, res: Response) => {
       });
     }
 
-    // 1. Genesis Bootstrap: 0 approved terminals exist & logging in as Priest / Super Admin
-    if (approvedDevicesCount === 0 && isParishLeader) {
-      const defaultDeviceName = (deviceName || '').trim() || `${user.fullName}'s Primary Workstation`;
-      const finalTokenHash = tokenHash || hashDeviceSecret(`boot_${Date.now()}_${Math.random()}`);
-
-      if (device) {
-        device = await prisma.parishAuthorizedDevice.update({
-          where: { id: device.id },
-          data: {
-            status: 'APPROVED',
-            deviceName: defaultDeviceName,
-            registeredUserId: user.id,
-            registeredByName: user.fullName,
-            registeredByEmail: user.email,
-            registeredByRole: user.role,
-            approvedAt: new Date(),
-            approvedBy: 'System Bootstrap (First Primary Workstation)',
-            lastUsedAt: new Date(),
-            lastUsedUser: user.fullName,
-            lastUsedBrowser: browserInfo || req.headers['user-agent'] || 'Web Browser',
-            ipAddress: net.ipAddress,
-            networkScope: net.networkScope,
-            locationName: net.locationName,
-          },
-        });
-      } else {
-        device = await prisma.parishAuthorizedDevice.create({
-          data: {
-            parishId: activeParishId,
-            deviceName: defaultDeviceName,
-            deviceFingerprint: browserInfo || req.headers['user-agent'] || 'Web Browser',
-            deviceTokenHash: finalTokenHash,
-            status: 'APPROVED',
-            registeredUserId: user.id,
-            registeredByName: user.fullName,
-            registeredByEmail: user.email,
-            registeredByRole: user.role,
-            hardwareHash: hardwareHash || telemetry?.hardwareHash || null,
-            gpuRenderer: telemetry?.gpuRenderer || null,
-            screenResolution: telemetry?.screenResolution || null,
-            cpuCores: telemetry?.cpuCores || null,
-            deviceMemory: telemetry?.deviceMemory || null,
-            timezone: telemetry?.timezone || null,
-            approvedAt: new Date(),
-            approvedBy: 'System Bootstrap (First Primary Workstation)',
-            ipAddress: net.ipAddress,
-            networkScope: net.networkScope,
-            locationName: net.locationName,
-            lastUsedAt: new Date(),
-            lastUsedUser: user.fullName,
-            lastUsedBrowser: browserInfo || req.headers['user-agent'] || 'Web Browser',
-          },
-        });
-      }
-
-      await logSystemActivity({
-        parishId: activeParishId,
-        userId: user.id,
-        userName: user.fullName,
-        userRole: user.role,
-        actionType: 'TERMINAL_CHANGE',
-        category: 'SECURITY',
-        description: `Primary parish workstation "${device.deviceName}" initialized and auto-authorized for ${user.fullName} (${user.role}).`,
-        req,
-      });
-    }
-
-    // 2. Blocked / Revoked Device
+    // 1. Blocked / Revoked Device
     if (device && device.status === 'REVOKED') {
       await logSystemActivity({
         parishId: activeParishId,
@@ -252,8 +185,15 @@ authRouter.post('/login', async (req: Request, res: Response) => {
         req,
       });
 
+      const isBootstrap = approvedDevicesCount === 0 && isParishLeader;
+      const maskedEmail = user.email ? `${user.email.slice(0, 3)}***@${user.email.split('@')[1]}` : undefined;
+
       return res.status(403).json({
         needsDeviceApproval: true,
+        hasApprovedDevices: approvedDevicesCount > 0,
+        isBootstrap,
+        maskedEmail: isBootstrap ? maskedEmail : undefined,
+        parishId: activeParishId,
         deviceId: device.id,
         deviceName: device.deviceName,
         userName: user.fullName,
@@ -263,7 +203,9 @@ authRouter.post('/login', async (req: Request, res: Response) => {
         networkScope: net.networkScope,
         locationName: net.locationName,
         ipAddress: net.ipAddress,
-        message: 'This workstation requires administrator authorization. An enrollment request has been submitted to an Authorized Administrator with your credentials verified.',
+        message: isBootstrap
+          ? 'Initial Parish Setup: No approved workstations exist. Please verify via Administrator Email OTP to authorize this primary workstation.'
+          : 'This workstation requires administrator authorization. An enrollment request has been submitted to an Authorized Administrator with your credentials verified.',
       });
     }
 

@@ -252,28 +252,39 @@ export async function registerTerminal(
 }
 
 /**
- * Direct in-person terminal authorization by a Parish Priest or Admin typing their credentials.
+ * Request an initial bootstrap OTP verification code for the first workstation.
  */
-export async function authorizeTerminalDirectly(
+export async function sendBootstrapOtp(
   parishId: number,
-  identifier: string,
-  password: string,
-  terminalName?: string
-): Promise<{ success: boolean; status: string; deviceName: string; message: string }> {
+  deviceId: number,
+  email: string
+): Promise<{ success: boolean; message: string; maskedEmail: string }> {
+  const res = await api.post('/devices/bootstrap-otp/send', {
+    parishId,
+    deviceId,
+    email,
+  });
+  return res.data;
+}
+
+/**
+ * Verify initial bootstrap OTP code to authorize the primary workstation.
+ */
+export async function verifyBootstrapOtp(
+  parishId: number,
+  deviceId: number,
+  otp: string
+): Promise<{ success: boolean; status: string; deviceId: number; deviceName: string; message: string }> {
   const deviceToken = ensureDeviceSecret(parishId);
-  const browserInfo = getBrowserMetadata();
   const telemetry = collectHardwareTelemetry();
 
-  const res = await api.post('/devices/authorize-direct', {
+  const res = await api.post('/devices/bootstrap-otp/verify', {
     parishId,
+    deviceId,
+    otp,
     deviceToken,
-    email: identifier,
-    password,
-    terminalName,
-    browserInfo,
     telemetry,
   });
-
   return res.data;
 }
 

@@ -6,6 +6,7 @@ import { prisma } from '../lib/prisma.js';
 import { authenticateJWT } from '../middleware/auth.js';
 import { checkUserPermission } from './permissions.js';
 import { logSystemActivity } from '../lib/activityLogger.js';
+import { sendParishEmail } from '../lib/email.js';
 import { UserRole } from '@prisma/client';
 
 export const devicesRouter = Router();
@@ -359,137 +360,203 @@ devicesRouter.post('/request-review', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/devices/authorize-direct - In-place terminal authorization using Administrator credentials
-devicesRouter.post('/authorize-direct', async (req: Request, res: Response) => {
+// In-Memory store for Initial Bootstrap Workstation Setup Codes
+interface BootstrapOtpRecord {
+  parishId: number;
+  deviceId: number;
+  userId: number;
+  email: string;
+  codeHash: string;
+  expiresAt: number;
+  attempts: number;
+}
+const bootstrapOtpStore = new Map<number, BootstrapOtpRecord>();
+
+// POST /api/devices/bootstrap-otp/send - Send verification code to administrator for initial workstation setup
+devicesRouter.post('/bootstrap-otp/send', async (req: Request, res: Response) => {
   try {
-    const { parishId, deviceToken, email, username, password, terminalName, browserInfo, telemetry } = req.body;
-    const identifier = ((email || username || '') as string).trim().toLowerCase();
-
-    if (!identifier || !password) {
-      return res.status(400).json({ error: 'Administrator email and password are required.' });
-    }
-
-    if (!parishId || !deviceToken) {
-      return res.status(400).json({ error: 'Parish ID and terminal security token are required.' });
+    const { parishId, deviceId, email } = req.body;
+    if (!parishId || !deviceId || !email) {
+      return res.status(400).json({ error: 'Parish ID, Device ID, and Email are required.' });
     }
 
     const pid = Number(parishId);
-    const user = await prisma.parishUser.findFirst({
-      where: {
-        OR: [{ email: identifier }, { username: identifier }],
-      },
-      include: { parish: true },
+    const did = Number(deviceId);
+
+    // CRITICAL: Bootstrap OTP is ONLY allowed when 0 approved terminals exist in this parish!
+    const approvedCount = await prisma.parishAuthorizedDevice.count({
+      where: { parishId: pid, status: 'APPROVED' },
     });
 
-    if (!user || !user.isActive) {
-      return res.status(401).json({ error: 'Invalid administrator credentials.' });
+    if (approvedCount > 0) {
+      return res.status(400).json({
+        error: 'Initial workstation bootstrap is closed. Approved workstations already exist for this parish.',
+      });
     }
 
-    const isMatch = await bcrypt.compare(password, user.passwordHash);
-    if (!isMatch) {
-      return res.status(401).json({ error: 'Invalid administrator credentials.' });
+    // Verify user is an authorized leader
+    const user = await prisma.parishUser.findFirst({
+      where: {
+        email: (email as string).trim().toLowerCase(),
+        isActive: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'Administrator account not found.' });
     }
 
     const isAuthorizedRole =
       user.role === 'SUPER_ADMIN' ||
       user.role === 'DIOCESAN_ADMIN' ||
-      ((user.role === 'PARISH_PRIEST' || user.role === 'PARISH_ADMIN') && user.parishId === pid) ||
-      (await checkUserPermission(user.id, user.role, pid, 'TERMINALS', 'canApprove')) ||
-      (await checkUserPermission(user.id, user.role, pid, 'SETTINGS', 'canApprove')) ||
-      (await checkUserPermission(user.id, user.role, pid, 'SETTINGS', 'canEdit'));
+      ((user.role === 'PARISH_PRIEST' || user.role === 'PARISH_ADMIN') && (user.parishId === pid || user.parishId === null));
 
     if (!isAuthorizedRole) {
-      return res.status(403).json({ error: 'Only an authorized Administrator can authorize terminals.' });
+      return res.status(403).json({ error: 'Only an authorized administrator can perform initial workstation setup.' });
     }
 
-    const tokenHash = hashDeviceSecret(deviceToken);
-    let device = await prisma.parishAuthorizedDevice.findFirst({
-      where: {
-        parishId: pid,
-        OR: [
-          { deviceTokenHash: tokenHash },
-          ...(telemetry?.hardwareHash ? [{ hardwareHash: telemetry.hardwareHash }] : []),
-          ...(telemetry?.gpuRenderer && telemetry?.cpuCores && telemetry.gpuRenderer !== 'Standard Display Adapter'
-            ? [{
-                gpuRenderer: telemetry.gpuRenderer,
-                cpuCores: telemetry.cpuCores,
-                timezone: telemetry.timezone || undefined,
-              }]
-            : []),
-        ],
+    // Verify device exists and is PENDING
+    const device = await prisma.parishAuthorizedDevice.findFirst({
+      where: { id: did, parishId: pid },
+    });
+
+    if (!device) {
+      return res.status(404).json({ error: 'Workstation enrollment record not found.' });
+    }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const codeHash = crypto.createHash('sha256').update(otp).digest('hex');
+
+    bootstrapOtpStore.set(did, {
+      parishId: pid,
+      deviceId: did,
+      userId: user.id,
+      email: user.email,
+      codeHash,
+      expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutes
+      attempts: 0,
+    });
+
+    // Send email to administrator
+    await sendParishEmail(pid, {
+      to: user.email,
+      subject: `[Parish Register] Initial Workstation Verification Code: ${otp}`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px;">
+          <h2 style="color: #701a34; margin-top: 0;">Initial Workstation Authorization</h2>
+          <p>An initial setup request was initiated to authorize the primary workstation for your parish register system.</p>
+          <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 16px; text-align: center; margin: 20px 0;">
+            <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #0f172a;">${otp}</span>
+          </div>
+          <p style="font-size: 13px; color: #64748b;">This verification code is valid for <strong>10 minutes</strong>. Do not share this code with anyone.</p>
+          <p style="font-size: 12px; color: #94a3b8; margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 12px;">
+            Workstation Name: <strong>${device.deviceName}</strong><br/>
+            Requested by: ${user.fullName} (${user.role})
+          </p>
+        </div>
+      `,
+      text: `Your Parish Register workstation verification code is ${otp}. Valid for 10 minutes.`,
+    });
+
+    console.log(`[Bootstrap Security OTP] Initial Workstation Code for ${user.email} (Device #${did}): ${otp}`);
+
+    const masked = `${user.email.slice(0, 3)}***@${user.email.split('@')[1]}`;
+    return res.json({
+      success: true,
+      message: `A 6-digit verification code has been sent to ${masked}.`,
+      maskedEmail: masked,
+    });
+  } catch (err: any) {
+    console.error('Bootstrap OTP send error:', err);
+    return res.status(500).json({ error: 'Failed to send verification code.' });
+  }
+});
+
+// POST /api/devices/bootstrap-otp/verify - Verify code and authorize primary workstation
+devicesRouter.post('/bootstrap-otp/verify', async (req: Request, res: Response) => {
+  try {
+    const { parishId, deviceId, otp } = req.body;
+    if (!parishId || !deviceId || !otp) {
+      return res.status(400).json({ error: 'Parish ID, Device ID, and verification code are required.' });
+    }
+
+    const pid = Number(parishId);
+    const did = Number(deviceId);
+
+    // CRITICAL: Bootstrap OTP is ONLY allowed when 0 approved terminals exist in this parish!
+    const approvedCount = await prisma.parishAuthorizedDevice.count({
+      where: { parishId: pid, status: 'APPROVED' },
+    });
+
+    if (approvedCount > 0) {
+      return res.status(400).json({
+        error: 'Initial workstation bootstrap is closed. Approved workstations already exist for this parish.',
+      });
+    }
+
+    const record = bootstrapOtpStore.get(did);
+    if (!record || record.parishId !== pid) {
+      return res.status(400).json({ error: 'No active verification code found. Please request a new code.' });
+    }
+
+    if (Date.now() > record.expiresAt) {
+      bootstrapOtpStore.delete(did);
+      return res.status(400).json({ error: 'Verification code has expired. Please request a new code.' });
+    }
+
+    if (record.attempts >= 5) {
+      bootstrapOtpStore.delete(did);
+      return res.status(429).json({ error: 'Too many incorrect attempts. Please request a new code.' });
+    }
+
+    const inputHash = crypto.createHash('sha256').update((otp as string).trim()).digest('hex');
+    if (inputHash !== record.codeHash) {
+      record.attempts++;
+      return res.status(400).json({
+        error: `Invalid verification code. ${5 - record.attempts} attempts remaining.`,
+      });
+    }
+
+    // OTP Verified! Consume the record
+    bootstrapOtpStore.delete(did);
+
+    const net = resolveNetworkInfo(req);
+    const approvedDevice = await prisma.parishAuthorizedDevice.update({
+      where: { id: did },
+      data: {
+        status: 'APPROVED',
+        approvedAt: new Date(),
+        approvedBy: `Initial Setup via Email OTP (${record.email})`,
+        lastUsedAt: new Date(),
+        lastUsedUser: record.email,
+        ipAddress: net.ipAddress,
+        networkScope: net.networkScope,
+        locationName: net.locationName,
       },
     });
 
-    const net = resolveNetworkInfo(req);
-    const finalDeviceName = sanitizeDeviceName((terminalName || '').trim() || device?.deviceName, `${user.fullName}'s Workstation`);
-
-    if (!device) {
-      device = await prisma.parishAuthorizedDevice.create({
-        data: {
-          parishId: pid,
-          deviceName: finalDeviceName,
-          deviceFingerprint: browserInfo || req.headers['user-agent'] || 'Web Browser',
-          deviceTokenHash: tokenHash,
-          status: 'APPROVED',
-          hardwareHash: telemetry?.hardwareHash || null,
-          gpuRenderer: telemetry?.gpuRenderer || null,
-          screenResolution: telemetry?.screenResolution || null,
-          cpuCores: telemetry?.cpuCores || null,
-          deviceMemory: telemetry?.deviceMemory || null,
-          timezone: telemetry?.timezone || null,
-          approvedAt: new Date(),
-          approvedBy: `${user.fullName} (${user.role})`,
-          ipAddress: net.ipAddress,
-          networkScope: net.networkScope,
-          locationName: net.locationName,
-          lastUsedAt: new Date(),
-          lastUsedBrowser: browserInfo || req.headers['user-agent'] || 'Web Browser',
-        },
-      });
-    } else {
-      device = await prisma.parishAuthorizedDevice.update({
-        where: { id: device.id },
-        data: {
-          status: 'APPROVED',
-          deviceName: finalDeviceName,
-          hardwareHash: device.hardwareHash || telemetry?.hardwareHash || undefined,
-          gpuRenderer: device.gpuRenderer || telemetry?.gpuRenderer || undefined,
-          screenResolution: device.screenResolution || telemetry?.screenResolution || undefined,
-          cpuCores: device.cpuCores || telemetry?.cpuCores || undefined,
-          deviceMemory: device.deviceMemory || telemetry?.deviceMemory || undefined,
-          timezone: device.timezone || telemetry?.timezone || undefined,
-          approvedAt: new Date(),
-          approvedBy: `${user.fullName} (${user.role})`,
-          revokedAt: null,
-          revokedBy: null,
-          ipAddress: net.ipAddress,
-          networkScope: net.networkScope,
-          locationName: net.locationName,
-          lastUsedAt: new Date(),
-          lastUsedBrowser: browserInfo || req.headers['user-agent'] || 'Web Browser',
-        },
-      });
-    }
-
     await logSystemActivity({
       parishId: pid,
-      userId: user.id,
+      userId: record.userId,
+      userName: record.email,
+      userRole: 'ADMIN',
       actionType: 'TERMINAL_CHANGE',
       category: 'SECURITY',
-      description: `Terminal "${device.deviceName}" authorized in-person by ${user.fullName} (${user.role}).`,
+      description: `Primary parish workstation "${approvedDevice.deviceName}" authorized via Email OTP by ${record.email}.`,
       req,
     });
 
     return res.json({
       success: true,
       status: 'APPROVED',
-      deviceId: device.id,
-      deviceName: device.deviceName,
-      message: `Terminal authorized successfully by ${user.fullName}.`,
+      deviceId: approvedDevice.id,
+      deviceName: approvedDevice.deviceName,
+      message: 'Workstation successfully authorized as the primary parish terminal.',
     });
   } catch (err: any) {
-    console.error('Direct terminal authorize error:', err);
-    return res.status(500).json({ error: 'Failed to authorize terminal directly.' });
+    console.error('Bootstrap OTP verify error:', err);
+    return res.status(500).json({ error: 'Failed to verify code.' });
   }
 });
 

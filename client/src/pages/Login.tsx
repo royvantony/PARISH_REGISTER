@@ -18,12 +18,14 @@ import {
   KeyRound,
   Loader2,
   Send,
+  Mail,
 } from 'lucide-react';
 import { ForgotPasswordModal } from '../components/auth/ForgotPasswordModal';
 import { api } from '../lib/api';
 import {
   verifyTerminalAuthorization,
-  authorizeTerminalDirectly,
+  sendBootstrapOtp,
+  verifyBootstrapOtp,
   getHardwarePlatform,
   collectHardwareTelemetry,
   type DeviceVerifyResult,
@@ -85,7 +87,6 @@ export const LoginPage: React.FC = () => {
   const [terminalStatus, setTerminalStatus] = useState<'IDLE' | 'APPROVED' | 'PENDING' | 'REVOKED'>('IDLE');
   const [terminalData, setTerminalData] = useState<DeviceVerifyResult | null>(null);
   const [pendingApprovalData, setPendingApprovalData] = useState<any>(null);
-  const [newTerminalName, setNewTerminalName] = useState('');
 
   // Smooth Authenticating & Redirecting Polish Transition (1.3s enterprise security perception)
   const [isRedirecting, setIsRedirecting] = useState(false);
@@ -95,12 +96,12 @@ export const LoginPage: React.FC = () => {
   });
   const [redirectProgress, setRedirectProgress] = useState(30);
 
-  // In-person Administrator Direct Authorization
-  const [showDirectAuth, setShowDirectAuth] = useState(false);
-  const [directAuthEmail, setDirectAuthEmail] = useState('');
-  const [directAuthPassword, setDirectAuthPassword] = useState('');
-  const [directAuthLoading, setDirectAuthLoading] = useState(false);
-  const [directAuthError, setDirectAuthError] = useState<string | null>(null);
+  // Initial Bootstrap OTP State (for Day-1 First Workstation Setup)
+  const [bootstrapOtpSent, setBootstrapOtpSent] = useState(false);
+  const [bootstrapOtpLoading, setBootstrapOtpLoading] = useState(false);
+  const [bootstrapOtpError, setBootstrapOtpError] = useState<string | null>(null);
+  const [bootstrapOtpSuccess, setBootstrapOtpSuccess] = useState<string | null>(null);
+  const [bootstrapOtpCode, setBootstrapOtpCode] = useState('');
 
   // Revoked Workstation Review State
   const [revokedTerminalInfo, setRevokedTerminalInfo] = useState<{
@@ -130,7 +131,6 @@ export const LoginPage: React.FC = () => {
   };
 
   useEffect(() => {
-    setNewTerminalName(getHardwarePlatform());
     runTerminalCheck();
   }, []);
 
@@ -163,22 +163,40 @@ export const LoginPage: React.FC = () => {
     return () => clearInterval(interval);
   }, [terminalStatus, email, password]);
 
-  const handleDirectAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setDirectAuthError(null);
+  const handleSendBootstrapOtp = async () => {
+    if (!pendingApprovalData?.deviceId) return;
+    try {
+      setBootstrapOtpLoading(true);
+      setBootstrapOtpError(null);
+      setBootstrapOtpSuccess(null);
+      const res = await sendBootstrapOtp(
+        pendingApprovalData.parishId || 1,
+        pendingApprovalData.deviceId,
+        email.trim()
+      );
+      setBootstrapOtpSent(true);
+      setBootstrapOtpSuccess(res.message || 'Verification code sent to your email.');
+    } catch (err: any) {
+      setBootstrapOtpError(err.response?.data?.error || 'Failed to send verification code. Please try again.');
+    } finally {
+      setBootstrapOtpLoading(false);
+    }
+  };
 
-    if (!directAuthEmail.trim() || !directAuthPassword) {
-      setDirectAuthError('Please enter administrator email and password.');
+  const handleVerifyBootstrapOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pendingApprovalData?.deviceId || !bootstrapOtpCode.trim()) {
+      setBootstrapOtpError('Please enter the 6-digit verification code.');
       return;
     }
 
     try {
-      setDirectAuthLoading(true);
-      const res = await authorizeTerminalDirectly(
-        1,
-        directAuthEmail.trim(),
-        directAuthPassword,
-        newTerminalName.trim() || undefined
+      setBootstrapOtpLoading(true);
+      setBootstrapOtpError(null);
+      const res = await verifyBootstrapOtp(
+        pendingApprovalData.parishId || 1,
+        pendingApprovalData.deviceId,
+        bootstrapOtpCode.trim()
       );
 
       setTerminalData({
@@ -186,9 +204,8 @@ export const LoginPage: React.FC = () => {
         deviceName: res.deviceName,
       });
       setTerminalStatus('APPROVED');
-      setShowDirectAuth(false);
 
-      // Auto login if credentials exist
+      // Auto login with credentials
       if (email && password) {
         const loginRes = await login(email, password);
         if (loginRes.success) {
@@ -197,9 +214,9 @@ export const LoginPage: React.FC = () => {
         }
       }
     } catch (err: any) {
-      setDirectAuthError(err.response?.data?.error || 'Direct authorization failed. Please check credentials.');
+      setBootstrapOtpError(err.response?.data?.error || 'Invalid or expired code. Please try again.');
     } finally {
-      setDirectAuthLoading(false);
+      setBootstrapOtpLoading(false);
     }
   };
 
@@ -495,11 +512,17 @@ export const LoginPage: React.FC = () => {
             <div className="space-y-1.5">
               <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 text-[11px] font-bold">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-ping" />
-                <span>Workstation Approval Pending</span>
+                <span>{pendingApprovalData?.isBootstrap ? 'Initial Setup Required' : 'Workstation Approval Pending'}</span>
               </div>
-              <h2 className="text-xl font-extrabold text-parish-text">Awaiting Administrator Authorization</h2>
+              <h2 className="text-xl font-extrabold text-parish-text">
+                {pendingApprovalData?.isBootstrap ? 'Initial Workstation Setup' : 'Awaiting Administrator Authorization'}
+              </h2>
               <p className="text-xs text-parish-text-muted max-w-sm mx-auto leading-relaxed">
-                Welcome, <strong className="text-parish-text">{pendingApprovalData?.userName || 'Parish Staff'}</strong>. Your credentials are valid. Because this computer is not yet authorized for this parish, an enrollment request has been submitted to an Authorized Administrator.
+                {pendingApprovalData?.isBootstrap ? (
+                  <>No authorized workstations exist for this parish yet. To register this machine as the initial primary terminal, verify your administrator email.</>
+                ) : (
+                  <>Welcome, <strong className="text-parish-text">{pendingApprovalData?.userName || 'Parish Staff'}</strong>. Your credentials are valid. This computer is awaiting approval from an authorized administrator.</>
+                )}
               </p>
             </div>
 
@@ -529,90 +552,102 @@ export const LoginPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex flex-col gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={runTerminalCheck}
-                className="w-full justify-center text-xs"
-                icon={<RotateCcw className="w-3.5 h-3.5" />}
-              >
-                Check Approval Status
-              </Button>
-              <p className="text-[10px] text-parish-text-muted">
-                Auto-polling every 3.5 seconds. Once an authorized administrator approves, you will log in automatically.
-              </p>
-            </div>
-
-            {/* In-Person Direct Administrator Authorization Accordion */}
-            <div className="pt-3 border-t border-parish-border/60 space-y-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowDirectAuth(!showDirectAuth);
-                  setDirectAuthError(null);
-                }}
-                className="w-full text-center text-xs text-parish-primary hover:text-parish-primary-dark font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer py-1"
-              >
-                <KeyRound className="w-3.5 h-3.5" />
-                <span>{showDirectAuth ? 'Hide In-Person Administrator Auth' : 'Authorize in-person as an Administrator'}</span>
-              </button>
-
-              {showDirectAuth && (
-                <form onSubmit={handleDirectAuth} className="mt-3 p-4 rounded-2xl bg-parish-surface-subtle border border-parish-border space-y-3 animate-in fade-in duration-200 text-left">
-                  <p className="text-[11px] text-parish-text-muted leading-tight">
-                    If you are an Authorized Administrator standing at this machine, sign in below to authorize it immediately:
-                  </p>
-                  {directAuthError && (
-                    <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-[11px] text-rose-700">
-                      {directAuthError}
-                    </div>
-                  )}
-                  <div>
-                    <label className="block text-[11px] font-semibold text-parish-text mb-1">Administrator Email</label>
-                    <Input
-                      type="text"
-                      value={directAuthEmail}
-                      onChange={(e) => setDirectAuthEmail(e.target.value)}
-                      placeholder="e.g. admin@parish.org.au"
-                      required
-                      className="text-xs"
-                    />
+            {/* If Initial Bootstrap Setup (0 workstations in parish): Show Email OTP Flow */}
+            {pendingApprovalData?.isBootstrap ? (
+              <div className="pt-3 border-t border-parish-border/60 space-y-3 text-left">
+                {bootstrapOtpError && (
+                  <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-[11px] text-rose-700">
+                    {bootstrapOtpError}
                   </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-parish-text mb-1">Password</label>
-                    <Input
-                      type="password"
-                      value={directAuthPassword}
-                      onChange={(e) => setDirectAuthPassword(e.target.value)}
-                      placeholder="••••••••"
-                      required
-                      className="text-xs"
-                    />
+                )}
+                {bootstrapOtpSuccess && (
+                  <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-700">
+                    {bootstrapOtpSuccess}
                   </div>
+                )}
+
+                {!bootstrapOtpSent ? (
                   <Button
-                    type="submit"
+                    type="button"
                     variant="primary"
                     size="sm"
-                    isLoading={directAuthLoading}
+                    isLoading={bootstrapOtpLoading}
+                    onClick={handleSendBootstrapOtp}
                     className="w-full justify-center text-xs font-bold"
+                    icon={<Mail className="w-3.5 h-3.5" />}
                   >
-                    Authorize This Machine Now
+                    Send Verification Code to {pendingApprovalData.maskedEmail || 'Administrator Email'}
                   </Button>
-                </form>
-              )}
+                ) : (
+                  <form onSubmit={handleVerifyBootstrapOtp} className="space-y-3">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-parish-text mb-1">
+                        Enter 6-Digit Verification Code
+                      </label>
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        value={bootstrapOtpCode}
+                        onChange={(e) => setBootstrapOtpCode(e.target.value.replace(/\D/g, ''))}
+                        placeholder="123456"
+                        required
+                        className="text-center font-mono text-base tracking-widest"
+                      />
+                    </div>
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      size="sm"
+                      isLoading={bootstrapOtpLoading}
+                      className="w-full justify-center text-xs font-bold"
+                      icon={<KeyRound className="w-3.5 h-3.5" />}
+                    >
+                      Verify & Authorize Workstation
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={handleSendBootstrapOtp}
+                      disabled={bootstrapOtpLoading}
+                      className="w-full text-center text-[11px] text-parish-primary hover:underline cursor-pointer"
+                    >
+                      Resend code
+                    </button>
+                  </form>
+                )}
+              </div>
+            ) : (
+              /* Normal Pending: Clean auto-polling (Zero password bypasses, Zero settings navigation hints) */
+              <div className="flex flex-col gap-2 pt-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={runTerminalCheck}
+                  className="w-full justify-center text-xs"
+                  icon={<RotateCcw className="w-3.5 h-3.5" />}
+                >
+                  Check Approval Status
+                </Button>
+                <p className="text-[10px] text-parish-text-muted">
+                  Auto-checking status every 3.5 seconds. Please contact an authorized administrator to approve this workstation.
+                </p>
+              </div>
+            )}
 
-              <button
-                type="button"
-                onClick={() => {
-                  setTerminalStatus('IDLE');
-                  setPendingApprovalData(null);
-                }}
-                className="text-xs text-parish-text-muted hover:text-parish-primary transition-colors font-medium cursor-pointer pt-2 block mx-auto"
-              >
-                ← Sign in as a different user
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setTerminalStatus('IDLE');
+                setPendingApprovalData(null);
+                setBootstrapOtpSent(false);
+                setBootstrapOtpCode('');
+                setBootstrapOtpError(null);
+                setBootstrapOtpSuccess(null);
+              }}
+              className="text-xs text-parish-text-muted hover:text-parish-primary transition-colors font-medium cursor-pointer pt-2 block mx-auto"
+            >
+              ← Sign in as a different user
+            </button>
           </div>
         ) : terminalStatus === 'REVOKED' && !isDevRevealed ? (
           /* ================================================================= */
