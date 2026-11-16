@@ -133,6 +133,12 @@ authRouter.post('/login', async (req: Request, res: Response) => {
       ];
     }
 
+    if (user.mustChangePassword) {
+      sendTempLoginOtp(user).catch((err) => {
+        console.error('Failed to dispatch temp login OTP on sign-in:', err);
+      });
+    }
+
     return res.json({
       message: 'Login successful',
       token,
@@ -302,6 +308,12 @@ authRouter.post('/dev-login', async (req: Request, res: Response) => {
       ];
     }
 
+    if (user.mustChangePassword) {
+      sendTempLoginOtp(user).catch((err) => {
+        console.error('Failed to dispatch temp login OTP on dev sign-in:', err);
+      });
+    }
+
     return res.json({
       message: 'Developer login successful',
       token,
@@ -465,11 +477,85 @@ interface ChangePasswordOtp {
 
 const changePasswordOtpStore = new Map<number, ChangePasswordOtp>();
 
+interface TempLoginOtp {
+  otpHash: string;
+  expiresAt: number; // 5 minutes
+  lastSentAt: number;
+}
+
+const tempLoginOtpStore = new Map<number, TempLoginOtp>();
+
 function maskEmail(email?: string): string {
   if (!email || !email.includes('@')) return email || '';
   const [name, domain] = email.split('@');
   if (name.length <= 2) return `${name}***@${domain}`;
   return `${name.substring(0, 2)}***${name.slice(-1)}@${domain}`;
+}
+
+async function sendTempLoginOtp(user: { id: number; fullName: string; email: string; parishId?: number | null }): Promise<{ success: boolean; error?: string }> {
+  if (!user.email || !user.email.trim()) {
+    return { success: false, error: 'No registered email address found for user.' };
+  }
+
+  const rawOtp = Math.floor(100000 + Math.random() * 900000).toString();
+  const otpHash = crypto.createHash('sha256').update(rawOtp).digest('hex');
+  const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes validity
+
+  tempLoginOtpStore.set(user.id, {
+    otpHash,
+    expiresAt,
+    lastSentAt: Date.now(),
+  });
+
+  const parishId = user.parishId || 1;
+  const emailHtml = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
+      <div style="text-align: center; margin-bottom: 24px;">
+        <span style="background-color: #fef3c7; color: #92400e; font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 9999px; border: 1px solid #fde68a; text-transform: uppercase; letter-spacing: 0.5px;">
+          Security Verification (First Sign-In)
+        </span>
+      </div>
+
+      <p style="color: #334155; font-size: 14px; line-height: 1.6; margin-bottom: 12px;">
+        Hello <strong>${user.fullName}</strong>,
+      </p>
+      <p style="color: #334155; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">
+        A sign-in attempt was initiated for your Parish Register account using a temporary administrator-assigned password. To confirm your identity and set your personal permanent password, enter this verification code:
+      </p>
+
+      <div style="background-color: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 20px; text-align: center; margin: 24px 0;">
+        <div style="font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 1px; margin-bottom: 8px;">
+          One-Time Verification Code (OTP)
+        </div>
+        <div style="font-family: 'Courier New', Courier, monospace; font-size: 34px; font-weight: 800; letter-spacing: 8px; color: #064e3b;">
+          ${rawOtp}
+        </div>
+        <div style="font-size: 12px; color: #dc2626; font-weight: 700; margin-top: 8px;">
+          ⏱️ Valid for 5 minutes only
+        </div>
+      </div>
+
+      <p style="color: #dc2626; font-size: 12px; line-height: 1.6; margin-top: 20px; font-weight: 600;">
+        ⚠️ If you did not initiate this sign-in attempt, someone may be attempting to access your account. Please notify your Parish Priest or Administrator immediately.
+      </p>
+
+      <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 24px 0;" />
+      <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">
+        Parish Register Security • St. Thomas the Apostle Syro-Malabar Diocese
+      </p>
+    </div>
+  `;
+
+  console.log(`[Temp Login OTP] Generated 5-minute OTP for user ${user.email}: ${rawOtp}`);
+
+  const emailResult = await sendParishEmail(parishId, {
+    to: user.email,
+    subject: `[Parish Register] Sign-In Verification Code: ${rawOtp} (5-min validity)`,
+    html: emailHtml,
+    text: `Hello ${user.fullName},\n\nYour 6-digit verification code to complete sign-in and set your permanent password is: ${rawOtp}\n\nThis code is valid for 5 minutes only.\n\nBlessings,\nParish Administration`,
+  });
+
+  return { success: emailResult.success || Boolean(emailResult.skipped), error: emailResult.error };
 }
 
 // POST /api/auth/change-password/request-otp - Send 6-digit OTP to user's registered email for password update
@@ -566,6 +652,40 @@ authRouter.post('/change-password/request-otp', authenticateJWT, async (req: Req
   }
 });
 
+// POST /api/auth/temp-login/resend-otp - Resend 5-minute OTP for users logging in with temporary password
+authRouter.post('/temp-login/resend-otp', authenticateJWT, async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.parishUser.findUnique({
+      where: { id: req.user!.userId },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User account not found.' });
+    }
+
+    if (!user.mustChangePassword) {
+      return res.status(400).json({ error: 'Account does not require temporary password setup.' });
+    }
+
+    const existing = tempLoginOtpStore.get(user.id);
+    if (existing && Date.now() - existing.lastSentAt < 60 * 1000) {
+      const waitSeconds = Math.ceil((60 * 1000 - (Date.now() - existing.lastSentAt)) / 1000);
+      return res.status(429).json({ error: `Please wait ${waitSeconds}s before requesting a new code.` });
+    }
+
+    await sendTempLoginOtp(user);
+
+    return res.json({
+      success: true,
+      message: `A new 5-minute verification code has been dispatched to ${maskEmail(user.email)}.`,
+      email: maskEmail(user.email),
+    });
+  } catch (err: any) {
+    console.error('Resend temp login OTP error:', err);
+    return res.status(500).json({ error: 'Failed to dispatch verification code.' });
+  }
+});
+
 // POST /api/auth/change-password - Set new password on first login or profile update
 authRouter.post('/change-password', authenticateJWT, async (req: Request, res: Response) => {
   try {
@@ -583,8 +703,27 @@ authRouter.post('/change-password', authenticateJWT, async (req: Request, res: R
       return res.status(404).json({ error: 'User not found.' });
     }
 
-    // If user is voluntarily changing password (not forced on first login) or currentPassword is sent, verify it
-    if (!user.mustChangePassword || currentPassword) {
+    // Branch 1: User logged in with a temporary password (mustChangePassword === true)
+    if (user.mustChangePassword) {
+      const cleanOtp = ((otp || '') as string).trim();
+      if (!cleanOtp) {
+        return res.status(400).json({ error: 'Please enter the 6-digit verification code sent to your registered email.' });
+      }
+
+      const stored = tempLoginOtpStore.get(user.id);
+      if (!stored || Date.now() > stored.expiresAt) {
+        return res.status(400).json({ error: 'Your 5-minute verification code has expired. Please click "Resend Code" to receive a new one.' });
+      }
+
+      const submittedHash = crypto.createHash('sha256').update(cleanOtp).digest('hex');
+      if (submittedHash !== stored.otpHash) {
+        return res.status(400).json({ error: 'Invalid verification code. Please check your email and try again.' });
+      }
+
+      // Consume OTP so it cannot be reused
+      tempLoginOtpStore.delete(user.id);
+    } else {
+      // Branch 2: Voluntary password change in user profile
       if (!currentPassword) {
         return res.status(400).json({ error: 'Current password is required to change your password.' });
       }
@@ -641,7 +780,9 @@ authRouter.post('/change-password', authenticateJWT, async (req: Request, res: R
       userRole: user.role,
       actionType: 'USER_CHANGE',
       category: 'SECURITY',
-      description: `User ${user.fullName} (${user.email}) changed account password with email OTP verification.`,
+      description: user.mustChangePassword
+        ? `User ${user.fullName} (${user.email}) completed first-time sign-in and set permanent password with 5-minute email OTP verification.`
+        : `User ${user.fullName} (${user.email}) changed account password with email OTP verification.`,
       req,
     });
 
