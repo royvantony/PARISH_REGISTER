@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   RotateCcw,
   KeyRound,
+  Loader2,
 } from 'lucide-react';
 import { ForgotPasswordModal } from '../components/auth/ForgotPasswordModal';
 import { api } from '../lib/api';
@@ -83,6 +84,14 @@ export const LoginPage: React.FC = () => {
   const [terminalData, setTerminalData] = useState<DeviceVerifyResult | null>(null);
   const [pendingApprovalData, setPendingApprovalData] = useState<any>(null);
   const [newTerminalName, setNewTerminalName] = useState('');
+
+  // Smooth Authenticating & Redirecting Polish Transition (1.3s enterprise security perception)
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  const [redirectNotice, setRedirectNotice] = useState({
+    title: 'Authenticating & Verifying Terminal...',
+    subtitle: 'Workstation trust confirmed. Encrypting session credentials...',
+  });
+  const [redirectProgress, setRedirectProgress] = useState(30);
 
   // In-person Priest/Admin Direct Authorization
   const [showDirectAuth, setShowDirectAuth] = useState(false);
@@ -254,11 +263,30 @@ export const LoginPage: React.FC = () => {
     setIsLoading(false);
 
     if (res.success) {
-      if (res.needsParishSelection) {
-        setIsChoosingParish(true);
-      } else {
-        navigate('/dashboard');
-      }
+      setIsRedirecting(true);
+      setRedirectProgress(40);
+      setRedirectNotice({
+        title: 'Authenticating & Verifying Workstation...',
+        subtitle: 'Hardware authorization verified. Encrypting session token...',
+      });
+
+      setTimeout(() => {
+        setRedirectProgress(85);
+        setRedirectNotice({
+          title: 'Entering Parish Portal...',
+          subtitle: 'Redirecting to your church administration console...',
+        });
+      }, 600);
+
+      setTimeout(() => {
+        setRedirectProgress(100);
+        if (res.needsParishSelection) {
+          setIsChoosingParish(true);
+          setIsRedirecting(false);
+        } else {
+          navigate('/dashboard');
+        }
+      }, 1250);
     } else if (res.needsDeviceApproval) {
       setPendingApprovalData(res.deviceApprovalData);
       setTerminalStatus('PENDING');
@@ -276,11 +304,22 @@ export const LoginPage: React.FC = () => {
     setIsLoading(false);
 
     if (res.success) {
-      if (res.needsParishSelection) {
-        setIsChoosingParish(true);
-      } else {
-        navigate('/dashboard');
-      }
+      setIsRedirecting(true);
+      setRedirectProgress(45);
+      setRedirectNotice({
+        title: 'Developer Fast-Access Initializing...',
+        subtitle: 'Authorizing bypass session credentials...',
+      });
+
+      setTimeout(() => {
+        setRedirectProgress(100);
+        if (res.needsParishSelection) {
+          setIsChoosingParish(true);
+          setIsRedirecting(false);
+        } else {
+          navigate('/dashboard');
+        }
+      }, 800);
     } else {
       setErrorMessage(res.error || 'Developer login failed.');
     }
@@ -367,6 +406,40 @@ export const LoginPage: React.FC = () => {
               >
                 ← Sign in as different user
               </button>
+            </div>
+          </div>
+        ) : isRedirecting ? (
+          /* ================================================================= */
+          /* INTERMEDIATE VERIFICATION GATEWAY: Authenticating & Redirecting   */
+          /* ================================================================= */
+          <div className="bg-parish-surface border border-parish-border py-12 px-6 sm:px-10 shadow-soft rounded-3xl text-center space-y-6 animate-in fade-in zoom-in-95 duration-300">
+            <div className="relative inline-flex items-center justify-center mx-auto">
+              <div className="absolute inset-0 rounded-3xl bg-emerald-500/20 animate-ping opacity-60" />
+              <div className="relative p-4 rounded-3xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300/80 text-emerald-600 shadow-sm">
+                <ShieldCheck className="w-10 h-10 text-emerald-600 animate-pulse" />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="text-lg font-black text-parish-text tracking-tight">
+                {redirectNotice.title}
+              </h3>
+              <p className="text-xs text-parish-text-muted leading-relaxed max-w-xs mx-auto">
+                {redirectNotice.subtitle}
+              </p>
+            </div>
+
+            {/* Smooth animated progress line */}
+            <div className="w-56 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full mx-auto overflow-hidden relative border border-slate-200 dark:border-slate-700">
+              <div
+                className="h-full bg-emerald-600 rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${redirectProgress}%` }}
+              />
+            </div>
+
+            <div className="text-[11px] text-parish-text-muted flex items-center justify-center gap-1.5 font-mono pt-1">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
+              <span>Redirecting to Parish Portal...</span>
             </div>
           </div>
         ) : terminalStatus === 'PENDING' && !isDevRevealed ? (
