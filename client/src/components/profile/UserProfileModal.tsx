@@ -4,6 +4,7 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { useAuth } from '../../context/AuthContext';
+import { api } from '../../lib/api';
 import {
   User,
   KeyRound,
@@ -50,10 +51,33 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  // OTP state
+  const [otpCode, setOtpCode] = useState('');
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpFeedback, setOtpFeedback] = useState<string | null>(null);
+  const [otpCountdown, setOtpCountdown] = useState(0);
+  const [devOtpHint, setDevOtpHint] = useState<string | null>(null);
+
+  // OTP Countdown Timer
+  useEffect(() => {
+    if (otpCountdown <= 0) return;
+    const timer = setInterval(() => {
+      setOtpCountdown((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [otpCountdown]);
+
   const resetPasswordForm = () => {
     setCurrentPassword('');
     setNewPassword('');
     setConfirmPassword('');
+    setOtpCode('');
+    setIsSendingOtp(false);
+    setOtpSent(false);
+    setOtpFeedback(null);
+    setOtpCountdown(0);
+    setDevOtpHint(null);
     setErrorMsg(null);
     setSuccessMsg(null);
   };
@@ -62,6 +86,47 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     resetPasswordForm();
     setActiveTab('details');
     onClose();
+  };
+
+  const handleRequestOtp = async () => {
+    setErrorMsg(null);
+    setOtpFeedback(null);
+
+    if (!currentPassword) {
+      setErrorMsg('Please enter your current password first before requesting an OTP.');
+      return;
+    }
+
+    if (!newPassword || newPassword.length < 6) {
+      setErrorMsg('Please enter a valid new password (minimum 6 characters) before requesting an OTP.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setErrorMsg('New password and confirmation do not match.');
+      return;
+    }
+
+    if (newPassword === currentPassword) {
+      setErrorMsg('New password cannot be the same as your current password.');
+      return;
+    }
+
+    try {
+      setIsSendingOtp(true);
+      const res = await api.post('/auth/change-password/request-otp');
+      setOtpSent(true);
+      setOtpFeedback(res.data.message || 'Verification code sent to your email.');
+      setOtpCountdown(60);
+      if (res.data.devOtpHint) {
+        setDevOtpHint(res.data.devOtpHint);
+        setOtpCode(res.data.devOtpHint);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.error || 'Failed to dispatch verification code. Please try again.');
+    } finally {
+      setIsSendingOtp(false);
+    }
   };
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
@@ -89,14 +154,18 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       return;
     }
 
+    const cleanOtp = otpCode.trim();
+    if (!cleanOtp || cleanOtp.length !== 6) {
+      setErrorMsg('Please request and enter the 6-digit email verification code (OTP).');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const result = await updatePassword(newPassword, currentPassword);
+      const result = await updatePassword(newPassword, currentPassword, cleanOtp);
       if (result.success) {
         setSuccessMsg('Your password has been updated successfully!');
-        setCurrentPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
+        resetPasswordForm();
       } else {
         setErrorMsg(result.error || 'Failed to update password.');
       }
@@ -352,6 +421,67 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+            </div>
+
+            {/* Email OTP Verification Section */}
+            <div className="p-4 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-800/60 space-y-3">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-1.5 font-bold text-xs text-parish-text">
+                    <Shield className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>Security Verification Code (Email OTP)</span>
+                    <span className="text-red-500">*</span>
+                  </div>
+                  <p className="text-[11px] text-parish-text-muted">
+                    To prevent misuse on shared computers, an email OTP is required.
+                  </p>
+                </div>
+                {user.email && (
+                  <span className="text-[10px] font-mono bg-amber-100/70 dark:bg-amber-900/40 text-amber-900 dark:text-amber-200 px-2 py-0.5 rounded-full border border-amber-300/60">
+                    {user.email}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    type="text"
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="Enter 6-digit OTP"
+                    maxLength={6}
+                    required
+                    className="font-mono tracking-widest text-sm text-center font-bold"
+                  />
+                </div>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRequestOtp}
+                  disabled={isSendingOtp || otpCountdown > 0}
+                  isLoading={isSendingOtp}
+                  icon={<Mail className="w-3.5 h-3.5 text-parish-primary" />}
+                  className="shrink-0 text-xs font-bold"
+                >
+                  {otpCountdown > 0 ? `Resend (${otpCountdown}s)` : otpSent ? 'Resend OTP' : 'Send Email OTP'}
+                </Button>
+              </div>
+
+              {otpFeedback && (
+                <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 text-emerald-800 dark:text-emerald-300 text-[11px] flex items-center gap-2 animate-in fade-in">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
+                  <span>{otpFeedback}</span>
+                </div>
+              )}
+
+              {devOtpHint && (
+                <div className="p-2 rounded bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 text-indigo-800 dark:text-indigo-300 text-[11px] font-mono">
+                  💡 Dev OTP auto-filled: <strong>{devOtpHint}</strong>
+                </div>
+              )}
             </div>
 
             <div className="p-3 rounded-lg bg-parish-surface-subtle border border-parish-border text-[11px] text-parish-text-muted leading-relaxed">

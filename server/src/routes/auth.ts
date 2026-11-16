@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { prisma } from '../lib/prisma.js';
 import { authenticateJWT, optionalAuth, AuthenticatedUser } from '../middleware/auth.js';
 import { UserRole } from '@prisma/client';
@@ -456,10 +457,120 @@ authRouter.get('/me', authenticateJWT, async (req: Request, res: Response) => {
   }
 });
 
+interface ChangePasswordOtp {
+  otpHash: string;
+  expiresAt: number;
+  userId: number;
+}
+
+const changePasswordOtpStore = new Map<number, ChangePasswordOtp>();
+
+function maskEmail(email?: string): string {
+  if (!email || !email.includes('@')) return email || '';
+  const [name, domain] = email.split('@');
+  if (name.length <= 2) return `${name}***@${domain}`;
+  return `${name.substring(0, 2)}***${name.slice(-1)}@${domain}`;
+}
+
+// POST /api/auth/change-password/request-otp - Send 6-digit OTP to user's registered email for password update
+authRouter.post('/change-password/request-otp', authenticateJWT, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const user = await prisma.parishUser.findUnique({
+      where: { id: userId },
+      include: { parish: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User account not found.' });
+    }
+
+    if (!user.email || !user.email.trim()) {
+      return res.status(400).json({ error: 'No registered email address found for your account. Please update your profile with a valid email.' });
+    }
+
+    // Generate 6-digit numeric OTP
+    const rawOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpHash = crypto.createHash('sha256').update(rawOtp).digest('hex');
+    const expiresAt = Date.now() + 15 * 60 * 1000; // 15 mins
+
+    changePasswordOtpStore.set(userId, {
+      otpHash,
+      expiresAt,
+      userId,
+    });
+
+    const parishId = user.parishId || req.activeParishId || 1;
+    const parishName = user.parish?.parishName || 'Parish Register';
+
+    const emailHtml = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h2 style="color: #064e3b; margin: 0 0 6px 0; font-size: 20px; font-weight: 800;">${parishName}</h2>
+          <span style="background-color: #ecfdf5; color: #047857; font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 9999px; border: 1px solid #a7f3d0;">
+            Security Verification Code
+          </span>
+        </div>
+
+        <p style="color: #334155; font-size: 14px; line-height: 1.6; margin-bottom: 12px;">
+          Hello <strong>${user.fullName}</strong>,
+        </p>
+        <p style="color: #334155; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">
+          A password change was requested for your account in the Parish Register portal. To verify your identity and prevent unauthorized changes or misuse by other users, enter the following 6-digit verification code:
+        </p>
+
+        <div style="background-color: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 20px; text-align: center; margin: 24px 0;">
+          <div style="font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 1px; margin-bottom: 8px;">
+            One-Time Password (OTP)
+          </div>
+          <div style="font-family: 'Courier New', Courier, monospace; font-size: 34px; font-weight: 800; letter-spacing: 8px; color: #064e3b;">
+            ${rawOtp}
+          </div>
+          <div style="font-size: 12px; color: #94a3b8; margin-top: 8px;">
+            Valid for 15 minutes
+          </div>
+        </div>
+
+        <p style="color: #dc2626; font-size: 12px; line-height: 1.6; margin-top: 20px; font-weight: 600;">
+          ⚠️ If you did not initiate this password change, do not share this code with anyone. Your password will remain unchanged unless this code is provided.
+        </p>
+
+        <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 24px 0;" />
+        <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">
+          Parish Register Security • St. Thomas the Apostle Syro-Malabar Diocese
+        </p>
+      </div>
+    `;
+
+    const emailResult = await sendParishEmail(parishId, {
+      to: user.email,
+      subject: `[Parish Register] Password Change Verification Code: ${rawOtp}`,
+      html: emailHtml,
+      text: `Hello ${user.fullName},\n\nYour 6-digit verification code to change your password is: ${rawOtp}\n\nThis code is valid for 15 minutes. If you did not request this, please ignore this email.\n\nBlessings,\nParish Administration`,
+    });
+
+    const isDevEnv = process.env.NODE_ENV !== 'production' || process.env.IS_DEMO === 'true';
+    if (!emailResult.success && !emailResult.skipped) {
+      console.error('Failed to send change password OTP email:', emailResult.error);
+    }
+    console.log(`[Change Password OTP] Generated OTP for user ${user.email}: ${rawOtp}`);
+
+    return res.json({
+      success: true,
+      message: `A 6-digit verification code has been dispatched to ${maskEmail(user.email)}.`,
+      email: maskEmail(user.email),
+      devOtpHint: isDevEnv ? rawOtp : undefined,
+    });
+  } catch (err: any) {
+    console.error('Request change password OTP error:', err);
+    return res.status(500).json({ error: 'Failed to dispatch verification code.' });
+  }
+});
+
 // POST /api/auth/change-password - Set new password on first login or profile update
 authRouter.post('/change-password', authenticateJWT, async (req: Request, res: Response) => {
   try {
-    const { currentPassword, newPassword } = req.body;
+    const { currentPassword, newPassword, otp } = req.body;
 
     if (!newPassword || typeof newPassword !== 'string' || newPassword.trim().length < 6) {
       return res.status(400).json({ error: 'New password must be at least 6 characters long.' });
@@ -487,6 +598,25 @@ authRouter.post('/change-password', authenticateJWT, async (req: Request, res: R
       if (currentPassword === newPassword.trim()) {
         return res.status(400).json({ error: 'New password cannot be the same as your current password.' });
       }
+
+      // Verify OTP to prevent misuse by other users on shared sessions
+      const cleanOtp = ((otp || '') as string).trim();
+      if (!cleanOtp) {
+        return res.status(400).json({ error: 'Email verification code (OTP) is required. Please click "Send Email OTP" to receive a verification code.' });
+      }
+
+      const stored = changePasswordOtpStore.get(user.id);
+      if (!stored || Date.now() > stored.expiresAt) {
+        return res.status(400).json({ error: 'Verification code has expired or was not requested. Please click "Send Email OTP" to receive a new code.' });
+      }
+
+      const submittedHash = crypto.createHash('sha256').update(cleanOtp).digest('hex');
+      if (submittedHash !== stored.otpHash) {
+        return res.status(400).json({ error: 'Invalid verification code. Please check your email and try again.' });
+      }
+
+      // Consume OTP so it cannot be reused
+      changePasswordOtpStore.delete(user.id);
     }
 
     const passwordHash = await bcrypt.hash(newPassword.trim(), 10);
@@ -503,6 +633,17 @@ authRouter.post('/change-password', authenticateJWT, async (req: Request, res: R
         role: true,
         mustChangePassword: true,
       },
+    });
+
+    await logSystemActivity({
+      parishId: user.parishId || 1,
+      userId: user.id,
+      userName: user.fullName,
+      userRole: user.role,
+      actionType: 'USER_CHANGE',
+      category: 'SECURITY',
+      description: `User ${user.fullName} (${user.email}) changed account password with email OTP verification.`,
+      req,
     });
 
     return res.json({

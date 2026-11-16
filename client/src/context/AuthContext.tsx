@@ -106,7 +106,7 @@ export interface AuthContextType {
   ) => Promise<{ success: boolean; needsParishSelection?: boolean; error?: string }>;
   logout: () => void;
   setActiveParishById: (parishId: number) => void;
-  updatePassword: (newPassword: string, currentPassword?: string) => Promise<{ success: boolean; error?: string }>;
+  updatePassword: (newPassword: string, currentPassword?: string, otp?: string) => Promise<{ success: boolean; error?: string }>;
   refreshDiocese: () => Promise<void>;
   refreshParishes: () => Promise<void>;
   parishLogo: string;
@@ -529,9 +529,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const updatePassword = async (newPassword: string, currentPassword?: string) => {
+  const updatePassword = async (newPassword: string, currentPassword?: string, otp?: string) => {
     try {
-      await api.post('/auth/change-password', { newPassword, currentPassword });
+      await api.post('/auth/change-password', { newPassword, currentPassword, otp });
       if (user) {
         const updatedUser = { ...user, mustChangePassword: false };
         setUser(updatedUser);
