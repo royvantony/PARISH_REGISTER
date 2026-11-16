@@ -50,7 +50,7 @@ const DEV_SHORTCUT_ACCOUNTS: DevShortcutAccount[] = [
   {
     label: '🛡️ Parish Admin',
     roleHint: '(Trustee)',
-    email: 'rarichenmathew@yahoo.co.uk',
+    email: 'royantonyvadakumpadan@gmail.com',
     badgeVariant: 'subtle',
   },
   {
