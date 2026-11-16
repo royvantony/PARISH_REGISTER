@@ -275,12 +275,29 @@ export async function downloadExternalDocument(params: {
  * Resolves full path on disk and verifies it remains within the storage sandbox.
  */
 export function getAbsoluteDocumentPath(relativePath: string): string | null {
-  const resolved = path.resolve(STORAGE_BASE_DIR, relativePath);
-  if (!resolved.startsWith(STORAGE_BASE_DIR)) {
+  // Check candidate storage directories (handles dev server vs deploy/demo working directories)
+  const candidateBases = [
+    process.env.STORAGE_BASE_DIR,
+    path.resolve(process.cwd(), 'uploads', 'documents'),
+    path.resolve(process.cwd(), 'deploy', 'demo', 'uploads', 'documents'),
+    path.resolve(__dirname, '..', '..', 'uploads', 'documents'),
+    path.resolve(__dirname, '..', 'uploads', 'documents'),
+  ].filter(Boolean) as string[];
+
+  for (const base of candidateBases) {
+    const resolved = path.resolve(base, relativePath);
+    if (resolved.startsWith(base) && fs.existsSync(resolved)) {
+      return resolved;
+    }
+  }
+
+  // Fallback to default base path
+  const defaultResolved = path.resolve(STORAGE_BASE_DIR, relativePath);
+  if (!defaultResolved.startsWith(STORAGE_BASE_DIR)) {
     // Directory traversal detected
     return null;
   }
-  return resolved;
+  return defaultResolved;
 }
 
 /**

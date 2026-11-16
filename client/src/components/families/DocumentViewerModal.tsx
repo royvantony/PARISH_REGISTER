@@ -119,10 +119,21 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
       } catch (err: any) {
         if (active) {
           console.error('Failed to load document stream:', err);
-          setError(
-            err.response?.data?.error ||
-            'Unable to load document. You may not have permission to view this attachment.'
-          );
+          let errorMessage = 'Unable to load document.';
+          if (err.response?.data instanceof Blob) {
+            try {
+              const text = await err.response.data.text();
+              const parsed = JSON.parse(text);
+              if (parsed.error) errorMessage = parsed.error;
+            } catch (_) {
+              errorMessage = 'Unable to load document from storage.';
+            }
+          } else if (err.response?.data?.error) {
+            errorMessage = err.response.data.error;
+          } else if (err.message) {
+            errorMessage = err.message;
+          }
+          setError(errorMessage);
         }
       } finally {
         if (active) setIsLoading(false);
