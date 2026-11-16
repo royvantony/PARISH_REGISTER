@@ -559,7 +559,6 @@ authRouter.post('/change-password/request-otp', authenticateJWT, async (req: Req
       success: true,
       message: `A 6-digit verification code has been dispatched to ${maskEmail(user.email)}.`,
       email: maskEmail(user.email),
-      devOtpHint: isDevEnv ? rawOtp : undefined,
     });
   } catch (err: any) {
     console.error('Request change password OTP error:', err);

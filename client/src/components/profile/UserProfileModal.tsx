@@ -57,7 +57,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const [otpSent, setOtpSent] = useState(false);
   const [otpFeedback, setOtpFeedback] = useState<string | null>(null);
   const [otpCountdown, setOtpCountdown] = useState(0);
-  const [devOtpHint, setDevOtpHint] = useState<string | null>(null);
 
   // OTP Countdown Timer
   useEffect(() => {
@@ -77,7 +76,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     setOtpSent(false);
     setOtpFeedback(null);
     setOtpCountdown(0);
-    setDevOtpHint(null);
     setErrorMsg(null);
     setSuccessMsg(null);
   };
@@ -118,10 +116,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       setOtpSent(true);
       setOtpFeedback(res.data.message || 'Verification code sent to your email.');
       setOtpCountdown(60);
-      if (res.data.devOtpHint) {
-        setDevOtpHint(res.data.devOtpHint);
-        setOtpCode(res.data.devOtpHint);
-      }
     } catch (err: any) {
       setErrorMsg(err.response?.data?.error || 'Failed to dispatch verification code. Please try again.');
     } finally {
@@ -474,12 +468,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 text-emerald-800 dark:text-emerald-300 text-[11px] flex items-center gap-2 animate-in fade-in">
                   <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
                   <span>{otpFeedback}</span>
-                </div>
-              )}
-
-              {devOtpHint && (
-                <div className="p-2 rounded bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 text-indigo-800 dark:text-indigo-300 text-[11px] font-mono">
-                  💡 Dev OTP auto-filled: <strong>{devOtpHint}</strong>
                 </div>
               )}
             </div>
