@@ -14,6 +14,9 @@ import {
   RotateCcw,
   Trash2,
   Info,
+  Cpu,
+  Globe,
+  Wifi,
 } from 'lucide-react';
 
 interface TerminalDevice {
@@ -21,6 +24,14 @@ interface TerminalDevice {
   deviceName: string;
   deviceFingerprint: string | null;
   status: 'PENDING' | 'APPROVED' | 'REVOKED';
+  hardwareHash?: string | null;
+  screenResolution?: string | null;
+  gpuRenderer?: string | null;
+  cpuCores?: number | null;
+  deviceMemory?: string | null;
+  timezone?: string | null;
+  networkScope?: string | null;
+  locationName?: string | null;
   ipAddress: string | null;
   lastUsedAt: string | null;
   lastUsedBrowser: string | null;
@@ -245,29 +256,78 @@ export const AuthorizedTerminalsTab: React.FC = () => {
             {pendingDevices.map((d) => (
               <div
                 key={d.id}
-                className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-amber-200/80 dark:border-amber-800/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-2xs"
+                className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-amber-200/80 dark:border-amber-800/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-2xs"
               >
-                <div className="flex items-start gap-3">
-                  <div className="p-2 rounded-lg bg-amber-100/70 dark:bg-amber-900/40 text-amber-700 shrink-0 mt-0.5">
+                <div className="flex items-start gap-3 w-full">
+                  <div className="p-2.5 rounded-xl bg-amber-100/70 dark:bg-amber-900/40 text-amber-700 shrink-0 mt-0.5">
                     {getDeviceIcon(d.deviceFingerprint)}
                   </div>
-                  <div>
+                  <div className="space-y-2 w-full">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-sm text-parish-text">{d.deviceName}</span>
-                      <Badge variant="warning" size="sm">Pending Approval</Badge>
+                      <span className="font-extrabold text-sm text-parish-text">{d.deviceName}</span>
+                      <Badge variant="warning" size="sm">Pending Pastoral Approval</Badge>
+
+                      {/* Network & Location Badge */}
+                      {d.networkScope === 'REMOTE_WAN' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 dark:bg-sky-950/50 text-sky-800 dark:text-sky-300 border border-sky-300">
+                          <Globe className="w-3 h-3 text-sky-600" />
+                          <span>Remote WAN: {d.locationName || 'Remote Location'} ({d.ipAddress})</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border border-emerald-300">
+                          <Wifi className="w-3 h-3 text-emerald-600" />
+                          <span>Parish Local Network (LAN / Wi-Fi) {d.ipAddress ? `• ${d.ipAddress}` : ''}</span>
+                        </span>
+                      )}
                     </div>
-                    <p className="text-xs text-parish-text-muted mt-0.5">
-                      Platform: <span className="font-medium text-parish-text">{d.deviceFingerprint || 'Web Browser'}</span>
-                      {d.ipAddress && <span className="ml-2 font-mono text-[11px]">({d.ipAddress})</span>}
-                    </p>
-                    <p className="text-[11px] text-parish-text-muted mt-0.5 flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      <span>Requested: {formatDate(d.createdAt)}</span>
-                    </p>
+
+                    {/* Rich Hardware & Telemetry Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs bg-parish-surface-subtle p-2.5 rounded-lg border border-parish-border/60">
+                      <div>
+                        <span className="text-parish-text-muted text-[10px] uppercase font-bold block">Platform & Browser</span>
+                        <span className="font-semibold text-parish-text">{d.deviceFingerprint || 'Web Browser'}</span>
+                      </div>
+                      {d.gpuRenderer && (
+                        <div>
+                          <span className="text-parish-text-muted text-[10px] uppercase font-bold block">Graphics Hardware (GPU)</span>
+                          <span className="font-semibold text-parish-text truncate block" title={d.gpuRenderer}>
+                            {d.gpuRenderer}
+                          </span>
+                        </div>
+                      )}
+                      {d.screenResolution && (
+                        <div>
+                          <span className="text-parish-text-muted text-[10px] uppercase font-bold block">Display Spec</span>
+                          <span className="font-semibold text-parish-text">{d.screenResolution}</span>
+                        </div>
+                      )}
+                      {(d.cpuCores || d.deviceMemory) && (
+                        <div>
+                          <span className="text-parish-text-muted text-[10px] uppercase font-bold block">Processor & Memory</span>
+                          <span className="font-semibold text-parish-text flex items-center gap-1">
+                            <Cpu className="w-3 h-3 text-slate-400" />
+                            <span>{[d.cpuCores ? `${d.cpuCores} CPU Cores` : null, d.deviceMemory].filter(Boolean).join(' • ')}</span>
+                          </span>
+                        </div>
+                      )}
+                      {d.timezone && (
+                        <div>
+                          <span className="text-parish-text-muted text-[10px] uppercase font-bold block">System Timezone</span>
+                          <span className="font-semibold text-parish-text">{d.timezone}</span>
+                        </div>
+                      )}
+                      <div>
+                        <span className="text-parish-text-muted text-[10px] uppercase font-bold block">Enrolled Date & Time</span>
+                        <span className="font-semibold text-parish-text flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-slate-400" />
+                          <span>{formatDate(d.createdAt)}</span>
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                <div className="flex items-center gap-2 shrink-0 self-end md:self-center mt-2 md:mt-0">
                   <Button
                     variant="primary"
                     size="sm"
@@ -320,16 +380,27 @@ export const AuthorizedTerminalsTab: React.FC = () => {
                   <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 shrink-0 mt-0.5">
                     {getDeviceIcon(d.deviceFingerprint)}
                   </div>
-                  <div>
+                  <div className="space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold text-sm text-parish-text">{d.deviceName}</span>
                       <Badge variant="success" size="sm">Active</Badge>
-                    </div>
-                    <p className="text-xs text-parish-text-muted mt-0.5">
-                      Platform: <span className="font-medium text-parish-text">{d.deviceFingerprint || 'Web Browser'}</span>
-                      {d.lastUsedBrowser && d.lastUsedBrowser !== d.deviceFingerprint && (
-                        <span className="text-[11px] ml-1.5 font-mono text-parish-text-muted">[{d.lastUsedBrowser}]</span>
+
+                      {d.networkScope === 'REMOTE_WAN' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 dark:bg-sky-950/50 text-sky-800 dark:text-sky-300 border border-sky-300">
+                          <Globe className="w-3 h-3 text-sky-600" />
+                          <span>Remote WAN: {d.locationName || 'Remote'} ({d.ipAddress})</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border border-emerald-300">
+                          <Wifi className="w-3 h-3 text-emerald-600" />
+                          <span>Parish Local Network {d.ipAddress ? `(${d.ipAddress})` : ''}</span>
+                        </span>
                       )}
+                    </div>
+                    <p className="text-xs text-parish-text-muted">
+                      Platform: <span className="font-medium text-parish-text">{d.deviceFingerprint || 'Web Browser'}</span>
+                      {d.gpuRenderer && <span className="text-[11px] ml-1.5 font-medium text-slate-500">• {d.gpuRenderer}</span>}
+                      {d.screenResolution && <span className="text-[11px] ml-1.5 font-medium text-slate-400">({d.screenResolution})</span>}
                     </p>
                     <div className="flex items-center gap-3 text-[11px] text-parish-text-muted mt-1 flex-wrap">
                       <span>Last active: <strong>{formatDate(d.lastUsedAt)}</strong></span>

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
+import geoip from 'geoip-lite';
 import { prisma } from '../lib/prisma.js';
 import { authenticateJWT } from '../middleware/auth.js';
 import { checkUserPermission } from './permissions.js';
@@ -14,10 +15,46 @@ export function hashDeviceSecret(secret: string): string {
   return crypto.createHash('sha256').update(secret.trim()).digest('hex');
 }
 
+// Helper: Determine private vs public IP and resolve location
+function isPrivateIp(ip: string): boolean {
+  if (!ip) return true;
+  const clean = ip.replace(/^::ffff:/, '').trim();
+  if (clean === '127.0.0.1' || clean === '::1' || clean === 'localhost') return true;
+  if (clean.startsWith('10.') || clean.startsWith('192.168.')) return true;
+  if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(clean)) return true;
+  return false;
+}
+
+export function resolveNetworkInfo(req: Request) {
+  const forwarded = req.headers['x-forwarded-for']?.toString().split(',')[0].trim();
+  const rawIp = forwarded || req.socket.remoteAddress || req.ip || '127.0.0.1';
+  const cleanIp = rawIp.replace(/^::ffff:/, '').trim();
+
+  const isLocal = isPrivateIp(cleanIp);
+  if (isLocal) {
+    return {
+      ipAddress: cleanIp,
+      networkScope: 'LOCAL_LAN',
+      locationName: 'Parish Local Network (Wi-Fi / LAN)',
+    };
+  }
+
+  // Remote IP: use offline geoip lookup
+  const geo = geoip.lookup(cleanIp);
+  const locParts = geo ? [geo.city, geo.region, geo.country].filter(Boolean) : [];
+  const locationName = locParts.length > 0 ? locParts.join(', ') : 'Remote Location';
+
+  return {
+    ipAddress: cleanIp,
+    networkScope: 'REMOTE_WAN',
+    locationName,
+  };
+}
+
 // POST /api/devices/verify - Check terminal authorization status on first load
 devicesRouter.post('/verify', async (req: Request, res: Response) => {
   try {
-    const { parishId, deviceToken, browserInfo } = req.body;
+    const { parishId, deviceToken, hardwareHash, telemetry, browserInfo } = req.body;
 
     const pid = parseInt(parishId, 10);
     const approvedCount = !isNaN(pid)
@@ -26,23 +63,44 @@ devicesRouter.post('/verify', async (req: Request, res: Response) => {
         })
       : 0;
 
-    if (!parishId || isNaN(pid) || !deviceToken) {
+    if (!parishId || isNaN(pid)) {
       return res.json({
         status: 'UNREGISTERED',
         isFirstDeviceSetup: approvedCount === 0,
       });
     }
 
-    const tokenHash = hashDeviceSecret(deviceToken);
-    const device = await prisma.parishAuthorizedDevice.findFirst({
-      where: {
-        parishId: pid,
-        deviceTokenHash: tokenHash,
-      },
-      include: {
-        parish: { select: { parishName: true, parishCode: true } },
-      },
-    });
+    const net = resolveNetworkInfo(req);
+    let device = null;
+
+    // 1. Try finding by device token in storage
+    if (deviceToken && typeof deviceToken === 'string') {
+      const tokenHash = hashDeviceSecret(deviceToken);
+      device = await prisma.parishAuthorizedDevice.findFirst({
+        where: {
+          parishId: pid,
+          deviceTokenHash: tokenHash,
+        },
+        include: {
+          parish: { select: { parishName: true, parishCode: true } },
+        },
+      });
+    }
+
+    // 2. If no token match (e.g. Safari Private Browsing or Cache Cleared),
+    // match by physical hardware signature for this parish
+    if (!device && hardwareHash && typeof hardwareHash === 'string') {
+      device = await prisma.parishAuthorizedDevice.findFirst({
+        where: {
+          parishId: pid,
+          hardwareHash: hardwareHash,
+          status: 'APPROVED',
+        },
+        include: {
+          parish: { select: { parishName: true, parishCode: true } },
+        },
+      });
+    }
 
     if (!device) {
       return res.json({
@@ -52,14 +110,21 @@ devicesRouter.post('/verify', async (req: Request, res: Response) => {
     }
 
     if (device.status === 'APPROVED') {
-      // Update last active metadata
-      const clientIp = req.headers['x-forwarded-for']?.toString().split(',')[0].trim() || req.socket.remoteAddress || req.ip;
+      // Update last active metadata and backfill hardware telemetry
       await prisma.parishAuthorizedDevice.update({
         where: { id: device.id },
         data: {
           lastUsedAt: new Date(),
           lastUsedBrowser: browserInfo || req.headers['user-agent'] || 'Web Browser',
-          ipAddress: clientIp,
+          ipAddress: net.ipAddress,
+          networkScope: net.networkScope,
+          locationName: net.locationName,
+          hardwareHash: device.hardwareHash || hardwareHash || undefined,
+          gpuRenderer: device.gpuRenderer || telemetry?.gpuRenderer || undefined,
+          screenResolution: device.screenResolution || telemetry?.screenResolution || undefined,
+          cpuCores: device.cpuCores || telemetry?.cpuCores || undefined,
+          deviceMemory: device.deviceMemory || telemetry?.deviceMemory || undefined,
+          timezone: device.timezone || telemetry?.timezone || undefined,
         },
       });
 
@@ -97,7 +162,7 @@ devicesRouter.post('/verify', async (req: Request, res: Response) => {
 // POST /api/devices/register - Request workstation enrollment for a parish
 devicesRouter.post('/register', async (req: Request, res: Response) => {
   try {
-    const { parishId, deviceName, deviceSecret, browserInfo } = req.body;
+    const { parishId, deviceName, deviceSecret, browserInfo, telemetry } = req.body;
 
     if (!parishId || isNaN(Number(parishId))) {
       return res.status(400).json({ error: 'Valid Parish ID is required.' });
@@ -122,9 +187,18 @@ devicesRouter.post('/register', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Parish not found.' });
     }
 
+    const net = resolveNetworkInfo(req);
     const tokenHash = hashDeviceSecret(cleanSecret);
+
+    // Check if this token or hardware signature was already registered
     const existing = await prisma.parishAuthorizedDevice.findFirst({
-      where: { deviceTokenHash: tokenHash },
+      where: {
+        parishId: pid,
+        OR: [
+          { deviceTokenHash: tokenHash },
+          ...(telemetry?.hardwareHash ? [{ hardwareHash: telemetry.hardwareHash }] : []),
+        ],
+      },
     });
 
     if (existing) {
@@ -133,7 +207,7 @@ devicesRouter.post('/register', async (req: Request, res: Response) => {
         status: existing.status,
         deviceId: existing.id,
         deviceName: existing.deviceName,
-        message: 'This workstation was already registered.',
+        message: 'This workstation is already registered.',
       });
     }
 
@@ -144,7 +218,6 @@ devicesRouter.post('/register', async (req: Request, res: Response) => {
     const isFirstApproved = approvedCount === 0;
     const initialStatus = isFirstApproved ? 'APPROVED' : 'PENDING';
 
-    const clientIp = req.headers['x-forwarded-for']?.toString().split(',')[0].trim() || req.socket.remoteAddress || req.ip;
     const device = await prisma.parishAuthorizedDevice.create({
       data: {
         parishId: pid,
@@ -152,9 +225,17 @@ devicesRouter.post('/register', async (req: Request, res: Response) => {
         deviceFingerprint: browserInfo || req.headers['user-agent'] || 'Web Browser',
         deviceTokenHash: tokenHash,
         status: initialStatus,
+        hardwareHash: telemetry?.hardwareHash || null,
+        gpuRenderer: telemetry?.gpuRenderer || null,
+        screenResolution: telemetry?.screenResolution || null,
+        cpuCores: telemetry?.cpuCores || null,
+        deviceMemory: telemetry?.deviceMemory || null,
+        timezone: telemetry?.timezone || null,
+        ipAddress: net.ipAddress,
+        networkScope: net.networkScope,
+        locationName: net.locationName,
         approvedAt: isFirstApproved ? new Date() : null,
         approvedBy: isFirstApproved ? 'Initial Setup (Primary Workstation)' : null,
-        ipAddress: clientIp,
         lastUsedAt: isFirstApproved ? new Date() : null,
         lastUsedBrowser: browserInfo || req.headers['user-agent'] || 'Web Browser',
       },
@@ -189,7 +270,7 @@ devicesRouter.post('/register', async (req: Request, res: Response) => {
 // POST /api/devices/authorize-direct - In-place terminal authorization using Priest / Admin credentials
 devicesRouter.post('/authorize-direct', async (req: Request, res: Response) => {
   try {
-    const { parishId, deviceToken, email, username, password, terminalName, browserInfo } = req.body;
+    const { parishId, deviceToken, email, username, password, terminalName, browserInfo, telemetry } = req.body;
     const identifier = ((email || username || '') as string).trim().toLowerCase();
 
     if (!identifier || !password) {
@@ -227,10 +308,16 @@ devicesRouter.post('/authorize-direct', async (req: Request, res: Response) => {
 
     const tokenHash = hashDeviceSecret(deviceToken);
     let device = await prisma.parishAuthorizedDevice.findFirst({
-      where: { parishId: pid, deviceTokenHash: tokenHash },
+      where: {
+        parishId: pid,
+        OR: [
+          { deviceTokenHash: tokenHash },
+          ...(telemetry?.hardwareHash ? [{ hardwareHash: telemetry.hardwareHash }] : []),
+        ],
+      },
     });
 
-    const clientIp = req.headers['x-forwarded-for']?.toString().split(',')[0].trim() || req.socket.remoteAddress || req.ip;
+    const net = resolveNetworkInfo(req);
     const finalDeviceName = (terminalName || '').trim() || device?.deviceName || `${user.fullName}'s Workstation`;
 
     if (!device) {
@@ -241,9 +328,17 @@ devicesRouter.post('/authorize-direct', async (req: Request, res: Response) => {
           deviceFingerprint: browserInfo || req.headers['user-agent'] || 'Web Browser',
           deviceTokenHash: tokenHash,
           status: 'APPROVED',
+          hardwareHash: telemetry?.hardwareHash || null,
+          gpuRenderer: telemetry?.gpuRenderer || null,
+          screenResolution: telemetry?.screenResolution || null,
+          cpuCores: telemetry?.cpuCores || null,
+          deviceMemory: telemetry?.deviceMemory || null,
+          timezone: telemetry?.timezone || null,
           approvedAt: new Date(),
           approvedBy: `${user.fullName} (${user.role})`,
-          ipAddress: clientIp,
+          ipAddress: net.ipAddress,
+          networkScope: net.networkScope,
+          locationName: net.locationName,
           lastUsedAt: new Date(),
           lastUsedBrowser: browserInfo || req.headers['user-agent'] || 'Web Browser',
         },
@@ -254,11 +349,19 @@ devicesRouter.post('/authorize-direct', async (req: Request, res: Response) => {
         data: {
           status: 'APPROVED',
           deviceName: finalDeviceName,
+          hardwareHash: device.hardwareHash || telemetry?.hardwareHash || undefined,
+          gpuRenderer: device.gpuRenderer || telemetry?.gpuRenderer || undefined,
+          screenResolution: device.screenResolution || telemetry?.screenResolution || undefined,
+          cpuCores: device.cpuCores || telemetry?.cpuCores || undefined,
+          deviceMemory: device.deviceMemory || telemetry?.deviceMemory || undefined,
+          timezone: device.timezone || telemetry?.timezone || undefined,
           approvedAt: new Date(),
           approvedBy: `${user.fullName} (${user.role})`,
           revokedAt: null,
           revokedBy: null,
-          ipAddress: clientIp,
+          ipAddress: net.ipAddress,
+          networkScope: net.networkScope,
+          locationName: net.locationName,
           lastUsedAt: new Date(),
           lastUsedBrowser: browserInfo || req.headers['user-agent'] || 'Web Browser',
         },
@@ -321,6 +424,14 @@ devicesRouter.get('/list', authenticateJWT, async (req: Request, res: Response) 
         deviceName: true,
         deviceFingerprint: true,
         status: true,
+        hardwareHash: true,
+        screenResolution: true,
+        gpuRenderer: true,
+        cpuCores: true,
+        deviceMemory: true,
+        timezone: true,
+        networkScope: true,
+        locationName: true,
         ipAddress: true,
         lastUsedAt: true,
         lastUsedBrowser: true,

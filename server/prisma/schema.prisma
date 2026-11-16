@@ -446,6 +446,15 @@ model ParishAuthorizedDevice {
   deviceTokenHash   String    @unique // SHA-256 hash of device secret key
   status            String    @default("PENDING") // "PENDING", "APPROVED", "REVOKED"
 
+  hardwareHash      String?   // Deterministic hardware signature (GPU + Screen + Cores + Platform + Timezone)
+  screenResolution  String?   // e.g. "2560x1664 (2x Retina)"
+  gpuRenderer       String?   // e.g. "Apple M2 GPU" or "Intel Iris Xe"
+  cpuCores          Int?      // e.g. 8
+  deviceMemory      String?   // e.g. "8 GB"
+  timezone          String?   // e.g. "Australia/Brisbane"
+  networkScope      String?   // "LOCAL_LAN" or "REMOTE_WAN"
+  locationName      String?   // e.g. "Parish Local Wi-Fi" or "Brisbane, QLD, AU"
+
   ipAddress         String?
   lastUsedAt        DateTime?
   lastUsedBrowser   String?
@@ -461,6 +470,7 @@ model ParishAuthorizedDevice {
   updatedAt         DateTime  @updatedAt
 
   @@index([parishId, status])
+  @@index([parishId, hardwareHash])
 }
 
 
