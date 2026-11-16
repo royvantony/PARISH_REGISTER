@@ -9,6 +9,7 @@ export type ActivityActionType =
   | 'SETTINGS_CHANGE'
   | 'USER_CHANGE'
   | 'WARD_CHANGE'
+  | 'TERMINAL_CHANGE'
   | 'SECURITY_ALERT'
   | 'FAMILY_VIEW'
   | 'FAMILY_UPDATE'

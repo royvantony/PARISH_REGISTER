@@ -44,7 +44,8 @@ import { DeveloperControlsTab } from '../components/settings/DeveloperControlsTa
 import { EmailSmtpTab } from '../components/settings/EmailSmtpTab';
 import { ActivityLogsTab } from '../components/settings/ActivityLogsTab';
 import { BackupRestoreTab } from '../components/settings/BackupRestoreTab';
-import { ShieldAlert, Shield, Archive } from 'lucide-react';
+import { AuthorizedTerminalsTab } from '../components/settings/AuthorizedTerminalsTab';
+import { ShieldAlert, Shield, Archive, Monitor } from 'lucide-react';
 
 interface SystemHealthResponse {
 
@@ -138,7 +139,7 @@ export const SettingsPage: React.FC = () => {
   } = useAuth();
   const { isFeatureEnabled, isDeveloper, getStoredFlag, isSimulatingClient } = useFeatures();
   const isDev = (isDeveloper || user?.role === 'SUPER_ADMIN') && !isSimulatingClient;
-  const [activeSubTab, setActiveSubTab] = useState<'governing' | 'dioceses' | 'email' | 'general' | 'logs' | 'backup' | 'developer'>('governing');
+  const [activeSubTab, setActiveSubTab] = useState<'governing' | 'dioceses' | 'terminals' | 'email' | 'general' | 'logs' | 'backup' | 'developer'>('governing');
 
   // Sync tab from URL query params (e.g. /settings?tab=developer)
   useEffect(() => {
@@ -146,6 +147,8 @@ export const SettingsPage: React.FC = () => {
     const tabParam = params.get('tab');
     if (tabParam === 'developer' && (isDeveloper || user?.role === 'SUPER_ADMIN')) {
       setActiveSubTab('developer');
+    } else if (tabParam === 'terminals') {
+      setActiveSubTab('terminals');
     } else if (tabParam === 'backup') {
       setActiveSubTab('backup');
     } else if (tabParam === 'email') {
@@ -617,6 +620,7 @@ export const SettingsPage: React.FC = () => {
   // Determine which sub-tabs are visible
   const showGoverning = isDev || isFeatureEnabled('SETTING_DIOCESE_BOX') || isFeatureEnabled('SETTING_PARISH_BOX');
   const showDioceses = isDev || isFeatureEnabled('SETTING_NATIVE_DIOCESES');
+  const showTerminals = isDev || user?.role === 'SUPER_ADMIN' || user?.role === 'PARISH_PRIEST' || user?.role === 'PARISH_ADMIN';
   const showEmail = isDev || isFeatureEnabled('SETTING_SMTP');
   const showGeneral = isDev || isFeatureEnabled('SETTING_SYSTEM_HEALTH');
   const showLogs = isDev || (isFeatureEnabled('SETTING_ACTIVITY_LOGS') && hasPermission('AUDIT_LOGS', 'canView'));
@@ -624,13 +628,14 @@ export const SettingsPage: React.FC = () => {
   const showDeveloper = isDeveloper || user?.role === 'SUPER_ADMIN';
 
   const hasAnyActiveTab =
-    showGoverning || showDioceses || showEmail || showGeneral || showLogs || showBackup || showDeveloper;
+    showGoverning || showDioceses || showTerminals || showEmail || showGeneral || showLogs || showBackup || showDeveloper;
 
   // Auto-switch away from hidden activeSubTab to first available tab
   useEffect(() => {
     const tabs: Array<{ id: typeof activeSubTab; visible: boolean }> = [
       { id: 'governing', visible: showGoverning },
       { id: 'dioceses', visible: showDioceses },
+      { id: 'terminals', visible: showTerminals },
       { id: 'email', visible: showEmail },
       { id: 'general', visible: showGeneral },
       { id: 'logs', visible: showLogs },
@@ -644,7 +649,7 @@ export const SettingsPage: React.FC = () => {
         setActiveSubTab(firstValid.id);
       }
     }
-  }, [showGoverning, showDioceses, showEmail, showGeneral, showLogs, showBackup, showDeveloper, activeSubTab]);
+  }, [showGoverning, showDioceses, showTerminals, showEmail, showGeneral, showLogs, showBackup, showDeveloper, activeSubTab]);
 
   if (!hasAnyActiveTab) {
     return null;
@@ -693,6 +698,19 @@ export const SettingsPage: React.FC = () => {
             {isDev && !getStoredFlag('SETTING_NATIVE_DIOCESES') && (
               <span className="text-[9px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1 py-0.2 rounded font-mono">Hidden</span>
             )}
+          </button>
+        )}
+
+        {showTerminals && (
+          <button
+            onClick={() => setActiveSubTab('terminals')}
+            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${activeSubTab === 'terminals'
+              ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
+              : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
+              }`}
+          >
+            <Monitor className="w-3.5 h-3.5" />
+            <span>Authorized Terminals</span>
           </button>
         )}
 
@@ -2205,6 +2223,10 @@ export const SettingsPage: React.FC = () => {
 
       {activeSubTab === 'email' && (
         <EmailSmtpTab />
+      )}
+
+      {activeSubTab === 'terminals' && (
+        <AuthorizedTerminalsTab />
       )}
 
       {activeSubTab === 'logs' && (

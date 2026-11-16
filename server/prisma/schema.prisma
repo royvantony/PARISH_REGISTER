@@ -107,6 +107,7 @@ model Parish {
   hideInactiveUsers      Boolean   @default(false)
   systemActivityLogs SystemActivityLog[]
   onboardingSessions OnboardingSession[]
+  authorizedDevices  ParishAuthorizedDevice[]
 
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
@@ -429,6 +430,39 @@ model OnboardingSession {
 
   @@index([parishId])
 }
+
+// ----------------------------------------------------
+// 8. AUTHORIZED TERMINALS & WORKSTATIONS
+// ----------------------------------------------------
+
+model ParishAuthorizedDevice {
+  id                Int       @id @default(autoincrement())
+  parishId          Int
+  parish            Parish    @relation(fields: [parishId], references: [id], onDelete: Cascade)
+
+  deviceName        String    // e.g. "Parish Office Desktop #1", "Fr. Sebastian Laptop"
+  deviceFingerprint String?   // OS / Platform / Architecture summary
+
+  deviceTokenHash   String    @unique // SHA-256 hash of device secret key
+  status            String    @default("PENDING") // "PENDING", "APPROVED", "REVOKED"
+
+  ipAddress         String?
+  lastUsedAt        DateTime?
+  lastUsedBrowser   String?
+  lastUsedUser      String?
+
+  approvedAt        DateTime?
+  approvedBy        String?
+
+  revokedAt         DateTime?
+  revokedBy         String?
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([parishId, status])
+}
+
 
 
 

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { api } from '../lib/api';
+import { getStoredDeviceSecret, getBrowserMetadata } from '../lib/deviceAuth';
 
 export type UserRole =
   | 'SUPER_ADMIN'
@@ -271,7 +272,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     overrideParishId?: number
   ): Promise<{ success: boolean; needsParishSelection?: boolean; error?: string }> => {
     try {
-      const res = await api.post('/auth/login', { email, password });
+      const defaultParishGuess = overrideParishId || activeParish?.id || 1;
+      const deviceToken = getStoredDeviceSecret(defaultParishGuess);
+      const browserInfo = getBrowserMetadata();
+
+      const res = await api.post('/auth/login', {
+        email,
+        password,
+        deviceToken,
+        browserInfo,
+      });
       const {
         token: receivedToken,
         user: receivedUser,

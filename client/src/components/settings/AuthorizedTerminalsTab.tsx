@@ -1,0 +1,433 @@
+import React, { useState, useEffect } from 'react';
+import { api } from '../../lib/api';
+import { Button } from '../ui/Button';
+import { Badge } from '../ui/Badge';
+import {
+  Monitor,
+  Smartphone,
+  Laptop,
+  CheckCircle2,
+  AlertTriangle,
+  Clock,
+  ShieldCheck,
+  ShieldAlert,
+  RotateCcw,
+  Trash2,
+  Info,
+} from 'lucide-react';
+
+interface TerminalDevice {
+  id: number;
+  deviceName: string;
+  deviceFingerprint: string | null;
+  status: 'PENDING' | 'APPROVED' | 'REVOKED';
+  ipAddress: string | null;
+  lastUsedAt: string | null;
+  lastUsedBrowser: string | null;
+  lastUsedUser: string | null;
+  approvedAt: string | null;
+  approvedBy: string | null;
+  revokedAt: string | null;
+  revokedBy: string | null;
+  createdAt: string;
+}
+
+export const AuthorizedTerminalsTab: React.FC = () => {
+  const [devices, setDevices] = useState<TerminalDevice[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [actionInProgressId, setActionInProgressId] = useState<number | null>(null);
+  const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const fetchDevices = async () => {
+    try {
+      setIsLoading(true);
+      const res = await api.get('/devices/list');
+      setDevices(res.data?.devices || []);
+    } catch (err: any) {
+      console.error('Failed to load terminals:', err);
+      setFeedback({
+        message: err.response?.data?.error || 'Failed to load authorized terminals.',
+        type: 'error',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDevices();
+  }, []);
+
+  const handleApprove = async (deviceId: number, name: string) => {
+    setActionInProgressId(deviceId);
+    setFeedback(null);
+    try {
+      const res = await api.post(`/devices/${deviceId}/approve`);
+      setFeedback({ message: res.data.message || `Terminal "${name}" approved.`, type: 'success' });
+      await fetchDevices();
+    } catch (err: any) {
+      setFeedback({
+        message: err.response?.data?.error || 'Failed to approve terminal.',
+        type: 'error',
+      });
+    } finally {
+      setActionInProgressId(null);
+    }
+  };
+
+  const handleRevoke = async (deviceId: number, name: string) => {
+    if (!window.confirm(`Are you sure you want to revoke "${name}"? This machine will immediately be blocked from accessing parish records.`)) {
+      return;
+    }
+
+    setActionInProgressId(deviceId);
+    setFeedback(null);
+    try {
+      const res = await api.post(`/devices/${deviceId}/revoke`);
+      setFeedback({ message: res.data.message || `Terminal "${name}" revoked.`, type: 'success' });
+      await fetchDevices();
+    } catch (err: any) {
+      setFeedback({
+        message: err.response?.data?.error || 'Failed to revoke terminal.',
+        type: 'error',
+      });
+    } finally {
+      setActionInProgressId(null);
+    }
+  };
+
+  const handleDelete = async (deviceId: number, name: string) => {
+    if (!window.confirm(`Permanently remove terminal "${name}"?`)) {
+      return;
+    }
+
+    setActionInProgressId(deviceId);
+    setFeedback(null);
+    try {
+      const res = await api.delete(`/devices/${deviceId}`);
+      setFeedback({ message: res.data.message || `Terminal "${name}" removed.`, type: 'success' });
+      await fetchDevices();
+    } catch (err: any) {
+      setFeedback({
+        message: err.response?.data?.error || 'Failed to remove terminal.',
+        type: 'error',
+      });
+    } finally {
+      setActionInProgressId(null);
+    }
+  };
+
+  const pendingDevices = devices.filter((d) => d.status === 'PENDING');
+  const approvedDevices = devices.filter((d) => d.status === 'APPROVED');
+  const revokedDevices = devices.filter((d) => d.status === 'REVOKED');
+
+  const getDeviceIcon = (fingerprint?: string | null) => {
+    const fp = (fingerprint || '').toLowerCase();
+    if (fp.includes('iphone') || fp.includes('android') || fp.includes('ios')) {
+      return <Smartphone className="w-4 h-4 text-indigo-600" />;
+    }
+    if (fp.includes('mac') || fp.includes('laptop')) {
+      return <Laptop className="w-4 h-4 text-emerald-600" />;
+    }
+    return <Monitor className="w-4 h-4 text-sky-600" />;
+  };
+
+  const formatDate = (isoString?: string | null) => {
+    if (!isoString) return '—';
+    try {
+      return new Date(isoString).toLocaleString('en-AU', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      });
+    } catch {
+      return isoString;
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Banner */}
+      <div className="p-5 rounded-2xl bg-parish-surface border border-parish-border shadow-xs flex flex-col sm:flex-row items-start justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-600 shrink-0">
+            <Monitor className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="font-extrabold text-sm text-parish-text flex items-center gap-2">
+              <span>Authorized Terminals & Workstations</span>
+              <Badge variant="success" size="sm">Core Hardware Security</Badge>
+            </h3>
+            <p className="text-xs text-parish-text-muted mt-1 leading-relaxed max-w-2xl">
+              Only physical computers and mobile devices authorized by the Parish Priest can load this parish’s software.
+              Every login and sensitive action is automatically tagged with the physical terminal name.
+            </p>
+          </div>
+        </div>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={fetchDevices}
+          isLoading={isLoading}
+          icon={<RotateCcw className="w-3.5 h-3.5" />}
+        >
+          Refresh List
+        </Button>
+      </div>
+
+      {feedback && (
+        <div
+          className={`p-3.5 rounded-xl text-xs font-semibold flex items-center gap-2 animate-in fade-in ${feedback.type === 'success'
+              ? 'bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 text-emerald-800 dark:text-emerald-300'
+              : 'bg-rose-50 dark:bg-rose-950/30 border border-rose-200 text-rose-800 dark:text-rose-300'
+            }`}
+        >
+          {feedback.type === 'success' ? (
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          ) : (
+            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+          )}
+          <span>{feedback.message}</span>
+        </div>
+      )}
+
+      {/* Summary KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="p-4 rounded-xl bg-parish-surface border border-parish-border shadow-2xs">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-parish-text-muted">Active Workstations</span>
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+          </div>
+          <div className="text-2xl font-black text-parish-text mt-2">{approvedDevices.length}</div>
+          <p className="text-[11px] text-parish-text-muted mt-0.5">Approved for registry access</p>
+        </div>
+
+        <div className="p-4 rounded-xl bg-parish-surface border border-parish-border shadow-2xs">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-parish-text-muted">Pending Approvals</span>
+            <Clock className={`w-4 h-4 ${pendingDevices.length > 0 ? 'text-amber-600 animate-pulse' : 'text-slate-400'}`} />
+          </div>
+          <div className={`text-2xl font-black mt-2 ${pendingDevices.length > 0 ? 'text-amber-600' : 'text-parish-text'}`}>
+            {pendingDevices.length}
+          </div>
+          <p className="text-[11px] text-parish-text-muted mt-0.5">Awaiting pastoral review</p>
+        </div>
+
+        <div className="p-4 rounded-xl bg-parish-surface border border-parish-border shadow-2xs">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-parish-text-muted">Revoked / Inactive</span>
+            <ShieldAlert className="w-4 h-4 text-rose-600" />
+          </div>
+          <div className="text-2xl font-black text-parish-text mt-2">{revokedDevices.length}</div>
+          <p className="text-[11px] text-parish-text-muted mt-0.5">Decommissioned terminals</p>
+        </div>
+      </div>
+
+      {/* Section 1: Pending Approvals (High Priority) */}
+      {pendingDevices.length > 0 && (
+        <div className="p-5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-300 dark:border-amber-800/60 shadow-xs space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+              </span>
+              <h4 className="font-extrabold text-sm text-parish-text">
+                Pending Terminal Approvals ({pendingDevices.length})
+              </h4>
+            </div>
+            <span className="text-[11px] text-amber-900 dark:text-amber-200 font-medium">
+              Action Required to Grant Access
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            {pendingDevices.map((d) => (
+              <div
+                key={d.id}
+                className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-amber-200/80 dark:border-amber-800/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-2xs"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-amber-100/70 dark:bg-amber-900/40 text-amber-700 shrink-0 mt-0.5">
+                    {getDeviceIcon(d.deviceFingerprint)}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-sm text-parish-text">{d.deviceName}</span>
+                      <Badge variant="warning" size="sm">Pending Approval</Badge>
+                    </div>
+                    <p className="text-xs text-parish-text-muted mt-0.5">
+                      Platform: <span className="font-medium text-parish-text">{d.deviceFingerprint || 'Web Browser'}</span>
+                      {d.ipAddress && <span className="ml-2 font-mono text-[11px]">({d.ipAddress})</span>}
+                    </p>
+                    <p className="text-[11px] text-parish-text-muted mt-0.5 flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      <span>Requested: {formatDate(d.createdAt)}</span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => handleApprove(d.id, d.deviceName)}
+                    isLoading={actionInProgressId === d.id}
+                    icon={<CheckCircle2 className="w-3.5 h-3.5" />}
+                  >
+                    Approve Terminal
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDelete(d.id, d.deviceName)}
+                    disabled={actionInProgressId === d.id}
+                    className="text-rose-600 hover:text-rose-700 hover:border-rose-300"
+                  >
+                    Reject
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Section 2: Active Authorized Terminals */}
+      <div className="p-5 rounded-2xl bg-parish-surface border border-parish-border shadow-xs space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm font-bold text-parish-text">
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <span>Active Authorized Terminals ({approvedDevices.length})</span>
+          </div>
+          <span className="text-[11px] text-parish-text-muted">
+            Computers with full portal access
+          </span>
+        </div>
+
+        {approvedDevices.length === 0 ? (
+          <div className="py-8 text-center text-xs text-parish-text-muted border border-dashed border-parish-border rounded-xl">
+            No active workstations currently authorized. When an office computer or pastoral device enrolls, it will appear here.
+          </div>
+        ) : (
+          <div className="divide-y divide-parish-border">
+            {approvedDevices.map((d) => (
+              <div
+                key={d.id}
+                className="py-3.5 first:pt-1 last:pb-1 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 shrink-0 mt-0.5">
+                    {getDeviceIcon(d.deviceFingerprint)}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-sm text-parish-text">{d.deviceName}</span>
+                      <Badge variant="success" size="sm">Active</Badge>
+                    </div>
+                    <p className="text-xs text-parish-text-muted mt-0.5">
+                      Platform: <span className="font-medium text-parish-text">{d.deviceFingerprint || 'Web Browser'}</span>
+                      {d.lastUsedBrowser && d.lastUsedBrowser !== d.deviceFingerprint && (
+                        <span className="text-[11px] ml-1.5 font-mono text-parish-text-muted">[{d.lastUsedBrowser}]</span>
+                      )}
+                    </p>
+                    <div className="flex items-center gap-3 text-[11px] text-parish-text-muted mt-1 flex-wrap">
+                      <span>Last active: <strong>{formatDate(d.lastUsedAt)}</strong></span>
+                      {d.lastUsedUser && (
+                        <span>User: <strong className="text-parish-text">{d.lastUsedUser}</strong></span>
+                      )}
+                      {d.approvedBy && (
+                        <span>Approved by: <strong>{d.approvedBy}</strong></span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleRevoke(d.id, d.deviceName)}
+                    isLoading={actionInProgressId === d.id}
+                    icon={<ShieldAlert className="w-3.5 h-3.5 text-rose-600" />}
+                    className="text-xs hover:border-rose-300 hover:text-rose-600"
+                  >
+                    Revoke Access
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Section 3: Revoked / Decommissioned Terminals */}
+      {revokedDevices.length > 0 && (
+        <div className="p-5 rounded-2xl bg-parish-surface border border-parish-border shadow-xs space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm font-bold text-parish-text">
+              <ShieldAlert className="w-4 h-4 text-rose-600" />
+              <span>Revoked / Blocked Terminals ({revokedDevices.length})</span>
+            </div>
+            <span className="text-[11px] text-parish-text-muted">
+              Access permanently severed
+            </span>
+          </div>
+
+          <div className="divide-y divide-parish-border">
+            {revokedDevices.map((d) => (
+              <div
+                key={d.id}
+                className="py-3 first:pt-1 last:pb-1 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 opacity-85"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-rose-50 dark:bg-rose-950/30 text-rose-600 shrink-0 mt-0.5">
+                    {getDeviceIcon(d.deviceFingerprint)}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-sm text-parish-text line-through">{d.deviceName}</span>
+                      <Badge variant="subtle" size="sm" className="text-rose-700 bg-rose-100/60">Revoked</Badge>
+                    </div>
+                    <p className="text-xs text-parish-text-muted mt-0.5">
+                      Platform: {d.deviceFingerprint || 'Web Browser'} • Revoked by: {d.revokedBy || 'Parish Priest'} on {formatDate(d.revokedAt)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleApprove(d.id, d.deviceName)}
+                    isLoading={actionInProgressId === d.id}
+                    icon={<RotateCcw className="w-3.5 h-3.5 text-emerald-600" />}
+                  >
+                    Re-Authorize
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDelete(d.id, d.deviceName)}
+                    disabled={actionInProgressId === d.id}
+                    icon={<Trash2 className="w-3.5 h-3.5 text-slate-400" />}
+                    title="Delete permanently"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Security Info Card */}
+      <div className="p-4 rounded-xl bg-parish-surface-subtle border border-parish-border text-xs text-parish-text-muted flex items-start gap-3">
+        <Info className="w-4 h-4 text-parish-primary shrink-0 mt-0.5" />
+        <div className="leading-relaxed">
+          <strong>How Terminal Security Works:</strong> When an office desktop, pastoral laptop, or tablet accesses this portal for the first time, it registers a cryptographic hardware token with the parish. Once approved by the Parish Priest, the machine is authorized for all staff members who have valid user accounts. Revoking a terminal blocks all access from that physical machine across Google Chrome, Microsoft Edge, and all other browsers immediately.
+        </div>
+      </div>
+    </div>
+  );
+};
+

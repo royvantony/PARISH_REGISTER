@@ -8,13 +8,14 @@ import { UserRole } from '@prisma/client';
 import { sendParishEmail } from '../lib/email.js';
 import { logSystemActivity } from '../lib/activityLogger.js';
 import { getJwtSecret, JWT_EXPIRES_IN } from '../lib/crypto.js';
+import { hashDeviceSecret } from './devices.js';
 
 export const authRouter = Router();
 
 // POST /api/auth/login
 authRouter.post('/login', async (req: Request, res: Response) => {
   try {
-    const { email, username, password } = req.body;
+    const { email, username, password, deviceToken, browserInfo } = req.body;
     const identifier = ((email || username || '') as string).trim().toLowerCase();
 
     if (!identifier || !password) {
@@ -70,7 +71,32 @@ authRouter.post('/login', async (req: Request, res: Response) => {
 
     const token = jwt.sign(payload, getJwtSecret(), { expiresIn: JWT_EXPIRES_IN });
 
+    // Resolve authorized terminal metadata if deviceToken was supplied
+    let terminalName = '';
+    if (deviceToken && user.parishId) {
+      try {
+        const tokenHash = hashDeviceSecret(deviceToken);
+        const dev = await prisma.parishAuthorizedDevice.findFirst({
+          where: { parishId: user.parishId, deviceTokenHash: tokenHash, status: 'APPROVED' },
+        });
+        if (dev) {
+          terminalName = dev.deviceName;
+          await prisma.parishAuthorizedDevice.update({
+            where: { id: dev.id },
+            data: {
+              lastUsedAt: new Date(),
+              lastUsedUser: user.fullName,
+              lastUsedBrowser: browserInfo || req.headers['user-agent'] || 'Web Browser',
+            },
+          });
+        }
+      } catch (err) {
+        console.error('Failed to resolve terminal metadata:', err);
+      }
+    }
+
     // Record successful login in system activity log
+    const terminalDesc = terminalName ? ` from "${terminalName}" (${browserInfo || 'Browser'})` : '';
     await logSystemActivity({
       parishId: user.parishId || 1,
       userId: user.id,
@@ -78,7 +104,7 @@ authRouter.post('/login', async (req: Request, res: Response) => {
       userRole: user.role,
       actionType: 'LOGIN',
       category: 'AUTH',
-      description: `User "${user.fullName}" (${user.role}) logged in successfully`,
+      description: `User "${user.fullName}" (${user.role}) logged in successfully${terminalDesc}.`,
       req,
     });
 
