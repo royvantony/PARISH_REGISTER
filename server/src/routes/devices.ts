@@ -537,6 +537,8 @@ devicesRouter.post('/bootstrap-otp/verify', async (req: Request, res: Response) 
       },
     });
 
+    realtimeHub.emitTerminalApproved(approvedDevice.id, approvedDevice.deviceName);
+
     await logSystemActivity({
       parishId: pid,
       userId: record.userId,

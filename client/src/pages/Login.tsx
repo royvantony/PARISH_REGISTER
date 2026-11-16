@@ -535,7 +535,7 @@ export const LoginPage: React.FC = () => {
               <span>Redirecting to Parish Portal...</span>
             </div>
           </div>
-        ) : terminalStatus === 'PENDING' && !isDevRevealed ? (
+        ) : terminalStatus === 'PENDING' ? (
           /* ================================================================= */
           /* 1. WORKSTATION ADMINISTRATOR APPROVAL REQUIRED FOR USER           */
           /* ================================================================= */
@@ -683,8 +683,27 @@ export const LoginPage: React.FC = () => {
             >
               ← Sign in as a different user
             </button>
+
+            {isDevRevealed && visibleDevAccounts.length > 0 && (
+              <div className="pt-3 border-t border-parish-border space-y-2 text-left">
+                <div className="text-[10px] uppercase font-bold text-parish-text-muted">
+                  Developer Bypass
+                </div>
+                {visibleDevAccounts.map((acct) => (
+                  <button
+                    key={acct.email}
+                    type="button"
+                    onClick={() => handleDevBypass(acct.email)}
+                    className="w-full text-left p-2 rounded-xl text-xs bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-between font-medium cursor-pointer"
+                  >
+                    <span>{acct.label}</span>
+                    <span className="text-[10px] text-parish-text-muted font-mono">{acct.roleHint}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        ) : terminalStatus === 'REVOKED' && !isDevRevealed ? (
+        ) : terminalStatus === 'REVOKED' ? (
           /* ================================================================= */
           /* 2. TERMINAL ACCESS REVOKED                                        */
           /* ================================================================= */
