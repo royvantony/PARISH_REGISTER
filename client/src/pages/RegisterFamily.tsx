@@ -8,6 +8,7 @@ import { ConfirmButton } from '../components/ui/ConfirmButton';
 import { ConfirmDeleteButton } from '../components/ui/ConfirmDeleteButton';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import {
   ArrowLeft,
   Users,
@@ -94,6 +95,10 @@ export const RegisterFamilyPage: React.FC = () => {
   // Approval option (for users with approval permission)
   const [activateImmediately, setActivateImmediately] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+
+  // Type change confirmation
+  const [pendingTypeChange, setPendingTypeChange] = useState<'INDIVIDUAL_STUDENT' | 'INDIVIDUAL' | null>(null);
+  const [showTypeChangeConfirm, setShowTypeChangeConfirm] = useState(false);
 
   // Status & Validation
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -327,6 +332,22 @@ export const RegisterFamilyPage: React.FC = () => {
     );
   }
 
+  const handleSelectRegistrationType = (newType: 'FAMILY' | 'INDIVIDUAL_STUDENT' | 'INDIVIDUAL') => {
+    if (newType === registrationType) return;
+
+    const hasEnteredFamilyData =
+      (hasSpouse && Boolean(spouseName.trim())) ||
+      children.some((c) => Boolean(c.fullName.trim()));
+
+    if (registrationType === 'FAMILY' && newType !== 'FAMILY' && hasEnteredFamilyData) {
+      setPendingTypeChange(newType);
+      setShowTypeChangeConfirm(true);
+      return;
+    }
+
+    setRegistrationType(newType);
+  };
+
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-12">
       {/* Header */}
@@ -380,7 +401,7 @@ export const RegisterFamilyPage: React.FC = () => {
               <button
                 key={t.type}
                 type="button"
-                onClick={() => setRegistrationType(t.type as any)}
+                onClick={() => handleSelectRegistrationType(t.type as any)}
                 className={`p-3.5 rounded-xl border text-left transition-all ${registrationType === t.type
                   ? 'border-parish-primary bg-parish-primary-light/50 ring-1 ring-parish-primary text-parish-text'
                   : 'border-parish-border bg-white text-parish-text-muted hover:border-parish-text-muted/60'
@@ -1014,6 +1035,25 @@ export const RegisterFamilyPage: React.FC = () => {
           </div>
         </div>
       </Modal>
+
+      {/* Confirm changing Registration Type from Family to Individual */}
+      <ConfirmDialog
+        isOpen={showTypeChangeConfirm}
+        title="Change Registration to Individual?"
+        message="Warning: Changing this registration from Family to Individual will remove the entered spouse and child/dependent details. All entered family data will be lost. Are you sure you want to proceed?"
+        confirmLabel="Yes, Change to Individual"
+        cancelLabel="Keep as Family"
+        variant="danger"
+        onConfirm={() => {
+          if (pendingTypeChange) setRegistrationType(pendingTypeChange);
+          setShowTypeChangeConfirm(false);
+          setPendingTypeChange(null);
+        }}
+        onClose={() => {
+          setShowTypeChangeConfirm(false);
+          setPendingTypeChange(null);
+        }}
+      />
     </div>
   );
 };

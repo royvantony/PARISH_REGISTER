@@ -35,6 +35,7 @@ import {
   Edit2,
   Trash2,
   Tag,
+  AlertTriangle,
 } from 'lucide-react';
 import { InactivateFamilyModal } from '../components/families/InactivateFamilyModal';
 import { ApproveFamilyModal } from '../components/families/ApproveFamilyModal';
@@ -125,6 +126,16 @@ export const EditFamilyPage: React.FC = () => {
 
   // General & Pastoral Notes
   const [generalNotes, setGeneralNotes] = useState('');
+
+  // Original household baseline (for conversion confirmation & data-loss protection)
+  const [originalRegistrationType, setOriginalRegistrationType] = useState<'FAMILY' | 'INDIVIDUAL_STUDENT' | 'INDIVIDUAL'>('FAMILY');
+  const [originalFamilyMembers, setOriginalFamilyMembers] = useState<any[]>([]);
+
+  // Modals for family to individual conversion confirmation
+  const [pendingTypeChange, setPendingTypeChange] = useState<'INDIVIDUAL_STUDENT' | 'INDIVIDUAL' | null>(null);
+  const [showTypeChangeConfirm, setShowTypeChangeConfirm] = useState(false);
+  const [showSaveLossConfirm, setShowSaveLossConfirm] = useState(false);
+  const [pendingSavePayload, setPendingSavePayload] = useState<any>(null);
 
   // Action status
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -293,6 +304,8 @@ export const EditFamilyPage: React.FC = () => {
       setStatus(f.status || 'ACTIVE');
       setFamilyCode(f.familyCode || null);
       setRegistrationType(f.registrationType || 'FAMILY');
+      setOriginalRegistrationType(f.registrationType || 'FAMILY');
+      setOriginalFamilyMembers(f.members || []);
       setHouseName(f.houseName || '');
       setSelectedUnitId(f.unitId ? String(f.unitId) : 'UNASSIGNED');
 
@@ -495,6 +508,53 @@ export const EditFamilyPage: React.FC = () => {
     return { valid: true, payload };
   };
 
+  // Check if changing from Family to Individual will cause member loss
+  const hasOmittedFamilyMembers = useMemo(() => {
+    if (registrationType === 'FAMILY') return false;
+    const wasFamily = originalRegistrationType === 'FAMILY';
+    const hasSpouseData = (hasSpouse && Boolean(spouseName.trim())) || originalFamilyMembers.some((m) => m.role === 'SPOUSE');
+    const hasChildrenData = children.some((c) => Boolean(c.fullName.trim())) || originalFamilyMembers.some((m) => m.role === 'CHILD' || m.role === 'OTHER_DEPENDENT');
+    return wasFamily && (hasSpouseData || hasChildrenData);
+  }, [registrationType, originalRegistrationType, hasSpouse, spouseName, children, originalFamilyMembers]);
+
+  const membersToDeleteCount = useMemo(() => {
+    let count = 0;
+    if (hasSpouse && spouseName.trim()) count++;
+    else if (originalFamilyMembers.some((m) => m.role === 'SPOUSE')) count++;
+
+    const activeChildCount = children.filter((c) => Boolean(c.fullName.trim())).length;
+    const origChildCount = originalFamilyMembers.filter((m) => m.role === 'CHILD' || m.role === 'OTHER_DEPENDENT').length;
+    count += Math.max(activeChildCount, origChildCount);
+
+    return count;
+  }, [hasSpouse, spouseName, children, originalFamilyMembers]);
+
+  const handleSelectRegistrationType = (newType: 'FAMILY' | 'INDIVIDUAL_STUDENT' | 'INDIVIDUAL') => {
+    if (newType === registrationType) return;
+
+    // If switching from FAMILY to an INDIVIDUAL type and there are existing spouse or child records
+    const hasExistingMembers =
+      (hasSpouse && Boolean(spouseName.trim())) ||
+      children.some((c) => Boolean(c.fullName.trim())) ||
+      originalFamilyMembers.some((m) => m.role === 'SPOUSE' || m.role === 'CHILD' || m.role === 'OTHER_DEPENDENT');
+
+    if (registrationType === 'FAMILY' && newType !== 'FAMILY' && hasExistingMembers) {
+      setPendingTypeChange(newType);
+      setShowTypeChangeConfirm(true);
+      return;
+    }
+
+    setRegistrationType(newType);
+  };
+
+  const handleConfirmTypeChange = () => {
+    if (pendingTypeChange) {
+      setRegistrationType(pendingTypeChange);
+      setPendingTypeChange(null);
+    }
+    setShowTypeChangeConfirm(false);
+  };
+
   // Pre-save validation hook for ConfirmButton
   const validateBeforeSave = (): boolean => {
     setErrorMessage(null);
@@ -520,9 +580,20 @@ export const EditFamilyPage: React.FC = () => {
       return;
     }
 
+    // Critical: If changing from Family to Individual and there are existing members, require explicit user confirmation
+    if (hasOmittedFamilyMembers) {
+      setPendingSavePayload(check.payload);
+      setShowSaveLossConfirm(true);
+      return;
+    }
+
+    await executeSave(check.payload);
+  };
+
+  const executeSave = async (payloadToSave: any) => {
     try {
       setIsSubmitting(true);
-      await api.put(`/families/${id}`, check.payload);
+      await api.put(`/families/${id}`, payloadToSave);
       setSuccessMessage('Household record and family members updated successfully.');
       setTimeout(() => setSuccessMessage(null), 4000);
       loadFamilyData();
@@ -531,6 +602,8 @@ export const EditFamilyPage: React.FC = () => {
       setErrorMessage(err.response?.data?.error || 'Failed to update record. Please verify the details.');
     } finally {
       setIsSubmitting(false);
+      setPendingSavePayload(null);
+      setShowSaveLossConfirm(false);
     }
   };
 
@@ -541,6 +614,11 @@ export const EditFamilyPage: React.FC = () => {
     if (!check.valid) {
       setErrorMessage(check.error || 'Please complete all required fields before approving.');
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (hasOmittedFamilyMembers) {
+      setPendingSavePayload(check.payload);
+      setShowSaveLossConfirm(true);
       return;
     }
     setCurrentApprovePayload(check.payload);
@@ -847,7 +925,7 @@ export const EditFamilyPage: React.FC = () => {
                 <button
                   key={item.type}
                   type="button"
-                  onClick={() => setRegistrationType(item.type as any)}
+                  onClick={() => handleSelectRegistrationType(item.type as any)}
                   className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${isSelected
                     ? 'border-parish-primary bg-emerald-50/40 shadow-xs'
                     : 'border-parish-border bg-parish-surface hover:border-parish-text-muted'
@@ -868,6 +946,43 @@ export const EditFamilyPage: React.FC = () => {
               );
             })}
           </div>
+
+          {/* Critical Warning Banner: Family Members will be removed */}
+          {hasOmittedFamilyMembers && (
+            <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border-2 border-rose-300 dark:border-rose-800 text-rose-900 dark:text-rose-200 text-xs space-y-2 animate-in fade-in">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-xl bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 shrink-0">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="font-extrabold text-sm text-rose-950 dark:text-rose-100 flex items-center gap-2">
+                    <span>Critical Warning: Family Members Will Be Removed</span>
+                    <Badge variant="danger" size="sm">Data Loss on Save</Badge>
+                  </h4>
+                  <p className="leading-relaxed text-rose-800 dark:text-rose-300">
+                    This household currently contains <strong>{membersToDeleteCount} registered family member(s)</strong> (spouse and children/dependents).
+                    Changing this household to <strong>{registrationType === 'INDIVIDUAL_STUDENT' ? 'Student' : 'Individual'}</strong> and saving will
+                    <strong> permanently delete all spouse and children records</strong> from the Parish Register.
+                  </p>
+                  <p className="font-bold text-rose-900 dark:text-rose-200">
+                    ⚠️ All saved data will be lost and cannot revert back once saved.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 pt-1 pl-10">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setRegistrationType('FAMILY')}
+                  icon={<RotateCcw className="w-3.5 h-3.5 text-parish-primary" />}
+                  className="bg-white dark:bg-slate-900 border-rose-300 hover:bg-rose-100 text-rose-800 font-bold"
+                >
+                  Keep as Family Household (Revert Type)
+                </Button>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
             <div>
@@ -1731,6 +1846,39 @@ export const EditFamilyPage: React.FC = () => {
           onClose={() => setDeletingDirectDebit(null)}
         />
       )}
+
+      {/* 1. Confirm changing Household Type from Family to Individual */}
+      <ConfirmDialog
+        isOpen={showTypeChangeConfirm}
+        title="Change Household from Family to Individual?"
+        message="Warning: If you change this household from Family to Individual, all registered members, spouse, and kids details will be removed. All saved data will be lost and cannot revert back once saved. Are you sure you want to change to Individual?"
+        confirmLabel="Yes, Change to Individual"
+        cancelLabel="Keep as Family"
+        variant="danger"
+        onConfirm={handleConfirmTypeChange}
+        onClose={() => {
+          setShowTypeChangeConfirm(false);
+          setPendingTypeChange(null);
+        }}
+      />
+
+      {/* 2. Confirm Final Save with Member Removal */}
+      <ConfirmDialog
+        isOpen={showSaveLossConfirm}
+        title="Confirm Permanent Removal of Family Members"
+        message={`Critical: You have changed this household to ${
+          registrationType === 'INDIVIDUAL_STUDENT' ? 'Student' : 'Individual'
+        }. Saving now will permanently remove ${membersToDeleteCount} registered family member(s) (spouse and kids details) from the Parish Register. All saved data will be lost and cannot revert back once saved. Do you want to proceed and save?`}
+        confirmLabel="Yes, Save & Permanently Remove Members"
+        cancelLabel="Cancel & Review Household"
+        variant="danger"
+        isLoading={isSubmitting}
+        onConfirm={() => pendingSavePayload && executeSave(pendingSavePayload)}
+        onClose={() => {
+          setShowSaveLossConfirm(false);
+          setPendingSavePayload(null);
+        }}
+      />
 
       {/* Household Registration Dossier Print Preview Modal */}
       <HouseholdDossierModal
