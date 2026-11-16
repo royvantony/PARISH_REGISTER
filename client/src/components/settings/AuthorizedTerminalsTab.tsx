@@ -24,6 +24,10 @@ interface TerminalDevice {
   deviceName: string;
   deviceFingerprint: string | null;
   status: 'PENDING' | 'APPROVED' | 'REVOKED';
+  registeredUserId?: number | null;
+  registeredByName?: string | null;
+  registeredByEmail?: string | null;
+  registeredByRole?: string | null;
   hardwareHash?: string | null;
   screenResolution?: string | null;
   gpuRenderer?: string | null;
@@ -278,6 +282,20 @@ export const AuthorizedTerminalsTab: React.FC = () => {
                           <Wifi className="w-3 h-3 text-emerald-600" />
                           <span>Parish Local Network (LAN / Wi-Fi) {d.ipAddress ? `• ${d.ipAddress}` : ''}</span>
                         </span>
+                      )}
+                    </div>
+
+                    {/* Prominent User Identity Request Banner */}
+                    <div className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-100/70 dark:bg-amber-950/40 border border-amber-300/80 text-xs flex-wrap">
+                      <span className="font-bold text-amber-900 dark:text-amber-200">User Requesting Access:</span>
+                      <strong className="text-sm text-parish-text">{d.registeredByName || d.lastUsedUser || 'Verified Parish User'}</strong>
+                      {d.registeredByRole && (
+                        <span className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold text-[11px] border border-slate-200 dark:border-slate-700">
+                          {d.registeredByRole}
+                        </span>
+                      )}
+                      {d.registeredByEmail && (
+                        <span className="text-slate-500 text-[11px]">({d.registeredByEmail})</span>
                       )}
                     </div>
 

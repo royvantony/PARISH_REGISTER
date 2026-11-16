@@ -129,6 +129,7 @@ model ParishUser {
   isActive       Boolean     @default(true)
   mustChangePassword Boolean @default(false)
   overrides      UserPermissionOverride[]
+  registeredDevices ParishAuthorizedDevice[]
 
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
@@ -445,6 +446,12 @@ model ParishAuthorizedDevice {
 
   deviceTokenHash   String    @unique // SHA-256 hash of device secret key
   status            String    @default("PENDING") // "PENDING", "APPROVED", "REVOKED"
+
+  registeredUserId  Int?
+  registeredUser    ParishUser? @relation(fields: [registeredUserId], references: [id], onDelete: SetNull)
+  registeredByName  String?   // User full name when registering
+  registeredByEmail String?   // User email when registering
+  registeredByRole  String?   // User role when registering
 
   hardwareHash      String?   // Deterministic hardware signature (GPU + Screen + Cores + Platform + Timezone)
   screenResolution  String?   // e.g. "2560x1664 (2x Retina)"

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { api } from '../lib/api';
-import { getStoredDeviceSecret, getBrowserMetadata } from '../lib/deviceAuth';
+import { getStoredDeviceSecret, getBrowserMetadata, collectHardwareTelemetry } from '../lib/deviceAuth';
 
 export type UserRole =
   | 'SUPER_ADMIN'
@@ -100,7 +100,13 @@ export interface AuthContextType {
     email: string,
     password: string,
     overrideParishId?: number
-  ) => Promise<{ success: boolean; needsParishSelection?: boolean; error?: string }>;
+  ) => Promise<{
+    success: boolean;
+    needsParishSelection?: boolean;
+    needsDeviceApproval?: boolean;
+    deviceApprovalData?: any;
+    error?: string;
+  }>;
   devLogin: (
     email: string,
     overrideParishId?: number
@@ -270,16 +276,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     email: string,
     password: string,
     overrideParishId?: number
-  ): Promise<{ success: boolean; needsParishSelection?: boolean; error?: string }> => {
+  ): Promise<{
+    success: boolean;
+    needsParishSelection?: boolean;
+    needsDeviceApproval?: boolean;
+    deviceApprovalData?: any;
+    error?: string;
+  }> => {
     try {
       const defaultParishGuess = overrideParishId || activeParish?.id || 1;
       const deviceToken = getStoredDeviceSecret(defaultParishGuess);
       const browserInfo = getBrowserMetadata();
+      const telemetry = collectHardwareTelemetry();
 
       const res = await api.post('/auth/login', {
         email,
         password,
         deviceToken,
+        hardwareHash: telemetry.hardwareHash,
+        telemetry,
         browserInfo,
       });
       const {
@@ -328,6 +343,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       return { success: true, needsParishSelection: false };
     } catch (err: any) {
+      if (err.response?.data?.needsDeviceApproval) {
+        return {
+          success: false,
+          needsDeviceApproval: true,
+          deviceApprovalData: err.response.data,
+          error: err.response.data.message,
+        };
+      }
       const errorMsg = err.response?.data?.error || 'Invalid email or password. Please try again.';
       return { success: false, error: errorMsg };
     }

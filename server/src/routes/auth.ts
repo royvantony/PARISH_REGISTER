@@ -8,14 +8,14 @@ import { UserRole } from '@prisma/client';
 import { sendParishEmail } from '../lib/email.js';
 import { logSystemActivity } from '../lib/activityLogger.js';
 import { getJwtSecret, JWT_EXPIRES_IN } from '../lib/crypto.js';
-import { hashDeviceSecret } from './devices.js';
+import { hashDeviceSecret, resolveNetworkInfo } from './devices.js';
 
 export const authRouter = Router();
 
 // POST /api/auth/login
 authRouter.post('/login', async (req: Request, res: Response) => {
   try {
-    const { email, username, password, deviceToken, browserInfo } = req.body;
+    const { email, username, password, deviceToken, hardwareHash, telemetry, browserInfo, deviceName } = req.body;
     const identifier = ((email || username || '') as string).trim().toLowerCase();
 
     if (!identifier || !password) {
@@ -60,6 +60,209 @@ authRouter.post('/login', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
 
+    // ----------------------------------------------------
+    // USER-FIRST ZERO-TRUST DEVICE VERIFICATION
+    // Credentials valid. Now verify if this workstation is authorized.
+    // ----------------------------------------------------
+    const activeParishId = user.parishId || 1;
+    const net = resolveNetworkInfo(req);
+    const tokenHash = deviceToken ? hashDeviceSecret(deviceToken) : null;
+
+    // Check if any approved devices exist in this parish (Bootstrap Check)
+    const approvedDevicesCount = await prisma.parishAuthorizedDevice.count({
+      where: { parishId: activeParishId, status: 'APPROVED' },
+    });
+
+    const isParishLeader = user.role === 'PARISH_PRIEST' || user.role === 'SUPER_ADMIN';
+
+    // Find existing device by token OR by deterministic hardware signature
+    let device = null;
+    if (tokenHash) {
+      device = await prisma.parishAuthorizedDevice.findFirst({
+        where: { parishId: activeParishId, deviceTokenHash: tokenHash },
+      });
+    }
+
+    if (!device && hardwareHash) {
+      device = await prisma.parishAuthorizedDevice.findFirst({
+        where: { parishId: activeParishId, hardwareHash: hardwareHash },
+      });
+    }
+
+    // 1. Genesis Bootstrap: 0 approved terminals exist & logging in as Priest / Super Admin
+    if (approvedDevicesCount === 0 && isParishLeader) {
+      const defaultDeviceName = (deviceName || '').trim() || `${user.fullName}'s Primary Workstation`;
+      const finalTokenHash = tokenHash || hashDeviceSecret(`boot_${Date.now()}_${Math.random()}`);
+
+      if (device) {
+        device = await prisma.parishAuthorizedDevice.update({
+          where: { id: device.id },
+          data: {
+            status: 'APPROVED',
+            deviceName: defaultDeviceName,
+            registeredUserId: user.id,
+            registeredByName: user.fullName,
+            registeredByEmail: user.email,
+            registeredByRole: user.role,
+            approvedAt: new Date(),
+            approvedBy: 'System Bootstrap (First Primary Workstation)',
+            lastUsedAt: new Date(),
+            lastUsedUser: user.fullName,
+            lastUsedBrowser: browserInfo || req.headers['user-agent'] || 'Web Browser',
+            ipAddress: net.ipAddress,
+            networkScope: net.networkScope,
+            locationName: net.locationName,
+          },
+        });
+      } else {
+        device = await prisma.parishAuthorizedDevice.create({
+          data: {
+            parishId: activeParishId,
+            deviceName: defaultDeviceName,
+            deviceFingerprint: browserInfo || req.headers['user-agent'] || 'Web Browser',
+            deviceTokenHash: finalTokenHash,
+            status: 'APPROVED',
+            registeredUserId: user.id,
+            registeredByName: user.fullName,
+            registeredByEmail: user.email,
+            registeredByRole: user.role,
+            hardwareHash: hardwareHash || telemetry?.hardwareHash || null,
+            gpuRenderer: telemetry?.gpuRenderer || null,
+            screenResolution: telemetry?.screenResolution || null,
+            cpuCores: telemetry?.cpuCores || null,
+            deviceMemory: telemetry?.deviceMemory || null,
+            timezone: telemetry?.timezone || null,
+            approvedAt: new Date(),
+            approvedBy: 'System Bootstrap (First Primary Workstation)',
+            ipAddress: net.ipAddress,
+            networkScope: net.networkScope,
+            locationName: net.locationName,
+            lastUsedAt: new Date(),
+            lastUsedUser: user.fullName,
+            lastUsedBrowser: browserInfo || req.headers['user-agent'] || 'Web Browser',
+          },
+        });
+      }
+
+      await logSystemActivity({
+        parishId: activeParishId,
+        userId: user.id,
+        userName: user.fullName,
+        userRole: user.role,
+        actionType: 'TERMINAL_CHANGE',
+        category: 'SECURITY',
+        description: `Primary parish workstation "${device.deviceName}" initialized and auto-authorized for ${user.fullName} (${user.role}).`,
+        req,
+      });
+    }
+
+    // 2. Blocked / Revoked Device
+    if (device && device.status === 'REVOKED') {
+      await logSystemActivity({
+        parishId: activeParishId,
+        userId: user.id,
+        userName: user.fullName,
+        userRole: user.role,
+        actionType: 'LOGIN_FAILED',
+        category: 'SECURITY',
+        description: `Blocked login attempt by ${user.fullName} (${user.role}) from revoked workstation "${device.deviceName}".`,
+        req,
+      });
+
+      return res.status(403).json({
+        error: `Terminal Access Blocked: This workstation ("${device.deviceName}") was revoked by parish administration. Access is denied.`,
+        isRevokedTerminal: true,
+      });
+    }
+
+    // 3. Unapproved Device: Needs Pastoral Approval!
+    if (!device || device.status !== 'APPROVED') {
+      const autoDeviceName = (deviceName || '').trim() || `${user.fullName}'s ${telemetry?.platformSummary || 'Workstation'}`;
+      const finalTokenHash = tokenHash || hashDeviceSecret(`dev_${Date.now()}_${Math.random()}`);
+
+      if (!device) {
+        device = await prisma.parishAuthorizedDevice.create({
+          data: {
+            parishId: activeParishId,
+            deviceName: autoDeviceName,
+            deviceFingerprint: browserInfo || req.headers['user-agent'] || 'Web Browser',
+            deviceTokenHash: finalTokenHash,
+            status: 'PENDING',
+            registeredUserId: user.id,
+            registeredByName: user.fullName,
+            registeredByEmail: user.email,
+            registeredByRole: user.role,
+            hardwareHash: hardwareHash || telemetry?.hardwareHash || null,
+            gpuRenderer: telemetry?.gpuRenderer || null,
+            screenResolution: telemetry?.screenResolution || null,
+            cpuCores: telemetry?.cpuCores || null,
+            deviceMemory: telemetry?.deviceMemory || null,
+            timezone: telemetry?.timezone || null,
+            ipAddress: net.ipAddress,
+            networkScope: net.networkScope,
+            locationName: net.locationName,
+            lastUsedAt: new Date(),
+            lastUsedUser: user.fullName,
+            lastUsedBrowser: browserInfo || req.headers['user-agent'] || 'Web Browser',
+          },
+        });
+      } else {
+        device = await prisma.parishAuthorizedDevice.update({
+          where: { id: device.id },
+          data: {
+            registeredUserId: user.id,
+            registeredByName: user.fullName,
+            registeredByEmail: user.email,
+            registeredByRole: user.role,
+            lastUsedAt: new Date(),
+            lastUsedUser: user.fullName,
+            lastUsedBrowser: browserInfo || req.headers['user-agent'] || 'Web Browser',
+            ipAddress: net.ipAddress,
+            networkScope: net.networkScope,
+            locationName: net.locationName,
+          },
+        });
+      }
+
+      await logSystemActivity({
+        parishId: activeParishId,
+        userId: user.id,
+        userName: user.fullName,
+        userRole: user.role,
+        actionType: 'TERMINAL_CHANGE',
+        category: 'SECURITY',
+        description: `Terminal authorization request submitted for ${user.fullName} (${user.role}) on "${device.deviceName}".`,
+        req,
+      });
+
+      return res.status(403).json({
+        needsDeviceApproval: true,
+        deviceId: device.id,
+        deviceName: device.deviceName,
+        userName: user.fullName,
+        userRole: user.role,
+        userEmail: user.email,
+        requestedAt: device.createdAt,
+        networkScope: net.networkScope,
+        locationName: net.locationName,
+        ipAddress: net.ipAddress,
+        message: 'This workstation requires pastoral authorization. An enrollment request has been submitted to the Parish Priest with your credentials verified.',
+      });
+    }
+
+    // 4. Approved Workstation: Grant Session Token
+    await prisma.parishAuthorizedDevice.update({
+      where: { id: device.id },
+      data: {
+        lastUsedAt: new Date(),
+        lastUsedUser: user.fullName,
+        lastUsedBrowser: browserInfo || req.headers['user-agent'] || 'Web Browser',
+        ipAddress: net.ipAddress,
+        networkScope: net.networkScope,
+        locationName: net.locationName,
+      },
+    });
+
     const payload: AuthenticatedUser = {
       userId: user.id,
       email: user.email,
@@ -71,40 +274,15 @@ authRouter.post('/login', async (req: Request, res: Response) => {
 
     const token = jwt.sign(payload, getJwtSecret(), { expiresIn: JWT_EXPIRES_IN });
 
-    // Resolve authorized terminal metadata if deviceToken was supplied
-    let terminalName = '';
-    if (deviceToken && user.parishId) {
-      try {
-        const tokenHash = hashDeviceSecret(deviceToken);
-        const dev = await prisma.parishAuthorizedDevice.findFirst({
-          where: { parishId: user.parishId, deviceTokenHash: tokenHash, status: 'APPROVED' },
-        });
-        if (dev) {
-          terminalName = dev.deviceName;
-          await prisma.parishAuthorizedDevice.update({
-            where: { id: dev.id },
-            data: {
-              lastUsedAt: new Date(),
-              lastUsedUser: user.fullName,
-              lastUsedBrowser: browserInfo || req.headers['user-agent'] || 'Web Browser',
-            },
-          });
-        }
-      } catch (err) {
-        console.error('Failed to resolve terminal metadata:', err);
-      }
-    }
-
     // Record successful login in system activity log
-    const terminalDesc = terminalName ? ` from "${terminalName}" (${browserInfo || 'Browser'})` : '';
     await logSystemActivity({
-      parishId: user.parishId || 1,
+      parishId: activeParishId,
       userId: user.id,
       userName: user.fullName,
       userRole: user.role,
       actionType: 'LOGIN',
       category: 'AUTH',
-      description: `User "${user.fullName}" (${user.role}) logged in successfully${terminalDesc}.`,
+      description: `User "${user.fullName}" (${user.role}) logged in successfully from authorized workstation "${device.deviceName}" (${browserInfo || 'Browser'}).`,
       req,
     });
 
