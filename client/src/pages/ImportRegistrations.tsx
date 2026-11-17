@@ -340,7 +340,7 @@ export const ImportRegistrationsPage: React.FC = () => {
               {isParsing ? 'Processing CSV File...' : 'Drop your CSV registration file here'}
             </h3>
             <p className="text-xs text-parish-text-muted mt-1 max-w-md">
-              Drag and drop your exported website registrations file, or click to browse. Supports both standard template format and direct web form exports.
+              Drag and drop your exported website registrations file, or click to browse.
             </p>
           </div>
 
@@ -469,15 +469,14 @@ export const ImportRegistrationsPage: React.FC = () => {
                     return (
                       <tr
                         key={rec.tempId}
-                        className={`transition-colors ${
-                          isProcessed
+                        className={`transition-colors ${isProcessed
                             ? 'bg-emerald-50/40 hover:bg-emerald-50/70'
                             : rec.status === 'ERROR'
-                            ? 'bg-red-50/30 hover:bg-red-50/50'
-                            : rec.status === 'WARNING'
-                            ? 'bg-amber-50/20 hover:bg-amber-50/40'
-                            : 'hover:bg-parish-surface-subtle/60'
-                        }`}
+                              ? 'bg-red-50/30 hover:bg-red-50/50'
+                              : rec.status === 'WARNING'
+                                ? 'bg-amber-50/20 hover:bg-amber-50/40'
+                                : 'hover:bg-parish-surface-subtle/60'
+                          }`}
                       >
                         {/* Row Index */}
                         <td className="py-3.5 px-4 text-center font-mono text-[11px] text-parish-text-muted font-semibold">
