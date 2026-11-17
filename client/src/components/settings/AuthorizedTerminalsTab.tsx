@@ -596,7 +596,7 @@ export const AuthorizedTerminalsTab: React.FC = () => {
       <div className="p-4 rounded-xl bg-parish-surface-subtle border border-parish-border text-xs text-parish-text-muted flex items-start gap-3">
         <Info className="w-4 h-4 text-parish-primary shrink-0 mt-0.5" />
         <div className="leading-relaxed">
-          <strong>How Terminal Security Works:</strong> When an office desktop, laptop, or mobile device accesses this portal for the first time, it registers a cryptographic hardware token with the parish. Once approved by an Authorized Administrator, the machine is authorized for all staff members who have valid user accounts. Revoking a terminal blocks all access from that physical machine across Google Chrome, Microsoft Edge, and all other browsers immediately.
+          <strong>Device Authorization:</strong> New computers and mobile devices require Administrator approval before anyone can sign in. Revoking a device immediately blocks all access from that machine.
         </div>
       </div>
 
