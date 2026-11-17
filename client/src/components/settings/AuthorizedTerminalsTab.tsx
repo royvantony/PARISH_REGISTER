@@ -186,9 +186,26 @@ export const AuthorizedTerminalsTab: React.FC = () => {
     }
   };
 
-  const pendingDevices = devices.filter((d) => d.status === 'PENDING');
-  const approvedDevices = devices.filter((d) => d.status === 'APPROVED');
+  const pendingDevices = devices.filter((d) => d.status === 'PENDING' || d.reviewStatus === 'REAUTHORIZE_PENDING');
+  const approvedDevices = devices.filter((d) => d.status === 'APPROVED' && d.reviewStatus !== 'REAUTHORIZE_PENDING');
   const revokedDevices = devices.filter((d) => d.status === 'REVOKED');
+
+  const handleDismissReauth = async (deviceId: number, name: string) => {
+    setActionInProgressId(deviceId);
+    setFeedback(null);
+    try {
+      const res = await api.post(`/devices/${deviceId}/decline-reauth`);
+      setFeedback({ message: res.data.message || `Re-authorization request for "${name}" dismissed.`, type: 'success' });
+      await fetchDevices();
+    } catch (err: any) {
+      setFeedback({
+        message: err.response?.data?.error || `Failed to dismiss re-authorization for "${name}".`,
+        type: 'error',
+      });
+    } finally {
+      setActionInProgressId(null);
+    }
+  };
 
   const getDeviceIcon = (fingerprint?: string | null) => {
     const fp = (fingerprint || '').toLowerCase();
@@ -323,7 +340,11 @@ export const AuthorizedTerminalsTab: React.FC = () => {
                   <div className="space-y-2 w-full">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-extrabold text-sm text-parish-text">{d.deviceName}</span>
-                      <Badge variant="warning" size="sm">Pending Administrator Approval</Badge>
+                      {d.reviewStatus === 'REAUTHORIZE_PENDING' ? (
+                        <Badge variant="warning" size="sm">🔄 Key Lost — Re-Authorization Requested</Badge>
+                      ) : (
+                        <Badge variant="warning" size="sm">Pending Administrator Approval</Badge>
+                      )}
 
                       {/* Network & Location Badge */}
                       {d.networkScope === 'REMOTE_WAN' ? (
@@ -338,6 +359,16 @@ export const AuthorizedTerminalsTab: React.FC = () => {
                         </span>
                       )}
                     </div>
+
+                    {/* Explanatory banner if key lost (browser cleaned or new browser) */}
+                    {d.reviewStatus === 'REAUTHORIZE_PENDING' && (
+                      <div className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-900 dark:text-amber-200">
+                        <RotateCcw className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>
+                          Local security key was cleared on this device (e.g. browser cache cleaned or alternate browser opened). Physical hardware matches this authorized computer. Click <strong>Re-Authorize Workstation</strong> to issue a new key.
+                        </span>
+                      </div>
+                    )}
 
                     {/* Prominent User Identity Request Banner */}
                     <div className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-100/70 dark:bg-amber-950/40 border border-amber-300/80 text-xs flex-wrap">
@@ -407,12 +438,18 @@ export const AuthorizedTerminalsTab: React.FC = () => {
                     isLoading={actionInProgressId === d.id}
                     icon={<CheckCircle2 className="w-3.5 h-3.5" />}
                   >
-                    Approve Terminal
+                    {d.reviewStatus === 'REAUTHORIZE_PENDING' ? 'Re-Authorize Workstation' : 'Approve Terminal'}
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => requestReject(d.id, d.deviceName)}
+                    onClick={() => {
+                      if (d.reviewStatus === 'REAUTHORIZE_PENDING') {
+                        handleDismissReauth(d.id, d.deviceName);
+                      } else {
+                        requestReject(d.id, d.deviceName);
+                      }
+                    }}
                     disabled={actionInProgressId === d.id}
                     className="text-rose-600 hover:text-rose-700 hover:border-rose-300"
                   >

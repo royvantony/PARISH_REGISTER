@@ -83,10 +83,11 @@ devicesRouter.post('/verify', async (req: Request, res: Response) => {
 
     const net = resolveNetworkInfo(req);
     let device = null;
+    let tokenHash: string | null = null;
 
     // 1. Try finding by device token in storage
     if (deviceToken && typeof deviceToken === 'string') {
-      const tokenHash = hashDeviceSecret(deviceToken);
+      tokenHash = hashDeviceSecret(deviceToken);
       device = await prisma.parishAuthorizedDevice.findFirst({
         where: {
           parishId: pid,
@@ -98,46 +99,23 @@ devicesRouter.post('/verify', async (req: Request, res: Response) => {
       });
     }
 
-    // 2. If no token match (e.g. Safari Private Browsing or Cache Cleared),
-    // match by physical hardware signature for this parish
-    if (!device && hardwareHash && typeof hardwareHash === 'string') {
-      device = await prisma.parishAuthorizedDevice.findFirst({
-        where: {
-          parishId: pid,
-          hardwareHash: hardwareHash,
-          status: 'APPROVED',
-        },
-        include: {
-          parish: { select: { parishName: true, parishCode: true } },
-        },
-      });
-    }
+    // 2. If token matched an approved workstation:
+    if (device && device.status === 'APPROVED') {
+      // Check if re-authorization was pending on this device
+      if (device.reviewStatus === 'REAUTHORIZE_PENDING') {
+        return res.json({
+          status: 'REAUTHORIZE_PENDING',
+          deviceId: device.id,
+          deviceName: device.deviceName,
+          parishName: device.parish.parishName,
+          isReauthorizing: true,
+          networkScope: net.networkScope,
+          locationName: net.locationName,
+          requestedAt: device.reviewRequestedAt || device.createdAt,
+        });
+      }
 
-    // 3. Fallback: match by physical GPU + CPU Cores + Timezone
-    if (!device && telemetry?.gpuRenderer && telemetry?.cpuCores && telemetry.gpuRenderer !== 'Standard Display Adapter') {
-      device = await prisma.parishAuthorizedDevice.findFirst({
-        where: {
-          parishId: pid,
-          gpuRenderer: telemetry.gpuRenderer,
-          cpuCores: telemetry.cpuCores,
-          timezone: telemetry.timezone || undefined,
-          status: 'APPROVED',
-        },
-        include: {
-          parish: { select: { parishName: true, parishCode: true } },
-        },
-      });
-    }
-
-    if (!device) {
-      return res.json({
-        status: 'UNREGISTERED',
-        isFirstDeviceSetup: approvedCount === 0,
-      });
-    }
-
-    if (device.status === 'APPROVED') {
-      // Update last active metadata and backfill hardware telemetry
+      // Normal approved workstation daily use:
       await prisma.parishAuthorizedDevice.update({
         where: { id: device.id },
         data: {
@@ -163,7 +141,7 @@ devicesRouter.post('/verify', async (req: Request, res: Response) => {
       });
     }
 
-    if (device.status === 'REVOKED') {
+    if (device && device.status === 'REVOKED') {
       return res.json({
         status: 'REVOKED',
         deviceId: device.id,
@@ -173,12 +151,98 @@ devicesRouter.post('/verify', async (req: Request, res: Response) => {
       });
     }
 
-    // Default: PENDING
+    if (device && device.status === 'PENDING') {
+      return res.json({
+        status: 'PENDING',
+        deviceId: device.id,
+        deviceName: device.deviceName,
+        requestedAt: device.createdAt,
+      });
+    }
+
+    // 3. Token did NOT match: Check if physical hardware matches an existing machine (Smart Re-Authorization)
+    let matchedHardware = null;
+    if (hardwareHash && typeof hardwareHash === 'string') {
+      matchedHardware = await prisma.parishAuthorizedDevice.findFirst({
+        where: {
+          parishId: pid,
+          hardwareHash: hardwareHash,
+        },
+        include: {
+          parish: { select: { parishName: true, parishCode: true } },
+        },
+      });
+    }
+
+    if (!matchedHardware && telemetry?.gpuRenderer && telemetry?.cpuCores && telemetry.gpuRenderer !== 'Standard Display Adapter') {
+      matchedHardware = await prisma.parishAuthorizedDevice.findFirst({
+        where: {
+          parishId: pid,
+          gpuRenderer: telemetry.gpuRenderer,
+          cpuCores: telemetry.cpuCores,
+          timezone: telemetry.timezone || undefined,
+        },
+        include: {
+          parish: { select: { parishName: true, parishCode: true } },
+        },
+      });
+    }
+
+    // If physical hardware belongs to a REVOKED machine: NEVER auto-heal or re-authorize! Hard block!
+    if (matchedHardware && matchedHardware.status === 'REVOKED') {
+      return res.json({
+        status: 'REVOKED',
+        deviceId: matchedHardware.id,
+        deviceName: matchedHardware.deviceName,
+        revokedAt: matchedHardware.revokedAt,
+        revokedBy: matchedHardware.revokedBy,
+      });
+    }
+
+    // If physical hardware matches an APPROVED machine whose local key was cleared: Trigger Re-Authorization!
+    if (matchedHardware && matchedHardware.status === 'APPROVED') {
+      const candidateTokenHash = tokenHash;
+      if (candidateTokenHash && (matchedHardware.reviewStatus !== 'REAUTHORIZE_PENDING' || matchedHardware.reviewReason !== candidateTokenHash)) {
+        await prisma.parishAuthorizedDevice.update({
+          where: { id: matchedHardware.id },
+          data: {
+            reviewStatus: 'REAUTHORIZE_PENDING',
+            reviewReason: candidateTokenHash,
+            reviewRequestedAt: new Date(),
+            lastUsedBrowser: browserInfo || req.headers['user-agent'] || 'Web Browser',
+            ipAddress: net.ipAddress,
+            networkScope: net.networkScope,
+            locationName: net.locationName,
+          },
+        });
+        realtimeHub.emitTerminalListChanged(pid);
+      }
+
+      return res.json({
+        status: 'REAUTHORIZE_PENDING',
+        deviceId: matchedHardware.id,
+        deviceName: matchedHardware.deviceName,
+        parishName: matchedHardware.parish.parishName,
+        isReauthorizing: true,
+        networkScope: net.networkScope,
+        locationName: net.locationName,
+        requestedAt: matchedHardware.reviewRequestedAt || new Date().toISOString(),
+      });
+    }
+
+    if (matchedHardware && matchedHardware.status === 'PENDING') {
+      return res.json({
+        status: 'PENDING',
+        deviceId: matchedHardware.id,
+        deviceName: matchedHardware.deviceName,
+        requestedAt: matchedHardware.createdAt,
+      });
+    }
+
+    // 4. Completely unregistered hardware:
     return res.json({
-      status: 'PENDING',
-      deviceId: device.id,
-      deviceName: device.deviceName,
-      requestedAt: device.createdAt,
+      status: 'UNREGISTERED',
+      isFirstDeviceSetup: approvedCount === 0,
     });
   } catch (err: any) {
     console.error('Device verify error:', err);
@@ -236,6 +300,40 @@ devicesRouter.post('/register', async (req: Request, res: Response) => {
     });
 
     if (existing) {
+      if (existing.status === 'REVOKED') {
+        return res.json({
+          success: false,
+          status: 'REVOKED',
+          deviceId: existing.id,
+          deviceName: existing.deviceName,
+          message: 'This workstation was revoked by parish administration.',
+        });
+      }
+
+      if (existing.status === 'APPROVED' && existing.deviceTokenHash !== tokenHash) {
+        await prisma.parishAuthorizedDevice.update({
+          where: { id: existing.id },
+          data: {
+            reviewStatus: 'REAUTHORIZE_PENDING',
+            reviewReason: tokenHash,
+            reviewRequestedAt: new Date(),
+            lastUsedBrowser: browserInfo || req.headers['user-agent'] || 'Web Browser',
+            ipAddress: net.ipAddress,
+            networkScope: net.networkScope,
+            locationName: net.locationName,
+          },
+        });
+        realtimeHub.emitTerminalListChanged(pid);
+        return res.json({
+          success: true,
+          status: 'REAUTHORIZE_PENDING',
+          deviceId: existing.id,
+          deviceName: existing.deviceName,
+          isReauthorizing: true,
+          message: 'Workstation re-authorization requested.',
+        });
+      }
+
       return res.json({
         success: true,
         status: existing.status,
@@ -680,6 +778,9 @@ devicesRouter.post('/:id/approve', authenticateJWT, async (req: Request, res: Re
       where: { id: deviceId },
       data: {
         status: 'APPROVED',
+        ...(device.reviewStatus === 'REAUTHORIZE_PENDING' && device.reviewReason
+          ? { deviceTokenHash: device.reviewReason }
+          : {}),
         approvedAt: new Date(),
         approvedBy: req.user.fullName || 'Parish Administration',
         revokedAt: null,
@@ -714,6 +815,50 @@ devicesRouter.post('/:id/approve', authenticateJWT, async (req: Request, res: Re
   } catch (err: any) {
     console.error('Approve device error:', err);
     return res.status(500).json({ error: 'Failed to approve terminal.' });
+  }
+});
+
+// POST /api/devices/:id/decline-reauth - Dismiss re-authorization request without deleting device (Protected)
+devicesRouter.post('/:id/decline-reauth', authenticateJWT, async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const deviceId = Number(req.params.id);
+    const parishId = req.activeParishId || req.user.parishId;
+
+    if (!parishId) {
+      return res.status(400).json({ error: 'No active parish selected.' });
+    }
+
+    const device = await prisma.parishAuthorizedDevice.findUnique({
+      where: { id: deviceId },
+    });
+
+    if (!device || device.parishId !== parishId) {
+      return res.status(404).json({ error: 'Terminal record not found.' });
+    }
+
+    const updated = await prisma.parishAuthorizedDevice.update({
+      where: { id: deviceId },
+      data: {
+        reviewStatus: null,
+        reviewReason: null,
+        reviewRequestedAt: null,
+        reviewRequestedBy: null,
+      },
+    });
+
+    realtimeHub.emitTerminalListChanged(parishId);
+
+    return res.json({
+      success: true,
+      message: `Re-authorization request for "${device.deviceName}" has been dismissed.`,
+      device: updated,
+    });
+  } catch (err: any) {
+    console.error('Decline reauth error:', err);
+    return res.status(500).json({ error: 'Failed to dismiss re-authorization.' });
   }
 });
 

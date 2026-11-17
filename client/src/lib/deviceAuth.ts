@@ -3,7 +3,7 @@ import { api } from './api';
 const DEVICE_STORAGE_PREFIX = 'parish_terminal_sec_';
 
 export interface DeviceVerifyResult {
-  status: 'APPROVED' | 'PENDING' | 'REVOKED' | 'UNREGISTERED';
+  status: 'APPROVED' | 'PENDING' | 'REVOKED' | 'UNREGISTERED' | 'REAUTHORIZE_PENDING';
   deviceId?: number;
   deviceName?: string;
   parishName?: string;
@@ -11,6 +11,9 @@ export interface DeviceVerifyResult {
   revokedAt?: string;
   revokedBy?: string;
   isFirstDeviceSetup?: boolean;
+  isReauthorizing?: boolean;
+  networkScope?: string;
+  locationName?: string;
 }
 
 /**
@@ -201,7 +204,7 @@ export function collectHardwareTelemetry(): HardwareTelemetry {
  * Seamlessly matches approved terminals by hardware signature even in Safari Private Browsing.
  */
 export async function verifyTerminalAuthorization(parishId: number): Promise<DeviceVerifyResult> {
-  const deviceToken = getStoredDeviceSecret(parishId);
+  const deviceToken = ensureDeviceSecret(parishId);
   const telemetry = collectHardwareTelemetry();
 
   try {

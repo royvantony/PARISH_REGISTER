@@ -122,6 +122,17 @@ export const LoginPage: React.FC = () => {
         setTerminalStatus('APPROVED');
       } else if (res.status === 'REVOKED') {
         setTerminalStatus('REVOKED');
+      } else if (res.status === 'REAUTHORIZE_PENDING') {
+        setTerminalStatus('PENDING');
+        setPendingApprovalData({
+          deviceId: res.deviceId || 0,
+          deviceName: res.deviceName || 'Workstation',
+          parishId: 1,
+          isFirstDeviceSetup: false,
+          isReauthorizing: true,
+          networkScope: res.networkScope,
+          locationName: res.locationName,
+        });
       } else {
         setTerminalStatus('IDLE');
       }
@@ -555,14 +566,28 @@ export const LoginPage: React.FC = () => {
             <div className="space-y-1.5">
               <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 text-[11px] font-bold">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-ping" />
-                <span>{pendingApprovalData?.isBootstrap ? 'Initial Setup Required' : 'Workstation Approval Pending'}</span>
+                <span>
+                  {pendingApprovalData?.isBootstrap
+                    ? 'Initial Setup Required'
+                    : pendingApprovalData?.isReauthorizing
+                    ? 'Workstation Re-Authorization Required'
+                    : 'Workstation Approval Pending'}
+                </span>
               </div>
               <h2 className="text-xl font-extrabold text-parish-text">
-                {pendingApprovalData?.isBootstrap ? 'Initial Workstation Setup' : 'Awaiting Administrator Authorization'}
+                {pendingApprovalData?.isBootstrap
+                  ? 'Initial Workstation Setup'
+                  : pendingApprovalData?.isReauthorizing
+                  ? 'Recognized Workstation — Re-Authorization Required'
+                  : 'Awaiting Administrator Authorization'}
               </h2>
               <p className="text-xs text-parish-text-muted max-w-sm mx-auto leading-relaxed">
                 {pendingApprovalData?.isBootstrap ? (
                   <>No authorized workstations exist for this parish yet. To register this machine as the initial primary terminal, verify your administrator email.</>
+                ) : pendingApprovalData?.isReauthorizing ? (
+                  <>
+                    Physical hardware matches authorized workstation <strong className="text-parish-text">"{pendingApprovalData?.deviceName || terminalData?.deviceName || 'Workstation'}"</strong>. The browser security key was cleared or changed. Awaiting administrator re-approval to issue a new key.
+                  </>
                 ) : (
                   <>Welcome, <strong className="text-parish-text">{pendingApprovalData?.userName || 'Parish Staff'}</strong>. Your credentials are valid. This computer is awaiting approval from an authorized administrator.</>
                 )}
@@ -570,17 +595,19 @@ export const LoginPage: React.FC = () => {
             </div>
 
             <div className="p-3.5 rounded-xl bg-parish-surface-subtle border border-parish-border text-left text-xs space-y-2">
-              <div className="flex justify-between items-center pb-2 border-b border-parish-border/60">
-                <span className="text-parish-text-muted font-medium">User:</span>
-                <span className="font-bold text-parish-text flex items-center gap-1.5">
-                  <span>{pendingApprovalData?.userName || email}</span>
-                  {pendingApprovalData?.userRole && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 font-bold">
-                      {pendingApprovalData.userRole}
-                    </span>
-                  )}
-                </span>
-              </div>
+              {(pendingApprovalData?.userName || email) && !pendingApprovalData?.isReauthorizing && (
+                <div className="flex justify-between items-center pb-2 border-b border-parish-border/60">
+                  <span className="text-parish-text-muted font-medium">User:</span>
+                  <span className="font-bold text-parish-text flex items-center gap-1.5">
+                    <span>{pendingApprovalData?.userName || email}</span>
+                    {pendingApprovalData?.userRole && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 font-bold">
+                        {pendingApprovalData.userRole}
+                      </span>
+                    )}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between items-center">
                 <span className="text-parish-text-muted font-medium">Terminal Name:</span>
                 <span className="font-bold text-parish-text">{pendingApprovalData?.deviceName || terminalData?.deviceName || 'Workstation'}</span>

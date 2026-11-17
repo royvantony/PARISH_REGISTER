@@ -126,6 +126,46 @@ authRouter.post('/login', async (req: Request, res: Response) => {
       });
     }
 
+    // 2. Re-Authorization Check: If physical hardware matched, but tokenHash is different or reviewStatus is REAUTHORIZE_PENDING
+    if (device && (device.deviceTokenHash !== tokenHash || device.reviewStatus === 'REAUTHORIZE_PENDING')) {
+      if (tokenHash && (device.reviewStatus !== 'REAUTHORIZE_PENDING' || device.reviewReason !== tokenHash)) {
+        await prisma.parishAuthorizedDevice.update({
+          where: { id: device.id },
+          data: {
+            reviewStatus: 'REAUTHORIZE_PENDING',
+            reviewReason: tokenHash || device.reviewReason,
+            reviewRequestedAt: new Date(),
+            registeredUserId: user.id,
+            registeredByName: user.fullName,
+            registeredByEmail: user.email,
+            registeredByRole: user.role,
+            lastUsedUser: user.fullName,
+            lastUsedBrowser: browserInfo || req.headers['user-agent'] || 'Web Browser',
+            ipAddress: net.ipAddress,
+            networkScope: net.networkScope,
+            locationName: net.locationName,
+          },
+        });
+        realtimeHub.emitTerminalListChanged(activeParishId);
+      }
+
+      return res.status(403).json({
+        needsDeviceApproval: true,
+        isReauthorizing: true,
+        parishId: activeParishId,
+        deviceId: device.id,
+        deviceName: device.deviceName,
+        userName: user.fullName,
+        userRole: user.role,
+        userEmail: user.email,
+        requestedAt: device.reviewRequestedAt || device.createdAt,
+        networkScope: net.networkScope,
+        locationName: net.locationName,
+        ipAddress: net.ipAddress,
+        message: `Workstation Re-Authorization Required: Local security key was cleared on "${device.deviceName}". Awaiting administrator re-approval.`,
+      });
+    }
+
     // 3. Unapproved Device: Needs Administrator Approval!
     if (!device || device.status !== 'APPROVED') {
       const autoDeviceName = (deviceName || '').trim() || `${user.fullName}'s ${telemetry?.platformSummary || 'Workstation'}`;
