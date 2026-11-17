@@ -167,8 +167,10 @@ export const UsersPage: React.FC = () => {
       setActiveTab('users');
     } else if (activeTab === 'overrides' && !isFeatureEnabled('USERS_TAB_OVERRIDES')) {
       setActiveTab('users');
+    } else if (activeTab === 'sessions' && (!isFeatureEnabled('USERS_TAB_SESSIONS') || !hasPermission('USERS', 'canView'))) {
+      setActiveTab('users');
     }
-  }, [activeTab, isFeatureEnabled]);
+  }, [activeTab, isFeatureEnabled, hasPermission]);
 
   // Evaluates whether a functional module is permitted for the active parish by Developer Controls
   const isModuleAllowedByDeveloper = useCallback(
@@ -1020,19 +1022,21 @@ export const UsersPage: React.FC = () => {
           </button>
         )}
 
-        <button
-          onClick={() => setActiveTab('sessions')}
-          className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'sessions'
-            ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
-            : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
-            }`}
-        >
-          <Radio className="w-4 h-4 text-emerald-500 animate-pulse" />
-          <span>Active Sessions</span>
-          <span className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded-full font-mono font-bold">
-            {activeSessions.length} Online
-          </span>
-        </button>
+        {isFeatureEnabled('USERS_TAB_SESSIONS') && hasPermission('USERS', 'canView') && (
+          <button
+            onClick={() => setActiveTab('sessions')}
+            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'sessions'
+              ? 'bg-white dark:bg-slate-800 text-parish-primary shadow-xs border border-parish-border/70'
+              : 'text-parish-text-muted hover:text-parish-text hover:bg-white/60'
+              }`}
+          >
+            <Radio className="w-4 h-4 text-emerald-500 animate-pulse" />
+            <span>Active Sessions</span>
+            <span className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded-full font-mono font-bold">
+              {activeSessions.length} Online
+            </span>
+          </button>
+        )}
       </div>
 
       {/* ========================================================================= */}
@@ -1915,7 +1919,7 @@ export const UsersPage: React.FC = () => {
       {/* ========================================================================= */}
       {/* TAB 4: REAL-TIME ACTIVE SESSIONS                                          */}
       {/* ========================================================================= */}
-      {activeTab === 'sessions' && (
+      {activeTab === 'sessions' && isFeatureEnabled('USERS_TAB_SESSIONS') && hasPermission('USERS', 'canView') && (
         <div className="space-y-6">
           {/* Header Card */}
           <div className="card p-6 border border-parish-border/70 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1967,7 +1971,6 @@ export const UsersPage: React.FC = () => {
                   <tr className="border-b border-parish-border bg-parish-surface-subtle/50 text-parish-text-muted font-bold text-[11px] uppercase tracking-wider">
                     <th className="py-3.5 px-4">User</th>
                     <th className="py-3.5 px-4">Role</th>
-                    <th className="py-3.5 px-4">Parish Scope</th>
                     <th className="py-3.5 px-4">Client / Platform</th>
                     <th className="py-3.5 px-4">Connected At</th>
                     <th className="py-3.5 px-4">Status</th>
@@ -1977,7 +1980,7 @@ export const UsersPage: React.FC = () => {
                 <tbody className="divide-y divide-parish-border/60">
                   {activeSessions.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-parish-text-muted">
+                      <td colSpan={6} className="py-12 text-center text-parish-text-muted">
                         <Radio className="w-8 h-8 mx-auto text-parish-text-muted/40 mb-2" />
                         <p className="font-semibold text-sm">No live SSE streams detected</p>
                         <p className="text-xs text-parish-text-muted mt-1">
@@ -2015,12 +2018,6 @@ export const UsersPage: React.FC = () => {
                             </Badge>
                           </td>
 
-                          <td className="py-3 px-4 text-parish-text">
-                            {session.parishName || (
-                              <span className="text-parish-text-muted italic">Global System Access</span>
-                            )}
-                          </td>
-
                           <td className="py-3 px-4">
                             <div className="flex items-center gap-2 text-parish-text">
                               <Laptop className="w-3.5 h-3.5 text-parish-text-muted shrink-0" />
@@ -2042,14 +2039,18 @@ export const UsersPage: React.FC = () => {
                           </td>
 
                           <td className="py-3 px-4 text-right">
-                            <button
-                              type="button"
-                              onClick={() => setKillingSession(session)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/40 dark:text-red-400 dark:hover:bg-red-900/50 transition-colors border border-red-200 dark:border-red-800 cursor-pointer shadow-xs"
-                            >
-                              <Power className="w-3 h-3" />
-                              <span>Kill Session</span>
-                            </button>
+                            {canEditUsers ? (
+                              <button
+                                type="button"
+                                onClick={() => setKillingSession(session)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/40 dark:text-red-400 dark:hover:bg-red-900/50 transition-colors border border-red-200 dark:border-red-800 cursor-pointer shadow-xs"
+                              >
+                                <Power className="w-3 h-3" />
+                                <span>Kill Session</span>
+                              </button>
+                            ) : (
+                              <span className="text-parish-text-muted text-[11px] italic">Read-only</span>
+                            )}
                           </td>
                         </tr>
                       );

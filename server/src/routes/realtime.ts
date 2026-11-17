@@ -4,6 +4,7 @@ import { authenticateJWT, optionalAuth } from '../middleware/auth.js';
 import { UserRole } from '@prisma/client';
 import { checkUserPermission } from './permissions.js';
 import { logSystemActivity } from '../lib/activityLogger.js';
+import { isFeatureEnabled } from './features.js';
 
 export const realtimeRouter = Router();
 
@@ -78,22 +79,27 @@ realtimeRouter.get('/sessions', authenticateJWT, async (req: Request, res: Respo
     const user = req.user;
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
+    const targetParishId = req.activeParishId || user.parishId || 1;
+
+    // Developer Controls Guard: Feature toggle check
+    const isFeatureActive = await isFeatureEnabled('USERS_TAB_SESSIONS', targetParishId);
+    if (!isFeatureActive && user.role !== UserRole.SUPER_ADMIN) {
+      return res.status(403).json({ error: 'Active Sessions telemetry is currently disabled in Developer Controls.' });
+    }
+
     const isAuthorized =
       user.role === UserRole.SUPER_ADMIN ||
       user.role === UserRole.DIOCESAN_ADMIN ||
       user.role === UserRole.PARISH_PRIEST ||
       user.role === UserRole.PARISH_ADMIN ||
-      (await checkUserPermission(user.userId, user.role, req.activeParishId || 1, 'USERS', 'canView'));
+      (await checkUserPermission(user.userId, user.role, targetParishId, 'USERS', 'canView'));
 
     if (!isAuthorized) {
       return res.status(403).json({ error: 'Access denied: Requires administrator privileges.' });
     }
 
-    const parishScope = (user.role === UserRole.SUPER_ADMIN || user.role === UserRole.DIOCESAN_ADMIN)
-      ? null
-      : (req.activeParishId || user.parishId || 1);
-
-    const sessions = realtimeHub.getActiveSessions(parishScope);
+    // Strictly parish-wise telemetry
+    const sessions = realtimeHub.getActiveSessions(targetParishId);
     return res.json({ sessions });
   } catch (err: any) {
     console.error('Error fetching realtime sessions:', err);
@@ -107,12 +113,20 @@ realtimeRouter.post('/sessions/:sessionId/kill', authenticateJWT, async (req: Re
     const user = req.user;
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
+    const targetParishId = req.activeParishId || user.parishId || 1;
+
+    // Developer Controls Guard: Feature toggle check
+    const isFeatureActive = await isFeatureEnabled('USERS_TAB_SESSIONS', targetParishId);
+    if (!isFeatureActive && user.role !== UserRole.SUPER_ADMIN) {
+      return res.status(403).json({ error: 'Active Sessions telemetry is currently disabled in Developer Controls.' });
+    }
+
     const isAuthorized =
       user.role === UserRole.SUPER_ADMIN ||
       user.role === UserRole.DIOCESAN_ADMIN ||
       user.role === UserRole.PARISH_PRIEST ||
       user.role === UserRole.PARISH_ADMIN ||
-      (await checkUserPermission(user.userId, user.role, req.activeParishId || 1, 'USERS', 'canEdit'));
+      (await checkUserPermission(user.userId, user.role, targetParishId, 'USERS', 'canEdit'));
 
     if (!isAuthorized) {
       return res.status(403).json({ error: 'Access denied: Requires administrator privileges.' });

@@ -233,6 +233,13 @@ export const SYSTEM_FEATURES: FeatureDefinition[] = [
     description: 'Fine-grained permission overrides per individual user',
     defaultEnabled: false,
   },
+  {
+    key: 'USERS_TAB_SESSIONS',
+    name: 'Active Sessions Telemetry Tab',
+    category: 'USERS',
+    description: 'Live real-time workstation session monitoring and remote session termination',
+    defaultEnabled: true,
+  },
 
   // 5. Parish Register Sub-Features
   {
